@@ -1,4 +1,4 @@
-package main
+package dkafka
 
 import (
 	"context"
@@ -13,10 +13,15 @@ import (
 	"github.com/dfuse-io/dfuse-eosio/filtering"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 	pbbstream "github.com/dfuse-io/pbgo/dfuse/bstream/v1"
+	pbhealth "github.com/dfuse-io/pbgo/grpc/health/v1"
+	"golang.org/x/oauth2"
+
+	"github.com/dfuse-io/shutter"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/google/cel-go/cel"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/oauth"
 
 	"log"
 
@@ -26,17 +31,59 @@ import (
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 )
 
-//var grpcEndpoint = "blocks.mainnet.eos.dfuse.io:443"
-var grpcEndpoint = "localhost:13035"
-var dfuseToken = "disabled"
-var topic = "quickstart-events"
-var kafkaEndpoints = []string{"127.0.0.1:9092"}
-var eventSource = "dfuse.chain.tests"
+type Config struct {
+	DfuseGRPCEndpoint string
+	DfuseToken        string
+	IncludeFilterExpr string
 
-var eventKeyExpr = "auth.filter(a, a.contains('@'))"
-var eventTypeExpr = "(notif?'!':'')+account+'/'+action" // account::action or   'notify'::account::action
-var startBlockNum = int64(16)
-var stopBlockNum = uint64(18)
+	KafkaEndpoints         []string
+	KafkaSSLEnable         bool
+	KafkaSSLCAFile         string
+	KafkaSSLInsecure       bool
+	KafkaSSLAuth           bool
+	KafkaSSLClientCertFile string
+	KafkaSSLClientKeyFile  string
+	KafkaTopic             string
+
+	EventSource     string
+	EventKeysExpr   string
+	EventTypeExpr   string
+	EventExtensions map[string]string
+
+	BatchMode     bool
+	StartBlockNum int64
+	StopBlockNum  uint64
+	StateFile     string
+}
+
+type App struct {
+	*shutter.Shutter
+	config         *Config
+	readinessProbe pbhealth.HealthClient
+}
+
+func New(config *Config) *App {
+	return &App{
+		Shutter: shutter.New(),
+		config:  config,
+	}
+}
+
+////var grpcEndpoint = "blocks.mainnet.eos.dfuse.io:443"
+//var grpcEndpoint = "localhost:13035"
+//var dfuseToken = "disabled"
+//var topic = "quickstart-events"
+//var kafkaEndpoints = []string{"127.0.0.1:9092"}
+//var eventSource = "dfuse.chain.tests"
+//
+//var eventKeysExpr = "auth.filter(a, a.contains('@'))"
+//var eventTypeExpr = "(notif?'!':'')+account+'/'+action" // account::action or   'notify'::account::action
+//var startBlockNum = int64(16)
+//var stopBlockNum = uint64(18)
+//var extensions = []*extension{
+//	{"concerned", "has(data.account)?data.account:'blah'", nil},
+//	//	//{"blkstep", "step", nil},
+//}
 
 type extension struct {
 	name string
@@ -44,20 +91,26 @@ type extension struct {
 	prog cel.Program
 }
 
-var extensions = []*extension{
-	{"concerned", "has(data.account)?data.account:'blah'", nil},
-	//{"blkstep", "step", nil},
-}
-
 var irreversibleOnly = false
-
 var includeFilter = "action != 'setabi'"
 
-func main() {
+func (a *App) Run() error {
 	saramaConfig := sarama.NewConfig()
 	saramaConfig.Version = sarama.V2_0_0_0
+	//	tlsConfig, err := NewTLSConfig("bundle/client.cer.pem",
+	//		"bundle/client.key.pem",
+	//		"bundle/server.cer.pem")
+	//	if err != nil {
+	//		log.Fatal(err)
+	//	}
+	//	// This can be used on test server if domain does not match cert:
+	//	tlsConfig.InsecureSkipVerify = true
+	//
+	//	consumerConfig := sarama.NewConfig()
+	//	consumerConfig.Net.TLS.Enable = true
+	//	consumerConfig.Net.TLS.Config = tlsConfig
 
-	sender, err := kafka_sarama.NewSender(kafkaEndpoints, saramaConfig, topic)
+	sender, err := kafka_sarama.NewSender(a.config.KafkaEndpoints, saramaConfig, a.config.KafkaTopic)
 	if err != nil {
 		log.Fatalf("failed to create protocol: %s", err.Error())
 	}
@@ -69,7 +122,7 @@ func main() {
 		log.Fatalf("failed to create client, %v", err)
 	}
 
-	addr := grpcEndpoint
+	addr := a.config.DfuseGRPCEndpoint
 	plaintext := strings.Contains(addr, "*")
 	addr = strings.Replace(addr, "*", "", -1)
 	var dialOptions []grpc.DialOption
@@ -80,8 +133,8 @@ func main() {
 			InsecureSkipVerify: true,
 		})
 		dialOptions = append(dialOptions, grpc.WithTransportCredentials(transportCreds))
-		// credential := oauth.NewOauthAccess(&oauth2.Token{AccessToken: dfuseToken, TokenType: "Bearer"})
-		// dialOptions  = append(dialOptions, grpc.WithPerRPCCredentials(credential))
+		credential := oauth.NewOauthAccess(&oauth2.Token{AccessToken: a.config.DfuseToken, TokenType: "Bearer"})
+		dialOptions = append(dialOptions, grpc.WithPerRPCCredentials(credential))
 		fmt.Println("connecting to conn with", addr, dialOptions)
 	}
 	conn, err := grpc.Dial(addr,
@@ -93,9 +146,12 @@ func main() {
 
 	client := pbbstream.NewBlockStreamV2Client(conn)
 
+	if !a.config.BatchMode {
+		return fmt.Errorf("live mode not implemented")
+	}
 	req := &pbbstream.BlocksRequestV2{
-		StartBlockNum:     startBlockNum,
-		StopBlockNum:      stopBlockNum,
+		StartBlockNum:     a.config.StartBlockNum,
+		StopBlockNum:      a.config.StopBlockNum,
 		ExcludeStartBlock: false,
 		Decoded:           true,
 		HandleForks:       true,
@@ -111,37 +167,38 @@ func main() {
 		panic(err)
 	}
 
-	eventTypeProg, err := exprToCelProgram(eventTypeExpr)
+	eventTypeProg, err := exprToCelProgram(a.config.EventTypeExpr)
 	if err != nil {
-		fmt.Println("error err", err)
-		return
+		return fmt.Errorf("cannot parse event-type-expr: %w", err)
 	}
-	eventKeyProg, err := exprToCelProgram(eventKeyExpr)
+	eventKeyProg, err := exprToCelProgram(a.config.EventKeysExpr)
 	if err != nil {
-		fmt.Println("error err", err)
-		return
+		return fmt.Errorf("cannot parse event-keys-expr: %w", err)
 	}
 
-	for _, ext := range extensions {
-		prog, err := exprToCelProgram(ext.expr)
+	var extensions []*extension
+	for k, v := range a.config.EventExtensions {
+		prog, err := exprToCelProgram(v)
 		if err != nil {
-			fmt.Println("error err", err)
-			return
+			return fmt.Errorf("cannot parse event-extension: %w", err)
 		}
-		ext.prog = prog
+		extensions = append(extensions, &extension{
+			name: k,
+			expr: v,
+			prog: prog,
+		})
+
 	}
 
 	for {
 		msg, err := executor.Recv()
 		if err != nil {
-			fmt.Println("exiting on error", err)
-			return
+			return fmt.Errorf("error on receive: %w", err)
 		}
 
 		blk := &pbcodec.Block{}
 		if err := ptypes.UnmarshalAny(msg.Block, blk); err != nil {
-			fmt.Println(fmt.Errorf("decoding any of type %q: %w", msg.Block.TypeUrl, err))
-			return
+			return fmt.Errorf("decoding any of type %q: %w", msg.Block.TypeUrl, err)
 		}
 
 		step := sanitizeStep(msg.Step.String())
@@ -186,16 +243,14 @@ func main() {
 
 				eventType, err := evalString(eventTypeProg, activation)
 				if err != nil {
-					fmt.Println("error eventtype eval", err)
-					return
+					return fmt.Errorf("error eventtype eval: %w", err)
 				}
 
 				extensionsKV := make(map[string]string)
 				for _, ext := range extensions {
 					val, err := evalString(ext.prog, activation)
 					if err != nil {
-						fmt.Println(fmt.Errorf("program: %w", err))
-						return
+						return fmt.Errorf("program: %w", err)
 					}
 					extensionsKV[ext.name] = val
 
@@ -203,15 +258,14 @@ func main() {
 
 				eventKeys, err := evalStringArray(eventKeyProg, activation)
 				if err != nil {
-					fmt.Println("error eventkeyeval", err)
-					return
+					return fmt.Errorf("event keyeval: %w", err)
 				}
 
 				for _, eventKey := range eventKeys {
 					e := cloudevents.NewEvent()
 					e.SetID(hashString(fmt.Sprintf("%s%s%d%s%s", blk.Id, trx.Id, act.ExecutionIndex, msg.Step.String(), eventKey)))
 					e.SetType(eventType)
-					e.SetSource(eventSource)
+					e.SetSource(a.config.EventSource)
 					for k, v := range extensionsKV {
 						e.SetExtension(k, v)
 					}
