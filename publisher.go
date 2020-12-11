@@ -92,7 +92,6 @@ type extension struct {
 }
 
 var irreversibleOnly = false
-var includeFilter = "action != 'setabi'"
 
 func (a *App) Run() error {
 	saramaConfig := sarama.NewConfig()
@@ -155,7 +154,7 @@ func (a *App) Run() error {
 		ExcludeStartBlock: false,
 		Decoded:           true,
 		HandleForks:       true,
-		IncludeFilterExpr: includeFilter,
+		IncludeFilterExpr: a.config.IncludeFilterExpr,
 	}
 	if irreversibleOnly {
 		req.HandleForksSteps = []pbbstream.ForkStep{pbbstream.ForkStep_STEP_IRREVERSIBLE}
