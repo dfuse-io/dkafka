@@ -249,6 +249,7 @@ func (a *App) Run() error {
 						Receiver:       act.Receiver,
 						Action:         act.Name(),
 						JSONData:       &jsonData,
+						DBOps:          trx.DBOpsForAction(act.ExecutionIndex),
 						Authorization:  auths,
 						GlobalSequence: act.Receipt.GlobalSequence,
 					},
@@ -314,6 +315,7 @@ type ActionInfo struct {
 	Action         string           `json:"action"`
 	GlobalSequence uint64           `json:"global_seq"`
 	Authorization  []string         `json:"authorizations"`
+	DBOps          []*pbcodec.DBOp  `json:"db_ops"`
 	JSONData       *json.RawMessage `json:"json_data"`
 }
 
