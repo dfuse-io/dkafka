@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"reflect"
 	"strings"
 
@@ -222,7 +221,6 @@ func (a *App) Run() error {
 			memoizableTrxTrace := filtering.MemoizableTrxTrace{TrxTrace: trx}
 			for _, act := range trx.ActionTraces {
 				if !act.FilteringMatched {
-					fmt.Println("SKIPPING\n\n")
 					continue
 				}
 				var jsonData json.RawMessage
@@ -276,7 +274,12 @@ func (a *App) Run() error {
 					return fmt.Errorf("event keyeval: %w", err)
 				}
 
+				dedupeMap := make(map[string]bool)
 				for _, eventKey := range eventKeys {
+					if dedupeMap[eventKey] {
+						continue
+					}
+					dedupeMap[eventKey] = true
 					e := cloudevents.NewEvent()
 					e.SetID(hashString(fmt.Sprintf("%s%s%d%s%s", blk.Id, trx.Id, act.ExecutionIndex, msg.Step.String(), eventKey)))
 					e.SetType(eventType)
@@ -294,7 +297,7 @@ func (a *App) Run() error {
 						kafka_sarama.WithMessageKey(ctx, sarama.StringEncoder(eventKey)),
 						e,
 					); cloudevents.IsUndelivered(result) {
-						log.Printf("failed to send: %v", err)
+						zlog.Warn("failed to send", zap.Uint32("blk_number", blk.Number), zap.String("event_id", e.ID()), zap.Error(err))
 					} else {
 						zlog.Debug("sent event", zap.Uint32("blk_number", blk.Number), zap.String("event_id", e.ID()))
 					}
