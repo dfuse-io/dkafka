@@ -7,13 +7,17 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"reflect"
 	"strings"
 
+	"github.com/Shopify/sarama"
 	"github.com/dfuse-io/dfuse-eosio/filtering"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 	pbbstream "github.com/dfuse-io/pbgo/dfuse/bstream/v1"
 	pbhealth "github.com/dfuse-io/pbgo/grpc/health/v1"
+	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 
 	"github.com/dfuse-io/shutter"
@@ -22,10 +26,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/oauth"
-
-	"log"
-
-	"github.com/Shopify/sarama"
 
 	"github.com/cloudevents/sdk-go/protocol/kafka_sarama/v2"
 	cloudevents "github.com/cloudevents/sdk-go/v2"
@@ -36,6 +36,7 @@ type Config struct {
 	DfuseToken        string
 	IncludeFilterExpr string
 
+	DryRun                 bool // do not connect to Kafka, just print to stdout
 	KafkaEndpoints         []string
 	KafkaSSLEnable         bool
 	KafkaSSLCAFile         string
@@ -69,22 +70,6 @@ func New(config *Config) *App {
 	}
 }
 
-////var grpcEndpoint = "blocks.mainnet.eos.dfuse.io:443"
-//var grpcEndpoint = "localhost:13035"
-//var dfuseToken = "disabled"
-//var topic = "quickstart-events"
-//var kafkaEndpoints = []string{"127.0.0.1:9092"}
-//var eventSource = "dfuse.chain.tests"
-//
-//var eventKeysExpr = "auth.filter(a, a.contains('@'))"
-//var eventTypeExpr = "(notif?'!':'')+account+'/'+action" // account::action or   'notify'::account::action
-//var startBlockNum = int64(16)
-//var stopBlockNum = uint64(18)
-//var extensions = []*extension{
-//	{"concerned", "has(data.account)?data.account:'blah'", nil},
-//	//	//{"blkstep", "step", nil},
-//}
-
 type extension struct {
 	name string
 	expr string
@@ -94,31 +79,58 @@ type extension struct {
 var irreversibleOnly = false
 
 func (a *App) Run() error {
-	saramaConfig := sarama.NewConfig()
-	saramaConfig.Version = sarama.V2_0_0_0
-	//	tlsConfig, err := NewTLSConfig("bundle/client.cer.pem",
-	//		"bundle/client.key.pem",
-	//		"bundle/server.cer.pem")
-	//	if err != nil {
-	//		log.Fatal(err)
-	//	}
-	//	// This can be used on test server if domain does not match cert:
-	//	tlsConfig.InsecureSkipVerify = true
-	//
-	//	consumerConfig := sarama.NewConfig()
-	//	consumerConfig.Net.TLS.Enable = true
-	//	consumerConfig.Net.TLS.Config = tlsConfig
 
-	sender, err := kafka_sarama.NewSender(a.config.KafkaEndpoints, saramaConfig, a.config.KafkaTopic)
-	if err != nil {
-		log.Fatalf("failed to create protocol: %s", err.Error())
+	var syncProducer sarama.SyncProducer
+	if a.config.DryRun {
+		prod, err := NewFakeProducer("-")
+		if err != nil {
+			return fmt.Errorf("cannot start dry-run fake producer: %s", err)
+		}
+		syncProducer = prod
+
+	} else {
+		saramaConfig := sarama.NewConfig()
+		saramaConfig.Version = sarama.V2_0_0_0
+		saramaConfig.Producer.Return.Successes = true // required for SyncProducer
+		if a.config.KafkaSSLEnable {
+			saramaConfig.Net.TLS.Enable = true
+			tlsConfig, err := tlsConfig(a.config.KafkaSSLCAFile)
+			if err != nil {
+				return fmt.Errorf("cannot create kafka TLS config: %w", err)
+			}
+			if a.config.KafkaSSLAuth {
+				zlog.Debug("setting kafka SSL auth")
+				if err := addClientCert(
+					a.config.KafkaSSLClientCertFile,
+					a.config.KafkaSSLClientKeyFile,
+					tlsConfig,
+				); err != nil {
+					return fmt.Errorf("cannot load client certs to authenticate to kafka via TLS")
+				}
+			}
+			if a.config.KafkaSSLInsecure {
+				zlog.Debug("setting insecure_skip_verify")
+				tlsConfig.InsecureSkipVerify = true
+			}
+			saramaConfig.Net.TLS.Config = tlsConfig
+
+		}
+		prod, err := sarama.NewSyncProducer(a.config.KafkaEndpoints, saramaConfig)
+		if err != nil {
+			return fmt.Errorf("cannot start kafka sync producer: %w", err)
+		}
+		syncProducer = prod
 	}
 
+	sender, err := kafka_sarama.NewSenderFromSyncProducer(a.config.KafkaTopic, syncProducer)
+	if err != nil {
+		return fmt.Errorf("failed to create protocol: %w", err)
+	}
 	defer sender.Close(context.Background())
 
 	c, err := cloudevents.NewClient(sender, cloudevents.WithTimeNow(), cloudevents.WithUUIDs())
 	if err != nil {
-		log.Fatalf("failed to create client, %v", err)
+		return fmt.Errorf("failed to create client, %w", err)
 	}
 
 	addr := a.config.DfuseGRPCEndpoint
@@ -134,13 +146,12 @@ func (a *App) Run() error {
 		dialOptions = append(dialOptions, grpc.WithTransportCredentials(transportCreds))
 		credential := oauth.NewOauthAccess(&oauth2.Token{AccessToken: a.config.DfuseToken, TokenType: "Bearer"})
 		dialOptions = append(dialOptions, grpc.WithPerRPCCredentials(credential))
-		fmt.Println("connecting to conn with", addr, dialOptions)
 	}
 	conn, err := grpc.Dial(addr,
 		dialOptions...,
 	)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("connecting to grpc address %s: %w", addr, err)
 	}
 
 	client := pbbstream.NewBlockStreamV2Client(conn)
@@ -163,7 +174,7 @@ func (a *App) Run() error {
 	ctx := context.Background()
 	executor, err := client.Blocks(ctx, req)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("requesting blocks from dfuse firehose: %w", err)
 	}
 
 	eventTypeProg, err := exprToCelProgram(a.config.EventTypeExpr)
@@ -192,6 +203,9 @@ func (a *App) Run() error {
 	for {
 		msg, err := executor.Recv()
 		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
 			return fmt.Errorf("error on receive: %w", err)
 		}
 
@@ -199,14 +213,16 @@ func (a *App) Run() error {
 		if err := ptypes.UnmarshalAny(msg.Block, blk); err != nil {
 			return fmt.Errorf("decoding any of type %q: %w", msg.Block.TypeUrl, err)
 		}
+		zlog.Debug("incoming block", zap.Uint32("blk_number", blk.Number), zap.Int("length_filtered_trx_traces", len(blk.FilteredTransactionTraces)))
 
 		step := sanitizeStep(msg.Step.String())
 
-		for _, trx := range blk.FilteredTransactionTraces {
+		for _, trx := range blk.TransactionTraces() {
 			status := sanitizeStatus(trx.Receipt.Status.String())
 			memoizableTrxTrace := filtering.MemoizableTrxTrace{TrxTrace: trx}
 			for _, act := range trx.ActionTraces {
 				if !act.FilteringMatched {
+					fmt.Println("SKIPPING\n\n")
 					continue
 				}
 				var jsonData json.RawMessage
@@ -280,7 +296,7 @@ func (a *App) Run() error {
 					); cloudevents.IsUndelivered(result) {
 						log.Printf("failed to send: %v", err)
 					} else {
-						log.Printf("sent: blknum %d, id: %s, extensions: %v", blk.Number, e.ID(), e.Extensions())
+						zlog.Debug("sent event", zap.Uint32("blk_number", blk.Number), zap.String("event_id", e.ID()))
 					}
 				}
 

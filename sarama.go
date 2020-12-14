@@ -6,29 +6,28 @@ import (
 	"io/ioutil"
 )
 
-//
-// NewTLSConfig generates a TLS configuration used to authenticate on server with
-// certificates.
-// Parameters are the three pem files path we need to authenticate: client cert, client key and CA cert.
-func NewTLSConfig(clientCertFile, clientKeyFile, caCertFile string) (*tls.Config, error) {
-	tlsConfig := tls.Config{}
+func tlsConfig(caCertFile string) (*tls.Config, error) {
+	tlsConfig := &tls.Config{}
+	caCertPool := x509.NewCertPool()
+	tlsConfig.RootCAs = caCertPool
+	if caCertFile == "" {
+		return tlsConfig, nil
+	}
 
+	caCert, err := ioutil.ReadFile(caCertFile)
+	if err != nil {
+		return nil, err
+	}
+	caCertPool.AppendCertsFromPEM(caCert)
+	return tlsConfig, nil
+}
+
+func addClientCert(clientCertFile, clientKeyFile string, tlsConfig *tls.Config) error {
 	// Load client cert
 	cert, err := tls.LoadX509KeyPair(clientCertFile, clientKeyFile)
 	if err != nil {
-		return &tlsConfig, err
+		return err
 	}
 	tlsConfig.Certificates = []tls.Certificate{cert}
-
-	// Load CA cert
-	caCert, err := ioutil.ReadFile(caCertFile)
-	if err != nil {
-		return &tlsConfig, err
-	}
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(caCert)
-	tlsConfig.RootCAs = caCertPool
-
-	tlsConfig.BuildNameToCertificate()
-	return &tlsConfig, err
+	return nil
 }

@@ -1,11 +1,11 @@
 package main
 
 import (
-	"fmt"
-	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+
+	"go.uber.org/zap"
 )
 
 func init() {
@@ -13,11 +13,10 @@ func init() {
 
 func main() {
 	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
+		zlog.Debug("starting pprof logging", zap.Error(http.ListenAndServe("localhost:6060", nil)))
 	}()
 
 	if err := RootCmd.Execute(); err != nil {
-		fmt.Println(err)
 		os.Exit(1)
 	}
 }

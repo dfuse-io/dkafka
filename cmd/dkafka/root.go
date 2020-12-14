@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/dfuse-io/dkafka"
 	"github.com/spf13/cobra"
@@ -40,6 +39,7 @@ func init() {
 	RootCmd.PersistentFlags().String("dfuse-firehose-grpc-addr", "localhost:13035", "firehose endpoint to connect to")
 	RootCmd.PersistentFlags().String("dfuse-firehose-include-expr", "", "CEL expression tu use for requests to firehose")
 	RootCmd.PersistentFlags().String("dfuse-auth-token", "", "JWT to authenticate to dfuse (empty to skip authentication)")
+	RootCmd.PersistentFlags().Bool("dry-run", false, "do not send anything to kafka, just print content")
 	RootCmd.PersistentFlags().StringSlice("kafka-endpoints", []string{"127.0.0.1:9092"}, "kafka endpoint addresses")
 	RootCmd.PersistentFlags().Bool("kafka-ssl-enable", false, "use SSL when connecting to kafka endpoints")
 	RootCmd.PersistentFlags().String("kafka-ssl-ca-file", "", "path to certificate authority validating kafka endpoints")
@@ -95,6 +95,7 @@ func publishRunE(cmd *cobra.Command, args []string) error {
 		DfuseGRPCEndpoint: viper.GetString("global-dfuse-firehose-grpc-addr"),
 		IncludeFilterExpr: viper.GetString("global-dfuse-firehose-include-expr"),
 
+		DryRun:                 viper.GetBool("global-dry-run"),
 		KafkaEndpoints:         viper.GetStringSlice("global-kafka-endpoints"),
 		KafkaSSLEnable:         viper.GetBool("global-kafka-ssl-enable"),
 		KafkaSSLCAFile:         viper.GetString("global-kafka-ssl-ca-file"),
@@ -115,16 +116,11 @@ func publishRunE(cmd *cobra.Command, args []string) error {
 		StateFile:     viper.GetString("publish-cmd-state-file"),
 	}
 
+	cmd.SilenceUsage = true
 	zlog.Info("starting dkafka publisher", zap.Reflect("config", conf))
 
 	app := dkafka.New(conf)
-	err := app.Run()
-	if err != nil {
-		fmt.Println("hum error not nil", err)
-	}
-	fmt.Println("run is done")
-	time.Sleep(time.Second * 10)
-	return nil
+	return app.Run()
 }
 
 func init() {
