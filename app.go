@@ -67,6 +67,11 @@ func New(config *Config) *App {
 
 func (a *App) Run() error {
 
+	// "get cloudevents client", includes the topic
+	// 1. create sarama SyncProducer with connection info,
+	// 2. get sender from syncproducer and topic string
+	// 3. create cloudevents  client
+
 	var syncProducer sarama.SyncProducer
 	if a.config.DryRun {
 		prod, err := NewFakeProducer("-")
@@ -120,6 +125,9 @@ func (a *App) Run() error {
 		return fmt.Errorf("failed to create client, %w", err)
 	}
 
+	// get and setup the checkpointer to load and adjust the starting block etc.
+
+	// get and setup the dfuse fetcher that gets a stream of blocks, includes the filter, will include the auth token resolver/refresher
 	addr := a.config.DfuseGRPCEndpoint
 	plaintext := strings.Contains(addr, "*")
 	addr = strings.Replace(addr, "*", "", -1)
@@ -164,6 +172,8 @@ func (a *App) Run() error {
 		return fmt.Errorf("requesting blocks from dfuse firehose: %w", err)
 	}
 
+	// setup the transformer, that will transform incoming blocks
+
 	eventTypeProg, err := exprToCelProgram(a.config.EventTypeExpr)
 	if err != nil {
 		return fmt.Errorf("cannot parse event-type-expr: %w", err)
@@ -187,6 +197,7 @@ func (a *App) Run() error {
 
 	}
 
+	// loop: receive block,  transform block, send message...
 	for {
 		msg, err := executor.Recv()
 		if err != nil {
