@@ -66,35 +66,6 @@ func New(config *Config) *App {
 
 func (a *App) Run() error {
 
-	conf := createKafkaConfig(a.config)
-
-	producerTransactionID := fmt.Sprintf("dkafka-%s", a.config.KafkaTopic) // should be unique per dkafka instance
-	producer, err := getKafkaProducer(conf, producerTransactionID)
-	if err != nil {
-		return fmt.Errorf("getting kafka producer: %w", err)
-	}
-
-	var cp checkpointer
-	cp = newKafkaCheckpointer(conf, a.config.KafkaCursorTopic, a.config.KafkaCursorPartition, producer)
-
-	//cp = newFileCheckpointer(a.config.CheckpointFilename)
-
-	cursor, err := cp.Load()
-	switch err {
-	case NoCursorErr:
-		zlog.Info("no cursor found, starting from beginning")
-	case nil:
-		zlog.Info("found cursor", zap.String("cursor", cursor))
-	default:
-		return fmt.Errorf("error loading cursor: %w", err)
-	}
-
-	var s sender
-	s, err = getKafkaSender(producer, cp)
-	if err != nil {
-		return err
-	}
-
 	// get and setup the dfuse fetcher that gets a stream of blocks, includes the filter, will include the auth token resolver/refresher
 	addr := a.config.DfuseGRPCEndpoint
 	plaintext := strings.Contains(addr, "*")
@@ -121,17 +92,44 @@ func (a *App) Run() error {
 
 	req := &pbbstream.BlocksRequestV2{
 		IncludeFilterExpr: a.config.IncludeFilterExpr,
+		StartBlockNum:     a.config.StartBlockNum,
+		StopBlockNum:      a.config.StopBlockNum,
 	}
 
+	conf := createKafkaConfig(a.config)
+
+	producerTransactionID := fmt.Sprintf("dkafka-%s", a.config.KafkaTopic) // should be unique per dkafka instance
+	producer, err := getKafkaProducer(conf, producerTransactionID)
+	if err != nil {
+		return fmt.Errorf("getting kafka producer: %w", err)
+	}
+
+	var cp checkpointer
 	if a.config.BatchMode {
-		req.StartBlockNum = a.config.StartBlockNum
-		req.StopBlockNum = a.config.StopBlockNum
+		zlog.Info("running in batch mode, ignoring cursors")
+		cp = &nilCheckpointer{}
 	} else {
-		// FIXME
-		req.StartCursor = "BJrGChD6xWFwlatVsKhV5KWwLpcyB11rXwvlKhFBhdqj9iOTiJSuUmRxOxSFxvj0iRG-SAj6jIrIHHt998lTv9fswOtnuXIxTnIolo_n_LzvePanPwJKd75oXu-JaNjbWzzXYgOvKOcI44bvafeMbhNjZJElLTO2hm5WooBcc_AV6yE2xjn5esrQg_-X9oZGrOpxELKplizwUzB4eho="
+		cp = newKafkaCheckpointer(conf, a.config.KafkaCursorTopic, a.config.KafkaCursorPartition, producer)
+
+		cursor, err := cp.Load()
+		switch err {
+		case NoCursorErr:
+			zlog.Info("running in live mode, no cursor found: starting from beginning", zap.Int64("start_block_num", a.config.StartBlockNum))
+		case nil:
+			zlog.Info("running in live mode, found cursor", zap.String("cursor", cursor))
+			req.StartCursor = cursor
+		default:
+			return fmt.Errorf("error loading cursor: %w", err)
+		}
 	}
 	if irreversibleOnly {
 		req.ForkSteps = []pbbstream.ForkStep{pbbstream.ForkStep_STEP_IRREVERSIBLE}
+	}
+
+	var s sender
+	s, err = getKafkaSender(producer, cp)
+	if err != nil {
+		return err
 	}
 
 	ctx := context.Background()
@@ -165,6 +163,23 @@ func (a *App) Run() error {
 
 	}
 
+	sourceHeader := kafka.Header{
+		Key:   "ce_source",
+		Value: []byte(a.config.EventSource),
+	}
+	specHeader := kafka.Header{
+		Key:   "ce_specversion",
+		Value: []byte("1.0"),
+	}
+	contentTypeHeader := kafka.Header{
+		Key:   "content-type",
+		Value: []byte("application/json"),
+	}
+	dataContentTypeHeader := kafka.Header{
+		Key:   "ce_datacontenttype",
+		Value: []byte("application/json"),
+	}
+
 	// loop: receive block,  transform block, send message...
 	for {
 		msg, err := executor.Recv()
@@ -174,7 +189,6 @@ func (a *App) Run() error {
 			}
 			return fmt.Errorf("error on receive: %w", err)
 		}
-		fmt.Println(msg.Cursor)
 
 		blk := &pbcodec.Block{}
 		if err := ptypes.UnmarshalAny(msg.Block, blk); err != nil {
@@ -250,45 +264,51 @@ func (a *App) Run() error {
 					}
 					dedupeMap[eventKey] = true
 
-					_ = eventType
+					headers := []kafka.Header{
+						kafka.Header{
+							Key:   "ce_id",
+							Value: hashString(fmt.Sprintf("%s%s%d%s%s", blk.Id, trx.Id, act.ExecutionIndex, msg.Step.String(), eventKey)),
+						},
+						sourceHeader,
+						specHeader,
+						kafka.Header{
+							Key:   "ce_type",
+							Value: []byte(eventType),
+						},
+						contentTypeHeader,
+						kafka.Header{
+							Key:   "ce_time",
+							Value: []byte(blk.MustTime().Format("2006-01-02T15:04:05.9Z")),
+						},
+						dataContentTypeHeader,
+						{
+							Key:   "ce_blkstep",
+							Value: []byte(step),
+						},
+					}
+					for k, v := range extensionsKV {
+						headers = append(headers, kafka.Header{
+							Key:   k,
+							Value: []byte(v),
+						})
+					}
 					msg := kafka.Message{
-						Value: eosioAction.JSON(),
+						Key:     []byte(eventKey),
+						Headers: headers,
+						Value:   eosioAction.JSON(),
 						TopicPartition: kafka.TopicPartition{
 							Topic: &a.config.KafkaTopic,
 						},
 					}
-					fmt.Println(msg)
 					if err := s.Send(&msg); err != nil {
 						return fmt.Errorf("sending message: %w", err)
 					}
-
-					//e := cloudevents.NewEvent()
-					//e.SetID(hashString(fmt.Sprintf("%s%s%d%s%s", blk.Id, trx.Id, act.ExecutionIndex, msg.Step.String(), eventKey)))
-					//e.SetType(eventType)
-					//e.SetSource(a.config.EventSource)
-					//for k, v := range extensionsKV {
-					//	e.SetExtension(k, v)
-					//}
-					//e.SetExtension("datacontenttype", "application/json")
-					//e.SetExtension("blkstep", step)
-
-					//e.SetTime(blk.MustTime())
-					//_ = e.SetData(cloudevents.ApplicationJSON, eosioAction)
-
-					//if result := c.Send(
-					//	kafka_sarama.WithMessageKey(ctx, sarama.StringEncoder(eventKey)),
-					//	e,
-					//); cloudevents.IsUndelivered(result) {
-					//	zlog.Warn("failed to send", zap.Uint32("blk_number", blk.Number), zap.String("event_id", e.ID()), zap.Error(err))
-					//} else {
-					//	zlog.Debug("sent event", zap.Uint32("blk_number", blk.Number), zap.String("event_id", e.ID()))
-					//}
 				}
 
 			}
 		}
 		if err := s.Commit(context.Background(), msg.Cursor); err != nil {
-			fmt.Println("hey error", err)
+			return fmt.Errorf("committing message: %w", err)
 		}
 	}
 }

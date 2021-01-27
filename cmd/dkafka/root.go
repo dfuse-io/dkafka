@@ -132,8 +132,8 @@ func init() {
 
 	PublishCmd.Flags().StringArray("event-extensions-expr", []string{}, "cloudevent extension definitions in this format: '{key}:{CEL expression}' (ex: 'blk:string(block_num)')")
 
-	PublishCmd.Flags().Bool("batch-mode", true, "Batch mode will ignore state-file and always start from {start-block-num}.")
-	PublishCmd.Flags().Int64("start-block-num", 0, "If we are in {batch-mode} or {state-file} does not exist, start streaming from this block number (if negative, relative to HEAD)")
+	PublishCmd.Flags().Bool("batch-mode", false, "Batch mode will ignore cursor and always start from {start-block-num}.")
+	PublishCmd.Flags().Int64("start-block-num", 0, "If we are in {batch-mode} or no prior cursor exists, start streaming from this block number (if negative, relative to HEAD)")
 	PublishCmd.Flags().Uint64("stop-block-num", 0, "If non-zero, stop processing before this block number")
 	PublishCmd.Flags().String("state-file", "./dkafka.state.json", "progress will be saved into this file")
 

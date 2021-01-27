@@ -69,10 +69,10 @@ func (e event) JSON() []byte {
 
 }
 
-func hashString(data string) string {
+func hashString(data string) []byte {
 	h := sha256.New()
 	h.Write([]byte(data))
-	return base64.StdEncoding.EncodeToString(([]byte(h.Sum(nil))))
+	return []byte(base64.StdEncoding.EncodeToString(([]byte(h.Sum(nil)))))
 }
 
 var stringType = reflect.TypeOf("")

@@ -5,9 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"os"
 	"strings"
 	"time"
 
@@ -20,6 +18,16 @@ var NoCursorErr = errors.New("no cursor exists")
 type checkpointer interface {
 	Save(cursor string) error
 	Load() (cursor string, err error)
+}
+
+type nilCheckpointer struct{}
+
+func (n *nilCheckpointer) Save(string) error {
+	return nil
+}
+
+func (n *nilCheckpointer) Load() (string, error) {
+	return "", NoCursorErr
 }
 
 func newKafkaCheckpointer(conf kafka.ConfigMap, cursorTopic string, cursorPartition int32, producer *kafka.Producer) *kafkaCheckpointer {
@@ -43,28 +51,29 @@ type kafkaCheckpointer struct {
 	partition      int32
 }
 
-func newFileCheckpointer(filename string) *localFileCheckpointer {
-	return &localFileCheckpointer{
-		filename: filename,
-	}
-}
-
-type localFileCheckpointer struct {
-	filename string
-}
-
-func (c *localFileCheckpointer) Save(cursor string) error {
-	dat := []byte(cursor)
-	return ioutil.WriteFile(c.filename, dat, 0644)
-}
-
-func (c *localFileCheckpointer) Load() (string, error) {
-	dat, err := ioutil.ReadFile(c.filename)
-	if os.IsNotExist(err) {
-		return "", NoCursorErr
-	}
-	return string(dat), err
-}
+// in case we need it
+//func newFileCheckpointer(filename string) *localFileCheckpointer {
+//	return &localFileCheckpointer{
+//		filename: filename,
+//	}
+//}
+//
+//type localFileCheckpointer struct {
+//	filename string
+//}
+//
+//func (c *localFileCheckpointer) Save(cursor string) error {
+//	dat := []byte(cursor)
+//	return ioutil.WriteFile(c.filename, dat, 0644)
+//}
+//
+//func (c *localFileCheckpointer) Load() (string, error) {
+//	dat, err := ioutil.ReadFile(c.filename)
+//	if os.IsNotExist(err) {
+//		return "", NoCursorErr
+//	}
+//	return string(dat), err
+//}
 
 type cs struct {
 	Cursor string `json:"cursor"`
@@ -136,8 +145,9 @@ func (c *kafkaCheckpointer) Load() (string, error) {
 		case kafka.Error:
 			return "", event
 		case *kafka.Message:
-			cursor := string(event.Value)
-			return cursor, nil
+			cursor := cs{}
+			err := json.Unmarshal(event.Value, &cursor)
+			return cursor.Cursor, err
 		default:
 		}
 	}
