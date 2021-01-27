@@ -8,22 +8,20 @@ import (
 	"io"
 	"strings"
 
-	"github.com/Shopify/sarama"
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/dfuse-io/dfuse-eosio/filtering"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 	pbbstream "github.com/dfuse-io/pbgo/dfuse/bstream/v1"
 	pbhealth "github.com/dfuse-io/pbgo/grpc/health/v1"
+
+	"github.com/golang/protobuf/ptypes"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
-
-	"github.com/dfuse-io/shutter"
-	"github.com/golang/protobuf/ptypes"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/oauth"
 
-	"github.com/cloudevents/sdk-go/protocol/kafka_sarama/v2"
-	cloudevents "github.com/cloudevents/sdk-go/v2"
+	"github.com/dfuse-io/shutter"
 )
 
 type Config struct {
@@ -36,20 +34,21 @@ type Config struct {
 	StopBlockNum  uint64
 	StateFile     string
 
-	KafkaEndpoints         []string
+	KafkaEndpoints         string
 	KafkaSSLEnable         bool
 	KafkaSSLCAFile         string
-	KafkaSSLInsecure       bool
 	KafkaSSLAuth           bool
 	KafkaSSLClientCertFile string
 	KafkaSSLClientKeyFile  string
 
-	IncludeFilterExpr string
-	KafkaTopic        string
-	EventSource       string
-	EventKeysExpr     string
-	EventTypeExpr     string
-	EventExtensions   map[string]string
+	IncludeFilterExpr    string
+	KafkaTopic           string
+	KafkaCursorTopic     string
+	KafkaCursorPartition int32
+	EventSource          string
+	EventKeysExpr        string
+	EventTypeExpr        string
+	EventExtensions      map[string]string
 }
 
 type App struct {
@@ -67,65 +66,34 @@ func New(config *Config) *App {
 
 func (a *App) Run() error {
 
-	// "get cloudevents client", includes the topic
-	// 1. create sarama SyncProducer with connection info,
-	// 2. get sender from syncproducer and topic string
-	// 3. create cloudevents  client
+	conf := createKafkaConfig(a.config)
 
-	var syncProducer sarama.SyncProducer
-	if a.config.DryRun {
-		prod, err := NewFakeProducer("-")
-		if err != nil {
-			return fmt.Errorf("cannot start dry-run fake producer: %s", err)
-		}
-		syncProducer = prod
-
-	} else {
-		saramaConfig := sarama.NewConfig()
-		saramaConfig.Version = sarama.V2_0_0_0
-		saramaConfig.Producer.Return.Successes = true // required for SyncProducer
-		if a.config.KafkaSSLEnable {
-			saramaConfig.Net.TLS.Enable = true
-			tlsConfig, err := tlsConfig(a.config.KafkaSSLCAFile)
-			if err != nil {
-				return fmt.Errorf("cannot create kafka TLS config: %w", err)
-			}
-			if a.config.KafkaSSLAuth {
-				zlog.Debug("setting kafka SSL auth")
-				if err := addClientCert(
-					a.config.KafkaSSLClientCertFile,
-					a.config.KafkaSSLClientKeyFile,
-					tlsConfig,
-				); err != nil {
-					return fmt.Errorf("cannot load client certs to authenticate to kafka via TLS")
-				}
-			}
-			if a.config.KafkaSSLInsecure {
-				zlog.Debug("setting insecure_skip_verify")
-				tlsConfig.InsecureSkipVerify = true
-			}
-			saramaConfig.Net.TLS.Config = tlsConfig
-
-		}
-		prod, err := sarama.NewSyncProducer(a.config.KafkaEndpoints, saramaConfig)
-		if err != nil {
-			return fmt.Errorf("cannot start kafka sync producer: %w", err)
-		}
-		syncProducer = prod
-	}
-
-	sender, err := kafka_sarama.NewSenderFromSyncProducer(a.config.KafkaTopic, syncProducer)
+	producerTransactionID := fmt.Sprintf("dkafka-%s", a.config.KafkaTopic) // should be unique per dkafka instance
+	producer, err := getKafkaProducer(conf, producerTransactionID)
 	if err != nil {
-		return fmt.Errorf("failed to create protocol: %w", err)
+		return fmt.Errorf("getting kafka producer: %w", err)
 	}
-	defer sender.Close(context.Background())
 
-	c, err := cloudevents.NewClient(sender, cloudevents.WithTimeNow(), cloudevents.WithUUIDs())
+	var cp checkpointer
+	cp = newKafkaCheckpointer(conf, a.config.KafkaCursorTopic, a.config.KafkaCursorPartition, producer)
+
+	//cp = newFileCheckpointer(a.config.CheckpointFilename)
+
+	cursor, err := cp.Load()
+	switch err {
+	case NoCursorErr:
+		zlog.Info("no cursor found, starting from beginning")
+	case nil:
+		zlog.Info("found cursor", zap.String("cursor", cursor))
+	default:
+		return fmt.Errorf("error loading cursor: %w", err)
+	}
+
+	var s sender
+	s, err = getKafkaSender(producer, cp)
 	if err != nil {
-		return fmt.Errorf("failed to create client, %w", err)
+		return err
 	}
-
-	// get and setup the checkpointer to load and adjust the starting block etc.
 
 	// get and setup the dfuse fetcher that gets a stream of blocks, includes the filter, will include the auth token resolver/refresher
 	addr := a.config.DfuseGRPCEndpoint
@@ -151,19 +119,19 @@ func (a *App) Run() error {
 
 	client := pbbstream.NewBlockStreamV2Client(conn)
 
-	if !a.config.BatchMode {
-		return fmt.Errorf("live mode not implemented")
-	}
 	req := &pbbstream.BlocksRequestV2{
-		StartBlockNum:     a.config.StartBlockNum,
-		StopBlockNum:      a.config.StopBlockNum,
-		ExcludeStartBlock: false,
-		Decoded:           true,
-		HandleForks:       true,
 		IncludeFilterExpr: a.config.IncludeFilterExpr,
 	}
+
+	if a.config.BatchMode {
+		req.StartBlockNum = a.config.StartBlockNum
+		req.StopBlockNum = a.config.StopBlockNum
+	} else {
+		// FIXME
+		req.StartCursor = "BJrGChD6xWFwlatVsKhV5KWwLpcyB11rXwvlKhFBhdqj9iOTiJSuUmRxOxSFxvj0iRG-SAj6jIrIHHt998lTv9fswOtnuXIxTnIolo_n_LzvePanPwJKd75oXu-JaNjbWzzXYgOvKOcI44bvafeMbhNjZJElLTO2hm5WooBcc_AV6yE2xjn5esrQg_-X9oZGrOpxELKplizwUzB4eho="
+	}
 	if irreversibleOnly {
-		req.HandleForksSteps = []pbbstream.ForkStep{pbbstream.ForkStep_STEP_IRREVERSIBLE}
+		req.ForkSteps = []pbbstream.ForkStep{pbbstream.ForkStep_STEP_IRREVERSIBLE}
 	}
 
 	ctx := context.Background()
@@ -206,6 +174,7 @@ func (a *App) Run() error {
 			}
 			return fmt.Errorf("error on receive: %w", err)
 		}
+		fmt.Println(msg.Cursor)
 
 		blk := &pbcodec.Block{}
 		if err := ptypes.UnmarshalAny(msg.Block, blk); err != nil {
@@ -280,30 +249,62 @@ func (a *App) Run() error {
 						continue
 					}
 					dedupeMap[eventKey] = true
-					e := cloudevents.NewEvent()
-					e.SetID(hashString(fmt.Sprintf("%s%s%d%s%s", blk.Id, trx.Id, act.ExecutionIndex, msg.Step.String(), eventKey)))
-					e.SetType(eventType)
-					e.SetSource(a.config.EventSource)
-					for k, v := range extensionsKV {
-						e.SetExtension(k, v)
-					}
-					e.SetExtension("datacontenttype", "application/json")
-					e.SetExtension("blkstep", step)
 
-					e.SetTime(blk.MustTime())
-					_ = e.SetData(cloudevents.ApplicationJSON, eosioAction)
-
-					if result := c.Send(
-						kafka_sarama.WithMessageKey(ctx, sarama.StringEncoder(eventKey)),
-						e,
-					); cloudevents.IsUndelivered(result) {
-						zlog.Warn("failed to send", zap.Uint32("blk_number", blk.Number), zap.String("event_id", e.ID()), zap.Error(err))
-					} else {
-						zlog.Debug("sent event", zap.Uint32("blk_number", blk.Number), zap.String("event_id", e.ID()))
+					_ = eventType
+					msg := kafka.Message{
+						Value: eosioAction.JSON(),
+						TopicPartition: kafka.TopicPartition{
+							Topic: &a.config.KafkaTopic,
+						},
 					}
+					fmt.Println(msg)
+					if err := s.Send(&msg); err != nil {
+						return fmt.Errorf("sending message: %w", err)
+					}
+
+					//e := cloudevents.NewEvent()
+					//e.SetID(hashString(fmt.Sprintf("%s%s%d%s%s", blk.Id, trx.Id, act.ExecutionIndex, msg.Step.String(), eventKey)))
+					//e.SetType(eventType)
+					//e.SetSource(a.config.EventSource)
+					//for k, v := range extensionsKV {
+					//	e.SetExtension(k, v)
+					//}
+					//e.SetExtension("datacontenttype", "application/json")
+					//e.SetExtension("blkstep", step)
+
+					//e.SetTime(blk.MustTime())
+					//_ = e.SetData(cloudevents.ApplicationJSON, eosioAction)
+
+					//if result := c.Send(
+					//	kafka_sarama.WithMessageKey(ctx, sarama.StringEncoder(eventKey)),
+					//	e,
+					//); cloudevents.IsUndelivered(result) {
+					//	zlog.Warn("failed to send", zap.Uint32("blk_number", blk.Number), zap.String("event_id", e.ID()), zap.Error(err))
+					//} else {
+					//	zlog.Debug("sent event", zap.Uint32("blk_number", blk.Number), zap.String("event_id", e.ID()))
+					//}
 				}
 
 			}
 		}
+		if err := s.Commit(context.Background(), msg.Cursor); err != nil {
+			fmt.Println("hey error", err)
+		}
 	}
+}
+
+func createKafkaConfig(appConf *Config) kafka.ConfigMap {
+	conf := kafka.ConfigMap{
+		"bootstrap.servers": appConf.KafkaEndpoints,
+	}
+	if appConf.KafkaSSLEnable {
+		conf["security.protocol"] = "ssl"
+		conf["ssl.ca.location"] = appConf.KafkaSSLCAFile
+	}
+	if appConf.KafkaSSLAuth {
+		conf["ssl.certificate.location"] = appConf.KafkaSSLClientCertFile
+		conf["ssl.key.location"] = appConf.KafkaSSLClientKeyFile
+		//conf["ssl.key.password"] = "keypass"
+	}
+	return conf
 }

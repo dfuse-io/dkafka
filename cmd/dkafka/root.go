@@ -40,15 +40,15 @@ func init() {
 	RootCmd.PersistentFlags().String("dfuse-firehose-include-expr", "", "CEL expression tu use for requests to firehose")
 	RootCmd.PersistentFlags().String("dfuse-auth-token", "", "JWT to authenticate to dfuse (empty to skip authentication)")
 	RootCmd.PersistentFlags().Bool("dry-run", false, "do not send anything to kafka, just print content")
-	RootCmd.PersistentFlags().StringSlice("kafka-endpoints", []string{"127.0.0.1:9092"}, "kafka endpoint addresses")
+	RootCmd.PersistentFlags().String("kafka-endpoints", "127.0.0.1:9092", "comma-separated kafka endpoint addresses")
 	RootCmd.PersistentFlags().Bool("kafka-ssl-enable", false, "use SSL when connecting to kafka endpoints")
 	RootCmd.PersistentFlags().String("kafka-ssl-ca-file", "", "path to certificate authority validating kafka endpoints")
-	RootCmd.PersistentFlags().Bool("kafka-ssl-insecure", false, "bypass ssl validation kafka endpoints")
 	RootCmd.PersistentFlags().Bool("kafka-ssl-auth", false, "authenticate to kafka endpoints using client certificate (requires {kafka-ssl-enable}")
 	RootCmd.PersistentFlags().String("kafka-ssl-client-cert-file", "./client.crt.pem", "path to client certificate to authenticate to kafka endpoint")
 	RootCmd.PersistentFlags().String("kafka-ssl-client-key-file", "./client.key.pem", "path to client key to authenticate to kafka endpoint")
 
 	RootCmd.PersistentFlags().String("kafka-topic", "default", "kafka topic to use for all writes or reads")
+	RootCmd.PersistentFlags().String("kafka-cursor-topic", "default", "kafka topic to use for all writes or reads")
 
 	RootCmd.PersistentFlags().String("log-format", "text", "Format for logging to stdout. Either 'text' or 'stackdriver'")
 	RootCmd.PersistentFlags().CountP("verbose", "v", "Enables verbose output (-vvvv for max verbosity)")
@@ -96,14 +96,14 @@ func publishRunE(cmd *cobra.Command, args []string) error {
 		IncludeFilterExpr: viper.GetString("global-dfuse-firehose-include-expr"),
 
 		DryRun:                 viper.GetBool("global-dry-run"),
-		KafkaEndpoints:         viper.GetStringSlice("global-kafka-endpoints"),
+		KafkaEndpoints:         viper.GetString("global-kafka-endpoints"),
 		KafkaSSLEnable:         viper.GetBool("global-kafka-ssl-enable"),
 		KafkaSSLCAFile:         viper.GetString("global-kafka-ssl-ca-file"),
-		KafkaSSLInsecure:       viper.GetBool("global-kafka-ssl-insecure"),
 		KafkaSSLAuth:           viper.GetBool("global-kafka-ssl-auth"),
 		KafkaSSLClientCertFile: viper.GetString("global-kafka-ssl-client-cert-file"),
 		KafkaSSLClientKeyFile:  viper.GetString("global-kafka-ssl-client-key-file"),
 		KafkaTopic:             viper.GetString("global-kafka-topic"),
+		KafkaCursorTopic:       viper.GetString("global-kafka-cursor-topic"),
 
 		EventSource:   viper.GetString("publish-cmd-event-source"),
 		EventKeysExpr: viper.GetString("publish-cmd-event-keys-expr"),
