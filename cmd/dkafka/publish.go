@@ -1,6 +1,9 @@
 package main
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/dfuse-io/dkafka"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -21,7 +24,7 @@ func init() {
 	PublishCmd.Flags().String("event-keys-expr", "[account]", "CEL expression defining the event keys. More then one key will result in multiple events being sent. Must resolve to an array of strings")
 	PublishCmd.Flags().String("event-type-expr", "(notif?'!':'')+account+'/'+action", "CEL expression defining the event type. Must resolve to a string")
 
-	PublishCmd.Flags().StringArray("event-extensions-expr", []string{}, "cloudevent extension definitions in this format: '{key}:{CEL expression}' (ex: 'blk:string(block_num)')")
+	PublishCmd.Flags().StringSlice("event-extensions-expr", []string{}, "cloudevent extension definitions in this format: '{key}:{CEL expression}' (ex: 'blk:string(block_num)')")
 
 	PublishCmd.Flags().Bool("batch-mode", false, "Batch mode will ignore cursor and always start from {start-block-num}.")
 	PublishCmd.Flags().Int64("start-block-num", 0, "If we are in {batch-mode} or no prior cursor exists, start streaming from this block number (if negative, relative to HEAD)")
@@ -35,6 +38,15 @@ func publishRunE(cmd *cobra.Command, args []string) error {
 		Verbosity: viper.GetInt("global-verbose") + 2, // FIXME hacking verbosity a bit
 		LogFormat: viper.GetString("global-log-format"),
 	})
+
+	extensions := make(map[string]string)
+	for _, ext := range viper.GetStringSlice("publish-cmd-event-extensions-expr") {
+		kv := strings.SplitN(ext, ":", 2)
+		if len(kv) != 2 {
+			return fmt.Errorf("invalid value for extension: %s", ext)
+		}
+		extensions[kv[0]] = kv[1]
+	}
 
 	conf := &dkafka.Config{
 		DfuseToken:        viper.GetString("global-dfuse-auth-token"),
@@ -52,10 +64,10 @@ func publishRunE(cmd *cobra.Command, args []string) error {
 		KafkaCursorTopic:       viper.GetString("global-kafka-cursor-topic"),
 		KafkaCursorPartition:   int32(viper.GetUint32("global-kafka-cursor-partition")),
 
-		EventSource:   viper.GetString("publish-cmd-event-source"),
-		EventKeysExpr: viper.GetString("publish-cmd-event-keys-expr"),
-		EventTypeExpr: viper.GetString("publish-cmd-event-type-expr"),
-		//	EventExtensions map[string]string //publish-cmd-event-extensions-expr // convert me with `:`
+		EventSource:     viper.GetString("publish-cmd-event-source"),
+		EventKeysExpr:   viper.GetString("publish-cmd-event-keys-expr"),
+		EventTypeExpr:   viper.GetString("publish-cmd-event-type-expr"),
+		EventExtensions: extensions,
 
 		BatchMode:     viper.GetBool("publish-cmd-batch-mode"),
 		StartBlockNum: viper.GetInt64("publish-cmd-start-block-num"),

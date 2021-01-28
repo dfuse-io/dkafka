@@ -29,6 +29,7 @@ kafka cloudevent integration
   * *--event-type-expr*  "CEL" --> `string`
   * *--event-keys-expr* "CEL" -->  `[array,of,strings]`
   * *--event-extensions-expr* : "key1:CEL1[,key2:CEL2...]" where each CEL expression --> `string`
+  * *--dfuse-firehose-include-expr*  "CEL" --> `bool`
 
 * the following names are available to be resolved from the EOS blocks, transactions, traces and actions.
   * `receiver`: receiver account, should be the same as the `account` unless it is a notification, ex: `eosio.token`, `johndoe12345`.   
@@ -50,3 +51,10 @@ kafka cloudevent integration
   * `trx_action_count`: number of actions within that transaction
   * top5`_trx_actors`: array of the 5 most recurrent actors in a transaction (useful for big transactions with lots of actions)
 
+* examples:
+  * to generate two events per action, one with 'account' as the key, one with the 'receiver' as the key (duplicates are removed automatically)
+    `--event-keys-expr="[account,receiver]"`
+  * to set the key to 'updateauth' when the action match, but 'account-{action}' for any other action:
+    `--event-keys-expr="action=='updateauth'?[action] : [account+'-'+action]"`
+  * to add a header `ce_newaccount` in kafka mesage with the value "yes" it is the action eosio::newaccount "no" ortherwise:
+    `--event-extensions-expr="ce_newaccount:account+':'+action=='eosio:newaccount'?'yes':'no'"`
