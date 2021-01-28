@@ -32,7 +32,7 @@ func (n *nilCheckpointer) Load() (string, error) {
 
 func newKafkaCheckpointer(conf kafka.ConfigMap, cursorTopic string, cursorPartition int32, producer *kafka.Producer) *kafkaCheckpointer {
 	consumerConfig := cloneConfig(conf)
-	consumerConfig["group.id"] = strings.Replace(fmt.Sprintf("%s-%d", cursorTopic, cursorPartition), "_", "", -1)
+	consumerConfig["group.id"] = strings.Replace(fmt.Sprintf("dk-%s-%d", cursorTopic, cursorPartition), "_", "", -1)
 	consumerConfig["enable.auto.commit"] = false
 
 	return &kafkaCheckpointer{

@@ -99,9 +99,13 @@ func (a *App) Run() error {
 	conf := createKafkaConfig(a.config)
 
 	producerTransactionID := fmt.Sprintf("dkafka-%s", a.config.KafkaTopic) // should be unique per dkafka instance
-	producer, err := getKafkaProducer(conf, producerTransactionID)
-	if err != nil {
-		return fmt.Errorf("getting kafka producer: %w", err)
+
+	var producer *kafka.Producer
+	if !a.config.BatchMode || !a.config.DryRun {
+		producer, err = getKafkaProducer(conf, producerTransactionID)
+		if err != nil {
+			return fmt.Errorf("getting kafka producer: %w", err)
+		}
 	}
 
 	var cp checkpointer
@@ -127,9 +131,13 @@ func (a *App) Run() error {
 	}
 
 	var s sender
-	s, err = getKafkaSender(producer, cp)
-	if err != nil {
-		return err
+	if a.config.DryRun {
+		s = &dryRunSender{}
+	} else {
+		s, err = getKafkaSender(producer, cp)
+		if err != nil {
+			return err
+		}
 	}
 
 	ctx := context.Background()

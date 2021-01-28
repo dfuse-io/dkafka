@@ -2,6 +2,7 @@ package dkafka
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -65,4 +66,36 @@ func getKafkaSender(producer *kafka.Producer, cp checkpointer) (*kafkaSender, er
 		cp:       cp,
 		producer: producer,
 	}, nil
+}
+
+type dryRunSender struct{}
+
+type fakeMessage struct {
+	Topic     string   `json:"topic"`
+	Headers   []string `json:"headers"`
+	Partition int      `json:"partition"`
+	Offset    int      `json:"offset"`
+	TS        uint64   `json:"ts"`
+	Key       string   `json:"key"`
+	Payload   string   `json:"payload"`
+}
+
+func (s *dryRunSender) Send(msg *kafka.Message) error {
+	out := &fakeMessage{
+		Payload: string(msg.Value),
+		Key:     string(msg.Key),
+	}
+	for _, h := range msg.Headers {
+		out.Headers = append(out.Headers, h.Key, string(h.Value))
+	}
+	outjson, err := json.Marshal(out)
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(outjson))
+	return nil
+}
+
+func (s *dryRunSender) Commit(context.Context, string) error {
+	return nil
 }
