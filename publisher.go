@@ -58,6 +58,7 @@ type event struct {
 	BlockNum      uint32     `json:"block_num"`
 	BlockID       string     `json:"block_id"`
 	Status        string     `json:"status"`
+	Executed      bool       `json:"executed"`
 	Step          string     `json:"block_step"`
 	TransactionID string     `json:"trx_id"`
 	ActionInfo    ActionInfo `json:"act_info"`

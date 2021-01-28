@@ -208,7 +208,7 @@ func (a *App) Run() error {
 
 		for _, trx := range blk.TransactionTraces() {
 			status := sanitizeStatus(trx.Receipt.Status.String())
-			memoizableTrxTrace := filtering.MemoizableTrxTrace{TrxTrace: trx}
+			memoizableTrxTrace := &filtering.MemoizableTrxTrace{TrxTrace: trx}
 			for _, act := range trx.ActionTraces {
 				if !act.FilteringMatched {
 					continue
@@ -228,10 +228,15 @@ func (a *App) Run() error {
 					auths = append(auths, auth.Authorization())
 				}
 
+				var globalSeq uint64
+				if act.Receipt != nil {
+					globalSeq = act.Receipt.GlobalSequence
+				}
 				eosioAction := event{
 					BlockNum:      blk.Number,
 					BlockID:       blk.Id,
 					Status:        status,
+					Executed:      !trx.HasBeenReverted(),
 					Step:          step,
 					TransactionID: trx.Id,
 					ActionInfo: ActionInfo{
@@ -241,7 +246,7 @@ func (a *App) Run() error {
 						JSONData:       &jsonData,
 						DBOps:          trx.DBOpsForAction(act.ExecutionIndex),
 						Authorization:  auths,
-						GlobalSequence: act.Receipt.GlobalSequence,
+						GlobalSequence: globalSeq,
 					},
 				}
 

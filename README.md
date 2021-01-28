@@ -21,6 +21,14 @@ kafka cloudevent integration
      --kafka-cursor-partition=0
 ```
  
+# Notes on transaction status and meaning of 'executed' in EOSIO
+
+* Reference: https://github.com/dfuse-io/dkafka/blob/main/pb/eosio-codec/codec.pb.go#L61-L68
+* Transaction status can be one of [NONE EXECUTED SOFTFAIL HARDFAIL DELAYED EXPIRED UNKNOWN CANCELED]
+* From a streaming perspective, you are *probably* only interested in the transactions that are *executed*, in the sense that their actions can modify the *state* of the chain
+* There is an edge case where a transaction can have a status of SOFTFAIL, but includes an successful call to an error handler (account::action == `eosio::onerror`, handled by the receiver) -- in this case, the the actions of this transaction are actually applied to the chain, and should *probably* be treated the same way as the other *executed* transactoins.
+* If you want only include all actions that are *executed* in that sense (including the weird SOFTFAIL case), use the field `executed` in your CEL filtering or look for a 'true' value on the `executed` field in your event.
+
 # CEL expression language
 
 * Reference: https://github.com/google/cel-spec/blob/master/doc/langdef.md
@@ -47,6 +55,7 @@ kafka cloudevent integration
   * `auth`: array of strings corresponding to the authorizations given to the action (who signed it?)
   * `input`: bool, if true, the action is top-level (declared in the transaction, not a consequence of another action)
   * `notif`: bool, if true, the action is a 'notification' (receiver!=account)
+  * `executed`: bool, if true, the action was executed successfully (including the error handling of a failed deferred transaction as a SOFTFAIL)
   * `scheduled`: bool, if true, the action was scheduled (delayed or deferred)
   * `trx_action_count`: number of actions within that transaction
   * top5`_trx_actors`: array of the 5 most recurrent actors in a transaction (useful for big transactions with lots of actions)
@@ -58,3 +67,48 @@ kafka cloudevent integration
     `--event-keys-expr="action=='updateauth'?[action] : [account+'-'+action]"`
   * to add a header `ce_newaccount` in kafka mesage with the value "yes" it is the action eosio::newaccount "no" ortherwise:
     `--event-extensions-expr="ce_newaccount:account+':'+action=='eosio:newaccount'?'yes':'no'"`
+
+
+# Format of a kafka event PAYLOAD
+
+
+* reference: https://github.com/dfuse-io/dkafka/blob/main/app.go#L231-L246 (could change in the near future)
+* example:
+
+```
+{
+  "block_num": 5,
+  "block_id": "000000053e6fe6497c3f609d1cae0d30dbb529cee0821c522b0d97c48e618744",
+  "status": "EXECUTED",
+  "executed": true,
+  "block_step": "NEW",
+  "trx_id": "4163246ac2fc096d949a7f1627e5c1252b44366fed52eb4bded960de7701831b",
+  "act_info": {
+    "account": "eosio",
+    "receiver": "eosio",
+    "action": "newaccount",
+    "global_seq": 41,
+    "authorizations": [
+      "eosio@active"
+    ],
+    "db_ops": [
+      {
+        "operation": 1,
+        "action_index": 1,
+        "code": "battlefield1",
+        "scope": "battlefield1",
+        "table_name": "variant",
+        "primary_key": ".........15n1",
+        "new_payer": "battlefield1",
+        "new_data": "MUsAAAAAAAAAAAAA9wAAAAAAAAA="
+      }
+    ],
+    "json_data": {
+      "creator": "eosio",
+      "name": "zzzzzzzzzzzz",
+      "owner": {...}
+       ...
+    }
+  }
+}
+```

@@ -28,7 +28,7 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	RootCmd.PersistentFlags().String("dfuse-firehose-grpc-addr", "localhost:13035", "firehose endpoint to connect to")
-	RootCmd.PersistentFlags().String("dfuse-firehose-include-expr", "", "CEL expression tu use for requests to firehose")
+	RootCmd.PersistentFlags().String("dfuse-firehose-include-expr", "executed", "CEL expression tu use for requests to firehose")
 	RootCmd.PersistentFlags().String("dfuse-auth-token", "", "JWT to authenticate to dfuse (empty to skip authentication)")
 	RootCmd.PersistentFlags().Bool("dry-run", false, "do not send anything to kafka, just print content")
 	RootCmd.PersistentFlags().String("kafka-endpoints", "127.0.0.1:9092", "comma-separated kafka endpoint addresses")
