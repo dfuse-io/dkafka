@@ -30,21 +30,24 @@ func (n *nilCheckpointer) Load() (string, error) {
 	return "", NoCursorErr
 }
 
-func newKafkaCheckpointer(conf kafka.ConfigMap, cursorTopic string, cursorPartition int32, producer *kafka.Producer) *kafkaCheckpointer {
+func newKafkaCheckpointer(conf kafka.ConfigMap, cursorTopic string, cursorPartition int32, dataTopic string, producer *kafka.Producer) *kafkaCheckpointer {
 	consumerConfig := cloneConfig(conf)
-	consumerConfig["group.id"] = strings.Replace(fmt.Sprintf("dk-%s-%d", cursorTopic, cursorPartition), "_", "", -1)
+	id := strings.Replace(fmt.Sprintf("dk-%s-%s-%d", dataTopic, cursorTopic, cursorPartition), "_", "", -1)
+
+	consumerConfig["group.id"] = id
 	consumerConfig["enable.auto.commit"] = false
 
 	return &kafkaCheckpointer{
 		consumerConfig: consumerConfig,
 		topic:          cursorTopic,
 		partition:      cursorPartition,
+		key:            []byte(id),
 		producer:       producer,
 	}
 }
 
 type kafkaCheckpointer struct {
-	tp             *kafka.TopicPartition
+	key            []byte
 	producer       *kafka.Producer
 	consumerConfig kafka.ConfigMap
 	topic          string
@@ -85,6 +88,7 @@ func (c *kafkaCheckpointer) Save(cursor string) error {
 		return err
 	}
 	msg := &kafka.Message{
+		Key: c.key,
 		TopicPartition: kafka.TopicPartition{
 			Topic:     &c.topic,
 			Partition: c.partition,
@@ -146,7 +150,14 @@ func (c *kafkaCheckpointer) Load() (string, error) {
 			return "", event
 		case *kafka.Message:
 			cursor := cs{}
-			err := json.Unmarshal(event.Value, &cursor)
+			if err := json.Unmarshal(event.Value, &cursor); err != nil {
+				return "", err
+			}
+			if strings.HasPrefix(string(event.Key), "dk-") {
+				if string(event.Key) != string(c.key) {
+					return "", fmt.Errorf("invalid key for cursor: expected %s, got %s -- are you reading from the right partition?", string(c.key), string(event.Key))
+				}
+			}
 			return cursor.Cursor, err
 		default:
 		}

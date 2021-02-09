@@ -113,7 +113,7 @@ func (a *App) Run() error {
 		zlog.Info("running in batch mode, ignoring cursors")
 		cp = &nilCheckpointer{}
 	} else {
-		cp = newKafkaCheckpointer(conf, a.config.KafkaCursorTopic, a.config.KafkaCursorPartition, producer)
+		cp = newKafkaCheckpointer(conf, a.config.KafkaCursorTopic, a.config.KafkaCursorPartition, a.config.KafkaTopic, producer)
 
 		cursor, err := cp.Load()
 		switch err {
