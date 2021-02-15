@@ -41,6 +41,9 @@ type Config struct {
 	KafkaSSLClientCertFile string
 	KafkaSSLClientKeyFile  string
 
+	KafkaCursorConsumerGroupID string
+	KafkaTransactionID         string
+
 	IncludeFilterExpr    string
 	KafkaTopic           string
 	KafkaCursorTopic     string
@@ -98,11 +101,9 @@ func (a *App) Run() error {
 
 	conf := createKafkaConfig(a.config)
 
-	producerTransactionID := fmt.Sprintf("dkafka-%s", a.config.KafkaTopic) // should be unique per dkafka instance
-
 	var producer *kafka.Producer
 	if !a.config.BatchMode || !a.config.DryRun {
-		producer, err = getKafkaProducer(conf, producerTransactionID)
+		producer, err = getKafkaProducer(conf, a.config.KafkaTransactionID)
 		if err != nil {
 			return fmt.Errorf("getting kafka producer: %w", err)
 		}
@@ -113,7 +114,7 @@ func (a *App) Run() error {
 		zlog.Info("running in batch mode, ignoring cursors")
 		cp = &nilCheckpointer{}
 	} else {
-		cp = newKafkaCheckpointer(conf, a.config.KafkaCursorTopic, a.config.KafkaCursorPartition, a.config.KafkaTopic, producer)
+		cp = newKafkaCheckpointer(conf, a.config.KafkaCursorTopic, a.config.KafkaCursorPartition, a.config.KafkaTopic, a.config.KafkaCursorConsumerGroupID, producer)
 
 		cursor, err := cp.Load()
 		switch err {
