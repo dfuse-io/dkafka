@@ -63,8 +63,8 @@ func publishRunE(cmd *cobra.Command, args []string) error {
 		KafkaTopic:                 viper.GetString("global-kafka-topic"),
 		KafkaCursorTopic:           viper.GetString("global-kafka-cursor-topic"),
 		KafkaCursorPartition:       int32(viper.GetUint32("global-kafka-cursor-partition")),
-		KafkaCursorConsumerGroupID: viper.GetString("kafka-cursor-consumer-group-id"),
-		KafkaTransactionID:         viper.GetString("kafka-transaction-id"),
+		KafkaCursorConsumerGroupID: viper.GetString("global-kafka-cursor-consumer-group-id"),
+		KafkaTransactionID:         viper.GetString("global-kafka-transaction-id"),
 
 		EventSource:     viper.GetString("publish-cmd-event-source"),
 		EventKeysExpr:   viper.GetString("publish-cmd-event-keys-expr"),
