@@ -158,6 +158,9 @@ func (c *kafkaCheckpointer) Load() (string, error) {
 					return "", fmt.Errorf("invalid key for cursor: expected %s, got %s -- are you reading from the right partition?", string(c.key), string(event.Key))
 				}
 			}
+			if cursor.Cursor == "" {
+				err = NoCursorErr
+			}
 			return cursor.Cursor, err
 		default:
 		}

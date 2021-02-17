@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/dfuse-io/bstream/forkable"
 	"go.uber.org/zap"
 )
 
@@ -16,6 +17,87 @@ func NewDebugger(config *Config) *Debugger {
 	return &Debugger{
 		config: config,
 	}
+}
+
+func (d *Debugger) ReadCursor() error {
+	conf := createKafkaConfig(d.config)
+
+	producer, err := getKafkaProducer(conf, "")
+	if err != nil {
+		return fmt.Errorf("getting kafka producer: %w", err)
+	}
+
+	cp := newKafkaCheckpointer(conf, d.config.KafkaCursorTopic, d.config.KafkaCursorPartition, d.config.KafkaTopic, d.config.KafkaCursorConsumerGroupID, producer)
+
+	cursor, err := cp.Load()
+	if err != nil {
+		return err
+	}
+	fmt.Println("cursor is", cursor)
+	if cursor != "" {
+		c, err := forkable.CursorFromOpaque(cursor)
+		if err != nil {
+			return err
+		}
+		zlog.Info("running in live mode, found cursor",
+			zap.String("cursor", cursor),
+			zap.Stringer("plain_cursor", c),
+			zap.Stringer("cursor_block", c.Block),
+			zap.Stringer("cursor_head_block", c.HeadBlock),
+			zap.Stringer("cursor_LIB", c.LIB),
+		)
+		fmt.Printf("%+v\n", c)
+	}
+	return nil
+}
+
+func (d *Debugger) WriteCursor(cursor string) error {
+	if cursor == "" {
+		return d.DeleteCursor()
+	}
+
+	conf := createKafkaConfig(d.config)
+
+	producer, err := getKafkaProducer(conf, "")
+	if err != nil {
+		return fmt.Errorf("getting kafka producer: %w", err)
+	}
+
+	if c, err := forkable.CursorFromString(cursor); err == nil {
+		cursor = c.ToOpaque() // we always write opaque version
+	}
+	if _, err = forkable.CursorFromOpaque(cursor); err != nil {
+		return fmt.Errorf("invalid cursor: %s", cursor)
+	}
+
+	cp := newKafkaCheckpointer(conf, d.config.KafkaCursorTopic, d.config.KafkaCursorPartition, d.config.KafkaTopic, d.config.KafkaCursorConsumerGroupID, producer)
+
+	err = cp.Save(cursor)
+	if err != nil {
+		return err
+	}
+	fmt.Println("successfully set cursor to", cursor)
+	producer.Close()
+	return nil
+}
+
+func (d *Debugger) DeleteCursor() error {
+	conf := createKafkaConfig(d.config)
+
+	producer, err := getKafkaProducer(conf, "")
+	if err != nil {
+		return fmt.Errorf("getting kafka producer: %w", err)
+	}
+
+	cp := newKafkaCheckpointer(conf, d.config.KafkaCursorTopic, d.config.KafkaCursorPartition, d.config.KafkaTopic, d.config.KafkaCursorConsumerGroupID, producer)
+
+	err = cp.Save("")
+	if err != nil {
+		return err
+	}
+	fmt.Println("successfully set empty cursor")
+	producer.Close()
+	return nil
 }
 
 func (d *Debugger) Write(key, val string) error {
@@ -70,12 +152,6 @@ func (d *Debugger) Read(groupID string, numValues int, startOffset int) error {
 
 	consumer.Subscribe(d.config.KafkaTopic, nil)
 
-	//md, err := consumer.GetMetadata(&d.config.KafkaTopic, false, 500)
-	//if err != nil {
-	//	return fmt.Errorf("getting metadata: %w", err)
-	//}
-	//fmt.Println("metadata", md)
-
 	if startOffset >= 0 {
 		zlog.Debug("setting offset to..", zap.Int("start_offset", startOffset))
 		err = consumer.Assign([]kafka.TopicPartition{
@@ -92,7 +168,7 @@ func (d *Debugger) Read(groupID string, numValues int, startOffset int) error {
 		ev := consumer.Poll(1000)
 		switch event := ev.(type) {
 		case kafka.Error:
-			fmt.Printf("got error: %w\n", event)
+			fmt.Printf("got error: %s\n", event)
 			return event
 		case *kafka.Message:
 			fmt.Printf("got event: %+v, key:%s, val:%s (partition: %d)\n", event, string(event.Key), string(event.Value), event.TopicPartition.Partition)

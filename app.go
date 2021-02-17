@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/dfuse-io/bstream/forkable"
 	"github.com/dfuse-io/dfuse-eosio/filtering"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 	pbbstream "github.com/dfuse-io/pbgo/dfuse/bstream/v1"
@@ -121,7 +122,18 @@ func (a *App) Run() error {
 		case NoCursorErr:
 			zlog.Info("running in live mode, no cursor found: starting from beginning", zap.Int64("start_block_num", a.config.StartBlockNum))
 		case nil:
-			zlog.Info("running in live mode, found cursor", zap.String("cursor", cursor))
+			c, err := forkable.CursorFromOpaque(cursor)
+			if err != nil {
+				zlog.Error("cannot decode cursor", zap.Error(err))
+				return err
+			}
+			zlog.Info("running in live mode, found cursor",
+				zap.String("cursor", cursor),
+				zap.Stringer("plain_cursor", c),
+				zap.Stringer("cursor_block", c.Block),
+				zap.Stringer("cursor_head_block", c.HeadBlock),
+				zap.Stringer("cursor_LIB", c.LIB),
+			)
 			req.StartCursor = cursor
 		default:
 			return fmt.Errorf("error loading cursor: %w", err)
@@ -203,9 +215,14 @@ func (a *App) Run() error {
 		if err := ptypes.UnmarshalAny(msg.Block, blk); err != nil {
 			return fmt.Errorf("decoding any of type %q: %w", msg.Block.TypeUrl, err)
 		}
-		zlog.Debug("incoming block", zap.Uint32("blk_number", blk.Number), zap.Int("length_filtered_trx_traces", len(blk.FilteredTransactionTraces)))
-
 		step := sanitizeStep(msg.Step.String())
+
+		if blk.Number%100 == 0 {
+			zlog.Info("incoming block 1/100", zap.Uint32("blk_number", blk.Number), zap.String("step", step), zap.Int("length_filtered_trx_traces", len(blk.FilteredTransactionTraces)))
+		}
+		if blk.Number%10 == 0 {
+			zlog.Debug("incoming block 1/10", zap.Uint32("blk_number", blk.Number), zap.String("step", step), zap.Int("length_filtered_trx_traces", len(blk.FilteredTransactionTraces)))
+		}
 
 		for _, trx := range blk.TransactionTraces() {
 			status := sanitizeStatus(trx.Receipt.Status.String())
