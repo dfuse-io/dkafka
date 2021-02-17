@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/dfuse-io/derr"
 	"github.com/dfuse-io/dkafka"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -75,8 +77,19 @@ func publishRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	cmd.SilenceUsage = true
-	zlog.Info("starting dkafka publisher", zap.Reflect("config", conf))
+	signalHandler := derr.SetupSignalHandler(time.Second)
 
+	zlog.Info("starting dkafka publisher", zap.Reflect("config", conf))
 	app := dkafka.New(conf)
-	return app.Run()
+	go func() { app.Shutdown(app.Run()) }()
+
+	select {
+	case <-signalHandler:
+		app.Shutdown(fmt.Errorf("shutdown signal received"))
+	case <-app.Terminating():
+	}
+	zlog.Info("terminating", zap.Error(app.Err()))
+
+	<-app.Terminated()
+	return app.Err()
 }

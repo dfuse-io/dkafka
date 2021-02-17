@@ -341,6 +341,9 @@ func (a *App) Run() error {
 		if err := s.Commit(context.Background(), msg.Cursor); err != nil {
 			return fmt.Errorf("committing message: %w", err)
 		}
+		if a.IsTerminating() {
+			return nil
+		}
 	}
 }
 

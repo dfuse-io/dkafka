@@ -6,6 +6,7 @@ require (
 	github.com/blendle/zapdriver v1.3.1
 	github.com/confluentinc/confluent-kafka-go v1.5.2
 	github.com/dfuse-io/bstream v0.0.2-0.20210125192647-167e31f99b40
+	github.com/dfuse-io/derr v0.0.0-20201001203637-4dc9d8014152
 	github.com/dfuse-io/dfuse-eosio v0.1.1-docker.0.20210128200504-f24b253436ef
 	github.com/dfuse-io/dlauncher v0.0.0-20201112212422-91f62bcef971
 	github.com/dfuse-io/logging v0.0.0-20210109005628-b97a57253f70

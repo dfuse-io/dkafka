@@ -12,30 +12,6 @@ import (
 	"github.com/google/cel-go/cel"
 )
 
-type dfuseConnectionConfig struct {
-	DfuseGRPCEndpoint string
-	DfuseToken        string
-}
-
-type publisherKafkaConnectionConfig struct {
-	KafkaEndpoints         []string
-	KafkaSSLEnable         bool
-	KafkaSSLCAFile         string
-	KafkaSSLInsecure       bool
-	KafkaSSLAuth           bool
-	KafkaSSLClientCertFile string
-	KafkaSSLClientKeyFile  string
-}
-
-type publisherJobConfig struct {
-	IncludeFilterExpr string
-	KafkaTopic        string
-	EventSource       string
-	EventKeysExpr     string
-	EventTypeExpr     string
-	EventExtensions   map[string]string
-}
-
 type extension struct {
 	name string
 	expr string
