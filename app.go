@@ -153,7 +153,11 @@ func (a *App) Run() error {
 		}
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	a.OnTerminating(func(_ error) {
+		cancel()
+	})
+
 	executor, err := client.Blocks(ctx, req)
 	if err != nil {
 		return fmt.Errorf("requesting blocks from dfuse firehose: %w", err)
