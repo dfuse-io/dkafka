@@ -22,6 +22,8 @@ var PublishCmd = &cobra.Command{
 func init() {
 	RootCmd.AddCommand(PublishCmd)
 
+	PublishCmd.Flags().Duration("delay-between-commits", time.Second*10, "no commits to kafka blow this delay, except un shutdown")
+
 	PublishCmd.Flags().String("event-source", "dkafka", "custom value for produced cloudevent source")
 	PublishCmd.Flags().String("event-keys-expr", "[account]", "CEL expression defining the event keys. More then one key will result in multiple events being sent. Must resolve to an array of strings")
 	PublishCmd.Flags().String("event-type-expr", "(notif?'!':'')+account+'/'+action", "CEL expression defining the event type. Must resolve to a string")
@@ -64,6 +66,7 @@ func publishRunE(cmd *cobra.Command, args []string) error {
 		KafkaCursorPartition:       int32(viper.GetUint32("global-kafka-cursor-partition")),
 		KafkaCursorConsumerGroupID: viper.GetString("global-kafka-cursor-consumer-group-id"),
 		KafkaTransactionID:         viper.GetString("global-kafka-transaction-id"),
+		CommitMinDelay:             viper.GetDuration("publish-cmd-delay-between-commits"),
 
 		EventSource:     viper.GetString("publish-cmd-event-source"),
 		EventKeysExpr:   viper.GetString("publish-cmd-event-keys-expr"),

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/dfuse-io/bstream/forkable"
@@ -44,6 +45,7 @@ type Config struct {
 
 	KafkaCursorConsumerGroupID string
 	KafkaTransactionID         string
+	CommitMinDelay             time.Duration
 
 	IncludeFilterExpr    string
 	KafkaTopic           string
@@ -342,11 +344,12 @@ func (a *App) Run() error {
 
 			}
 		}
-		if err := s.Commit(context.Background(), msg.Cursor); err != nil {
-			return fmt.Errorf("committing message: %w", err)
-		}
 		if a.IsTerminating() {
-			return nil
+			return s.Commit(context.Background(), msg.Cursor)
+		}
+
+		if err := s.CommitIfAfter(context.Background(), msg.Cursor, a.config.CommitMinDelay); err != nil {
+			return fmt.Errorf("committing message: %w", err)
 		}
 	}
 }

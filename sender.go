@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"go.uber.org/zap"
@@ -12,11 +13,13 @@ import (
 
 type sender interface {
 	Send(msg *kafka.Message) error
+	CommitIfAfter(ctx context.Context, cursor string, minimumDelay time.Duration) error
 	Commit(ctx context.Context, cursor string) error
 }
 
 type kafkaSender struct {
 	sync.RWMutex
+	lastCommit      time.Time
 	trxStarted      bool
 	producer        *kafka.Producer
 	cp              checkpointer
@@ -38,6 +41,14 @@ func (s *kafkaSender) Close(ctx context.Context) {
 	s.producer.Close()
 }
 
+func (s *kafkaSender) CommitIfAfter(ctx context.Context, cursor string, minimumDelay time.Duration) error {
+	if time.Since(s.lastCommit) > minimumDelay {
+		zlog.Debug("commiting cursor")
+		return s.Commit(ctx, cursor)
+	}
+	return nil
+}
+
 func (s *kafkaSender) Commit(ctx context.Context, cursor string) error {
 	s.Lock() // full write lock
 	defer s.Unlock()
@@ -45,6 +56,7 @@ func (s *kafkaSender) Commit(ctx context.Context, cursor string) error {
 	if err := s.cp.Save(cursor); err != nil {
 		return fmt.Errorf("saving cursor: %w", err)
 	}
+	s.lastCommit = time.Now()
 
 	if s.useTransactions {
 		if err := s.producer.CommitTransaction(ctx); err != nil {
@@ -111,6 +123,10 @@ func (s *dryRunSender) Send(msg *kafka.Message) error {
 		return err
 	}
 	fmt.Println(string(outjson))
+	return nil
+}
+
+func (s *dryRunSender) CommitIfAfter(context.Context, string, time.Duration) error {
 	return nil
 }
 
