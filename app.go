@@ -135,7 +135,7 @@ func (a *App) Run() error {
 	if a.config.DryRun {
 		s = &dryRunSender{}
 	} else {
-		s, err = getKafkaSender(producer, cp)
+		s, err = getKafkaSender(producer, cp, a.config.KafkaTransactionID != "")
 		if err != nil {
 			return err
 		}

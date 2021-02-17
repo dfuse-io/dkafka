@@ -34,10 +34,7 @@ func init() {
 }
 
 func publishRunE(cmd *cobra.Command, args []string) error {
-	SetupLogger(&LoggingOptions{
-		Verbosity: viper.GetInt("global-verbose") + 2, // FIXME hacking verbosity a bit
-		LogFormat: viper.GetString("global-log-format"),
-	})
+	SetupLogger()
 
 	extensions := make(map[string]string)
 	for _, ext := range viper.GetStringSlice("publish-cmd-event-extensions-expr") {

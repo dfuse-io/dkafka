@@ -24,10 +24,10 @@ import (
 	"sync"
 
 	"github.com/dfuse-io/logging"
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 
 	"github.com/blendle/zapdriver"
-	"github.com/dfuse-io/dlauncher/launcher"
 	zapbox "github.com/dfuse-io/dlauncher/zap-box"
 	"go.uber.org/zap/zapcore"
 )
@@ -38,39 +38,22 @@ func init() {
 	logging.Register("github.com/dfuse-io/dkafka/cmd/dkafka", &zlog)
 }
 
-var userLog = launcher.UserLog
+func SetupLogger() {
 
-type LoggingOptions struct {
-	Verbosity     int    // verbosity level
-	LogFormat     string // specifies the log format
-	LogListenAddr string // address that listens to change the logs
-
-}
-
-func SetupLogger(opts *LoggingOptions) {
-	verbosity := opts.Verbosity
-	logformat := opts.LogFormat
-
-	// TODO: The logger expect that the dataDir already exists...
+	verbosity := viper.GetInt("global-verbose")
+	logFormat := viper.GetString("global-log-format")
+	logListenAddr := viper.GetString("global-log-level-switcher-listen-addr")
 
 	logStdoutWriter := zapcore.Lock(os.Stdout)
 
 	commonLogger := createLogger(
 		"common",
-		[]zapcore.Level{zap.WarnLevel, zap.WarnLevel, zap.InfoLevel, zap.DebugLevel},
+		[]zapcore.Level{zap.InfoLevel, zap.DebugLevel},
 		verbosity,
 		logStdoutWriter,
-		logformat,
+		logFormat,
 	)
 	logging.Set(commonLogger)
-
-	logging.Set(createLogger(
-		"bstream",
-		[]zapcore.Level{zap.WarnLevel, zap.WarnLevel, zap.InfoLevel, zap.DebugLevel},
-		verbosity,
-		logStdoutWriter,
-		logformat,
-	), "github.com/dfuse-io/bstream.*")
 
 	// Fine-grain customization
 	//
@@ -91,11 +74,11 @@ func SetupLogger(opts *LoggingOptions) {
 	// Hijack standard Golang `log` and redirect it to our common logger
 	zap.RedirectStdLogAt(commonLogger, zap.DebugLevel)
 
-	if opts.LogListenAddr != "" {
+	if logListenAddr != "" {
 		go func() {
-			userLog.Debug("starting atomic level switcher", zap.String("listen_addr", opts.LogListenAddr))
-			if err := http.ListenAndServe(opts.LogListenAddr, http.HandlerFunc(handleHTTPLogChange)); err != nil {
-				userLog.Warn("failed starting atomic level switcher", zap.Error(err), zap.String("listen_addr", opts.LogListenAddr))
+			zlog.Debug("starting atomic level switcher", zap.String("listen_addr", logListenAddr))
+			if err := http.ListenAndServe(logListenAddr, http.HandlerFunc(handleHTTPLogChange)); err != nil {
+				zlog.Warn("failed starting atomic level switcher", zap.Error(err), zap.String("listen_addr", logListenAddr))
 			}
 		}()
 	}
@@ -129,13 +112,7 @@ func createLogger(appID string, levels []zapcore.Level, verbosity int, consoleSy
 
 func changeLoggersLevel(inputs string, level zapcore.Level) {
 	for _, input := range strings.Split(inputs, ",") {
-		normalizeInput := strings.Trim(input, " ")
-		if normalizeInput == "bstream" || normalizeInput == "dfuse" {
-			changeAppLogLevel(normalizeInput, level)
-		} else {
-			// Assumes it's a regex, we use the unnormalized input, just in case it had some spaces
-			logging.Extend(overrideLoggerLevel(level), input)
-		}
+		logging.Extend(overrideLoggerLevel(level), input)
 	}
 }
 
