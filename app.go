@@ -335,6 +335,7 @@ func (a *App) Run() error {
 						Value:   eosioAction.JSON(),
 						TopicPartition: kafka.TopicPartition{
 							Topic: &a.config.KafkaTopic,
+							Partition: kafka.PartitionAny,
 						},
 					}
 					if err := s.Send(&msg); err != nil {
