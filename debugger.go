@@ -116,7 +116,8 @@ func (d *Debugger) Write(key, val string) error {
 		Key:   []byte(key),
 		Value: []byte(val),
 		TopicPartition: kafka.TopicPartition{
-			Topic: &d.config.KafkaTopic,
+			Topic:     &d.config.KafkaTopic,
+			Partition: kafka.PartitionAny,
 		},
 	}
 	fmt.Printf("sending message: %s:%s to topic %s\n", key, val, d.config.KafkaTopic)
