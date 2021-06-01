@@ -7,8 +7,6 @@ import (
 	"reflect"
 	"strings"
 
-	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
-
 	"github.com/google/cel-go/cel"
 )
 
@@ -26,7 +24,7 @@ type ActionInfo struct {
 	Action         string           `json:"action"`
 	GlobalSequence uint64           `json:"global_seq"`
 	Authorization  []string         `json:"authorizations"`
-	DBOps          []*pbcodec.DBOp  `json:"db_ops"`
+	DBOps          []*decodedDBOp   `json:"db_ops"`
 	JSONData       *json.RawMessage `json:"json_data"`
 }
 

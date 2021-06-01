@@ -8,10 +8,12 @@ require (
 	github.com/dfuse-io/bstream v0.0.2-0.20210125192647-167e31f99b40
 	github.com/dfuse-io/derr v0.0.0-20201001203637-4dc9d8014152
 	github.com/dfuse-io/dfuse-eosio v0.1.1-docker.0.20210128200504-f24b253436ef
+	github.com/dfuse-io/dgrpc v0.0.0-20210118212827-12d9d8a14c40
 	github.com/dfuse-io/dlauncher v0.0.0-20201112212422-91f62bcef971
 	github.com/dfuse-io/logging v0.0.0-20210109005628-b97a57253f70
 	github.com/dfuse-io/pbgo v0.0.6-0.20210125181705-b17235518132
 	github.com/dfuse-io/shutter v1.4.1
+	github.com/eoscanada/eos-go v0.9.1-0.20210115195118-6d94af7a8501
 	github.com/golang/protobuf v1.4.3
 	github.com/google/cel-go v0.6.0
 	github.com/google/go-cmp v0.5.2 // indirect

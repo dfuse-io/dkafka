@@ -100,7 +100,10 @@ kafka cloudevent integration
         "table_name": "variant",
         "primary_key": ".........15n1",
         "new_payer": "battlefield1",
-        "new_data": "MUsAAAAAAAAAAAAA9wAAAAAAAAA="
+        "new_data": "MUsAAAAAAAAAAAAA9wAAAAAAAAA=",
+        "new_json": "{\"amount\":\"234545.231 BTF\"}"
+        "old_data": "BBEDDFE0wweFFFFFFFFFFFffewax",
+        "old_json": "{\"amount\":\"0.000 BTF\"}"
       }
     ],
     "json_data": {
@@ -112,3 +115,33 @@ kafka cloudevent integration
   }
 }
 ```
+
+# Decoding DBOps using ABIs
+
+* --local-abi-files flag allows you to specify local JSON files as ABIs for the contracts for which you want to decode DB operations, ex:
+```
+curl -H "Content-type: application/json" -XPOST "localhost:8888/v1/chain/get_abi" --data  '{"account_name":"eosio"}' | jq -c .abi >eosio.abi
+curl -H "Content-type: application/json" -XPOST "localhost:8888/v1/chain/get_abi" --data  '{"account_name":"eosio.token"}' | jq -c .abi >eosio.token.abi
+dkafka publish \
+  --dfuse-firehose-grpc-addr=localhost:9000 \
+  --start-block-num=2 \
+  --stop-block-num=180 \
+  --dfuse-firehose-include-expr="executed && action!='onblock'" \
+  --batch-mode \
+  --dry-run \
+  --local-abi-files=eosio.token:./eosio.token.abi,eosio:./eosio.abi
+```
+
+* --abicodec-grpc-addr flag allows you to specify the GRPC address of a dfuse "abicodec" service, so dkafka can fetch the ABIs on demand, ex:
+```
+dkafka publish \
+  --dfuse-firehose-grpc-addr=localhost:9000 \
+  --start-block-num=2 \
+  --stop-block-num=180 \
+  --dfuse-firehose-include-expr="executed && action!='onblock'" \
+  --batch-mode \
+  --dry-run \
+  --abicodec-grpc-addr=localhost:9001
+```
+
+* --fail-on-undecodable-db-op flag allows you to specify if you want dkafka to fail any time it cannot decode a given dbop to JSON
