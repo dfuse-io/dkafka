@@ -101,18 +101,18 @@ func getKafkaSender(producer *kafka.Producer, cp checkpointer, useTransactions b
 type dryRunSender struct{}
 
 type fakeMessage struct {
-	Topic     string   `json:"topic"`
-	Headers   []string `json:"headers"`
-	Partition int      `json:"partition"`
-	Offset    int      `json:"offset"`
-	TS        uint64   `json:"ts"`
-	Key       string   `json:"key"`
-	Payload   string   `json:"payload"`
+	Topic     string          `json:"topic"`
+	Headers   []string        `json:"headers"`
+	Partition int             `json:"partition"`
+	Offset    int             `json:"offset"`
+	TS        uint64          `json:"ts"`
+	Key       string          `json:"key"`
+	Payload   json.RawMessage `json:"payload"`
 }
 
 func (s *dryRunSender) Send(msg *kafka.Message) error {
 	out := &fakeMessage{
-		Payload: string(msg.Value),
+		Payload: json.RawMessage(msg.Value),
 		Key:     string(msg.Key),
 	}
 	for _, h := range msg.Headers {
