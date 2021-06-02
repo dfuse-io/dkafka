@@ -78,6 +78,7 @@ func New(config *Config) *App {
 }
 
 func (a *App) Run() error {
+	go startPrometheusMetrics("/metrics", ":9102")
 
 	// get and setup the dfuse fetcher that gets a stream of blocks, includes the filter, will include the auth token resolver/refresher
 	addr := a.config.DfuseGRPCEndpoint
@@ -253,6 +254,7 @@ func (a *App) Run() error {
 		if err := ptypes.UnmarshalAny(msg.Block, blk); err != nil {
 			return fmt.Errorf("decoding any of type %q: %w", msg.Block.TypeUrl, err)
 		}
+		blocksReceived.Inc()
 		step := sanitizeStep(msg.Step.String())
 
 		if blk.Number%100 == 0 {
@@ -263,12 +265,14 @@ func (a *App) Run() error {
 		}
 
 		for _, trx := range blk.TransactionTraces() {
+			transactionTracesReceived.Inc()
 			status := sanitizeStatus(trx.Receipt.Status.String())
 			memoizableTrxTrace := &filtering.MemoizableTrxTrace{TrxTrace: trx}
 			for _, act := range trx.ActionTraces {
 				if !act.FilteringMatched {
 					continue
 				}
+				actionTracesReceived.Inc()
 				var jsonData json.RawMessage
 				if act.Action.JsonData != "" {
 					jsonData = json.RawMessage(act.Action.JsonData)
@@ -381,6 +385,7 @@ func (a *App) Run() error {
 					if err := s.Send(&msg); err != nil {
 						return fmt.Errorf("sending message: %w", err)
 					}
+					messagesSent.Inc()
 				}
 
 			}
