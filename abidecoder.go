@@ -55,7 +55,7 @@ type decodedDBOp struct {
 	OldJSON *json.RawMessage `json:"old_json,omitempty"`
 }
 
-func (a *ABIDecoder) abi(contract string, blockNum uint32) (*eos.ABI, error) {
+func (a *ABIDecoder) abi(contract string, blockNum uint32, forceRefresh bool) (*eos.ABI, error) {
 	if a.overrides != nil {
 		if abi, ok := a.overrides[contract]; ok {
 			return abi, nil
@@ -66,9 +66,11 @@ func (a *ABIDecoder) abi(contract string, blockNum uint32) (*eos.ABI, error) {
 		return nil, fmt.Errorf("unable to get abi for contract %q", contract)
 	}
 
-	if abiObj, ok := a.abisCache[contract]; ok {
-		if abiObj.blockNum < blockNum {
-			return abiObj.abi, nil
+	if !forceRefresh {
+		if abiObj, ok := a.abisCache[contract]; ok {
+			if abiObj.blockNum < blockNum {
+				return abiObj.abi, nil
+			}
 		}
 	}
 
@@ -94,6 +96,35 @@ func (a *ABIDecoder) abi(contract string, blockNum uint32) (*eos.ABI, error) {
 	return abi, nil
 }
 
+func (a *ABIDecoder) decodeDBOp(op *decodedDBOp, blockNum uint32, forceRefresh bool) error {
+	abi, err := a.abi(op.Code, blockNum, forceRefresh)
+	if err != nil {
+		return fmt.Errorf("decoding dbop in block %d: %w", blockNum, err)
+	}
+	tableDef := abi.TableForName(eos.TableName(op.TableName))
+	if tableDef == nil {
+		return fmt.Errorf("table %s not present in ABI for contract %s", op.TableName, op.Code)
+	}
+
+	if len(op.NewData) > 0 {
+		bytes, err := abi.DecodeTableRowTyped(tableDef.Type, op.NewData)
+		if err != nil {
+			return fmt.Errorf("decode row: %w", err)
+		}
+		asJSON := json.RawMessage(bytes)
+		op.NewJSON = &asJSON
+	}
+	if len(op.OldData) > 0 {
+		bytes, err := abi.DecodeTableRowTyped(tableDef.Type, op.OldData)
+		if err != nil {
+			return fmt.Errorf("decode row: %w", err)
+		}
+		asJSON := json.RawMessage(bytes)
+		op.OldJSON = &asJSON
+	}
+	return nil
+}
+
 func (a *ABIDecoder) DecodeDBOps(in []*pbcodec.DBOp, blockNum uint32) (decodedDBOps []*decodedDBOp, err error) {
 	for _, op := range in {
 		decoded := &decodedDBOp{DBOp: op}
@@ -106,35 +137,15 @@ func (a *ABIDecoder) DecodeDBOps(in []*pbcodec.DBOp, blockNum uint32) (decodedDB
 
 	var errors []error
 	for _, op := range decodedDBOps {
-		abi, err := a.abi(op.Code, blockNum)
+		err := a.decodeDBOp(op, blockNum, false)
 		if err != nil {
-			return nil, fmt.Errorf("decoding dbop in block %d: %w", blockNum, err)
+			err = a.decodeDBOp(op, blockNum, true) //force refreshing ABI from cache
 		}
-		tableDef := abi.TableForName(eos.TableName(op.TableName))
-		if tableDef == nil {
-			errors = append(errors, fmt.Errorf("table %s not present in ABI for contract %s", op.TableName, op.Code))
-			continue
-		}
-
-		if len(op.NewData) > 0 {
-			bytes, err := abi.DecodeTableRowTyped(tableDef.Type, op.NewData)
-			if err != nil {
-				errors = append(errors, fmt.Errorf("decode row: %w", err))
-				continue
-			}
-			asJSON := json.RawMessage(bytes)
-			op.NewJSON = &asJSON
-		}
-		if len(op.OldData) > 0 {
-			bytes, err := abi.DecodeTableRowTyped(tableDef.Type, op.OldData)
-			if err != nil {
-				errors = append(errors, fmt.Errorf("decode row: %w", err))
-				continue
-			}
-			asJSON := json.RawMessage(bytes)
-			op.OldJSON = &asJSON
+		if err != nil {
+			errors = append(errors, err)
 		}
 	}
+
 	if len(errors) > 0 {
 		errorStr := ""
 		for _, e := range errors {
