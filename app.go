@@ -12,9 +12,12 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/dfuse-io/bstream/forkable"
 	"github.com/dfuse-io/dfuse-eosio/filtering"
+	pbabicodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/abicodec/v1"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
+	"github.com/dfuse-io/dgrpc"
 	pbbstream "github.com/dfuse-io/pbgo/dfuse/bstream/v1"
 	pbhealth "github.com/dfuse-io/pbgo/grpc/health/v1"
+	"github.com/eoscanada/eos-go"
 
 	"github.com/golang/protobuf/ptypes"
 	"go.uber.org/zap"
@@ -55,6 +58,10 @@ type Config struct {
 	EventKeysExpr        string
 	EventTypeExpr        string
 	EventExtensions      map[string]string
+
+	LocalABIFiles         map[string]string
+	ABICodecGRPCAddr      string
+	FailOnUndecodableDBOP bool
 }
 
 type App struct {
@@ -71,6 +78,7 @@ func New(config *Config) *App {
 }
 
 func (a *App) Run() error {
+	go startPrometheusMetrics("/metrics", ":9102")
 
 	// get and setup the dfuse fetcher that gets a stream of blocks, includes the filter, will include the auth token resolver/refresher
 	addr := a.config.DfuseGRPCEndpoint
@@ -110,6 +118,31 @@ func (a *App) Run() error {
 		if err != nil {
 			return fmt.Errorf("getting kafka producer: %w", err)
 		}
+	}
+
+	var abiFiles map[string]*eos.ABI
+	if len(a.config.LocalABIFiles) != 0 {
+		abiFiles, err = LoadABIFiles(a.config.LocalABIFiles)
+		if err != nil {
+			return err
+		}
+	}
+
+	var abiCodecClient pbabicodec.DecoderClient
+	if a.config.ABICodecGRPCAddr != "" {
+		abiCodecConn, err := dgrpc.NewInternalClient(a.config.ABICodecGRPCAddr)
+		if err != nil {
+			return fmt.Errorf("setting up abicodec client: %w", err)
+		}
+
+		abiCodecClient = pbabicodec.NewDecoderClient(abiCodecConn)
+	}
+
+	zlog.Info("setting up ABIDecoder")
+	abiDecoder := NewABIDecoder(abiFiles, abiCodecClient)
+
+	if abiDecoder.IsNOOP() && a.config.FailOnUndecodableDBOP {
+		return fmt.Errorf("Invalid config: no abicodec GRPC address and no local ABI file has been set, but fail-on-undecodable-db-op is enabled")
 	}
 
 	var cp checkpointer
@@ -221,6 +254,7 @@ func (a *App) Run() error {
 		if err := ptypes.UnmarshalAny(msg.Block, blk); err != nil {
 			return fmt.Errorf("decoding any of type %q: %w", msg.Block.TypeUrl, err)
 		}
+		blocksReceived.Inc()
 		step := sanitizeStep(msg.Step.String())
 
 		if blk.Number%100 == 0 {
@@ -231,12 +265,14 @@ func (a *App) Run() error {
 		}
 
 		for _, trx := range blk.TransactionTraces() {
+			transactionTracesReceived.Inc()
 			status := sanitizeStatus(trx.Receipt.Status.String())
 			memoizableTrxTrace := &filtering.MemoizableTrxTrace{TrxTrace: trx}
 			for _, act := range trx.ActionTraces {
 				if !act.FilteringMatched {
 					continue
 				}
+				actionTracesReceived.Inc()
 				var jsonData json.RawMessage
 				if act.Action.JsonData != "" {
 					jsonData = json.RawMessage(act.Action.JsonData)
@@ -256,6 +292,14 @@ func (a *App) Run() error {
 				if act.Receipt != nil {
 					globalSeq = act.Receipt.GlobalSequence
 				}
+
+				decodedDBOps, err := abiDecoder.DecodeDBOps(trx.DBOpsForAction(act.ExecutionIndex), blk.Number)
+				if err != nil {
+					if a.config.FailOnUndecodableDBOP {
+						return err
+					}
+					zlog.Warn("cannot decode dbops", zap.Uint32("block_number", blk.Number), zap.Error(err))
+				}
 				eosioAction := event{
 					BlockNum:      blk.Number,
 					BlockID:       blk.Id,
@@ -268,7 +312,7 @@ func (a *App) Run() error {
 						Receiver:       act.Receiver,
 						Action:         act.Name(),
 						JSONData:       &jsonData,
-						DBOps:          trx.DBOpsForAction(act.ExecutionIndex),
+						DBOps:          decodedDBOps,
 						Authorization:  auths,
 						GlobalSequence: globalSeq,
 					},
@@ -334,13 +378,14 @@ func (a *App) Run() error {
 						Headers: headers,
 						Value:   eosioAction.JSON(),
 						TopicPartition: kafka.TopicPartition{
-							Topic: &a.config.KafkaTopic,
+							Topic:     &a.config.KafkaTopic,
 							Partition: kafka.PartitionAny,
 						},
 					}
 					if err := s.Send(&msg); err != nil {
 						return fmt.Errorf("sending message: %w", err)
 					}
+					messagesSent.Inc()
 				}
 
 			}

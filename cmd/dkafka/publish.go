@@ -35,6 +35,9 @@ func init() {
 	PublishCmd.Flags().Uint64("stop-block-num", 0, "If non-zero, stop processing before this block number")
 	PublishCmd.Flags().String("state-file", "./dkafka.state.json", "progress will be saved into this file")
 
+	PublishCmd.Flags().StringSlice("local-abi-files", []string{}, "repeatable, ABI file definition in this format: '{account}:{path/to/filename}' (ex: 'eosio.token:/tmp/eosio_token.abi'). ABIs are used to decode DB ops. Provided ABIs have highest priority and will never be fetched or updated")
+	PublishCmd.Flags().String("abicodec-grpc-addr", "", "if set, will connect to this endpoint to fetch contract ABIs")
+	PublishCmd.Flags().Bool("fail-on-undecodable-db-op", false, "If true, program will fail and exit when a db OP cannot be decoded (ex: missing or incompatible ABI file or invalid ABI fetched from abicodec")
 }
 
 func publishRunE(cmd *cobra.Command, args []string) error {
@@ -47,6 +50,15 @@ func publishRunE(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("invalid value for extension: %s", ext)
 		}
 		extensions[kv[0]] = kv[1]
+	}
+
+	localABIFiles := make(map[string]string)
+	for _, ext := range viper.GetStringSlice("publish-cmd-local-abi-files") {
+		kv := strings.SplitN(ext, ":", 2)
+		if len(kv) != 2 {
+			return fmt.Errorf("invalid value for local ABI file: %s", ext)
+		}
+		localABIFiles[kv[0]] = kv[1]
 	}
 
 	conf := &dkafka.Config{
@@ -77,6 +89,10 @@ func publishRunE(cmd *cobra.Command, args []string) error {
 		StartBlockNum: viper.GetInt64("publish-cmd-start-block-num"),
 		StopBlockNum:  viper.GetUint64("publish-cmd-stop-block-num"),
 		StateFile:     viper.GetString("publish-cmd-state-file"),
+
+		LocalABIFiles:         localABIFiles,
+		ABICodecGRPCAddr:      viper.GetString("publish-cmd-abicodec-grpc-addr"),
+		FailOnUndecodableDBOP: viper.GetBool("publish-cmd-fail-on-undecodable-db-op"),
 	}
 
 	cmd.SilenceUsage = true
