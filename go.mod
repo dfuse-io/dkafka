@@ -6,7 +6,6 @@ require (
 	github.com/blendle/zapdriver v1.3.1
 	github.com/confluentinc/confluent-kafka-go v1.5.2
 	github.com/dfuse-io/bstream v0.0.2-0.20210125192647-167e31f99b40
-	github.com/dfuse-io/derr v0.0.0-20201001203637-4dc9d8014152
 	github.com/dfuse-io/dfuse-eosio v0.1.1-docker.0.20210128200504-f24b253436ef
 	github.com/dfuse-io/dgrpc v0.0.0-20210118212827-12d9d8a14c40
 	github.com/dfuse-io/dlauncher v0.0.0-20201112212422-91f62bcef971
@@ -26,6 +25,7 @@ require (
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/pflag v1.0.3
 	github.com/spf13/viper v1.6.2
+	github.com/streamingfast/derr v0.0.0-20210810022442-32249850a4fb
 	github.com/tidwall/gjson v1.6.7
 	go.uber.org/zap v1.16.0
 	golang.org/x/net v0.0.0-20200904194848-62affa334b73 // indirect

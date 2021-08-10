@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dfuse-io/derr"
+	"github.com/streamingfast/derr"
 	"github.com/dfuse-io/dkafka"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
