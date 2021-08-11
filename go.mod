@@ -5,13 +5,12 @@ go 1.14
 require (
 	github.com/blendle/zapdriver v1.3.1
 	github.com/confluentinc/confluent-kafka-go v1.5.2
-	github.com/dfuse-io/bstream v0.0.2-0.20210125192647-167e31f99b40
+	github.com/dfuse-io/bstream v0.0.2-0.20210811032019-ae285ee33ca3
 	github.com/dfuse-io/dfuse-eosio v0.1.1-docker.0.20210128200504-f24b253436ef
-	github.com/dfuse-io/dgrpc v0.0.0-20210118212827-12d9d8a14c40
+	github.com/dfuse-io/dgrpc v0.0.0-20210810041652-d033fee35ae0 // indirect
 	github.com/dfuse-io/dlauncher v0.0.0-20201112212422-91f62bcef971
 	github.com/dfuse-io/logging v0.0.0-20210109005628-b97a57253f70
-	github.com/dfuse-io/pbgo v0.0.6-0.20210125181705-b17235518132
-	github.com/dfuse-io/shutter v1.4.1
+	github.com/dfuse-io/pbgo v0.0.6-0.20210811031924-4e767d6fd138
 	github.com/eoscanada/eos-go v0.9.1-0.20210115195118-6d94af7a8501
 	github.com/golang/protobuf v1.4.3
 	github.com/google/cel-go v0.6.0
@@ -26,6 +25,9 @@ require (
 	github.com/spf13/pflag v1.0.3
 	github.com/spf13/viper v1.6.2
 	github.com/streamingfast/derr v0.0.0-20210810022442-32249850a4fb
+	github.com/streamingfast/dgrpc v0.0.0-20210810185305-905172f728e8 // indirect
+	github.com/streamingfast/opaque v0.0.0-20210809210154-b964592beb5d // indirect
+	github.com/streamingfast/shutter v1.5.0 // indirect
 	github.com/tidwall/gjson v1.6.7
 	go.uber.org/zap v1.16.0
 	golang.org/x/net v0.0.0-20200904194848-62affa334b73 // indirect
