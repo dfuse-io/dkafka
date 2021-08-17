@@ -23,12 +23,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dfuse-io/logging"
 	"github.com/spf13/viper"
+	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
 
 	"github.com/blendle/zapdriver"
-	zapbox "github.com/dfuse-io/dlauncher/zap-box"
+	zapbox "github.com/streamingfast/dlauncher/zap-box"
 	"go.uber.org/zap/zapcore"
 )
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"github.com/dfuse-io/bstream/forkable"
+	"github.com/streamingfast/bstream/forkable"
 	"go.uber.org/zap"
 )
 
