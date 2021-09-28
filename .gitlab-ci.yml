@@ -1,0 +1,87 @@
+image: golang:1.17
+
+cache:
+  paths:
+    - /apt-cache
+    - /go/src/github.com
+    - /go/src/golang.org
+    - /go/src/google.golang.org
+    - /go/src/gopkg.in
+
+stages:
+  - test
+  - build
+  - image
+# before_script:
+#   - mkdir -p /go/src/gitlab.com/pantomath-io /go/src/_/builds
+#   - cp -r $CI_PROJECT_DIR /go/src/gitlab.com/pantomath-io/pantomath
+#   - ln -s /go/src/gitlab.com/pantomath-io /go/src/_/builds/pantomath-io
+#   - make dep
+
+unit_tests:
+  tags:
+    - docker
+  stage: test
+  script:
+    - make test
+
+# race_detector:
+#   stage: test
+#   script:
+#     - make race
+
+# memory_sanitizer:
+#   stage: test
+#   script:
+#     - make msan
+
+code_coverage:
+  tags:
+    - docker
+  stage: test
+  script:
+    - make cov
+
+code_coverage_report:
+  tags:
+    - docker
+  stage: test
+  script:
+    - make covhtml
+  only:
+  - master
+
+# lint_code:
+#   stage: test
+#   script:
+#     - make lint
+
+build:
+  tags:
+    - docker
+  stage: build
+  script:
+    - make
+  artifacts:
+    paths:
+    - dkafka
+
+build-docker:
+  tags:
+    - docker
+  stage: image
+  variables:
+    VERSION: "${CI_COMMIT_SHORT_SHA}"
+  rules:
+    - if: $CI_COMMIT_TAG
+      variables:
+        VERSION: "${CI_COMMIT_TAG}"
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+  script:
+    - docker login "quay.io" --username "${QUAY_USERNAME}" --password "${QUAY_PASSWORD}"
+    - docker build --no-cache --tag "quay.io/ultraio/dkafka:${VERSION}"
+    - docker push "quay.io/ultraio/dkafka:${VERSION}"
+    - docker tag "quay.io/ultraio/dkafka:${VERSION}" "quay.io/ultraio/dkafka:latest"
+    - docker push "quay.io/ultraio/dkafka:latest"
