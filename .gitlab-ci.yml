@@ -1,5 +1,3 @@
-image: golang:1.17
-
 cache:
   paths:
     - /apt-cache
@@ -12,53 +10,59 @@ stages:
   - test
   - build
   - image
-# before_script:
-#   - mkdir -p /go/src/gitlab.com/pantomath-io /go/src/_/builds
-#   - cp -r $CI_PROJECT_DIR /go/src/gitlab.com/pantomath-io/pantomath
-#   - ln -s /go/src/gitlab.com/pantomath-io /go/src/_/builds/pantomath-io
-#   - make dep
 
-unit_tests:
+.golang_based:
   tags:
     - docker
+  image: golang:1.17
+
+unit-tests:
+  extends:
+    - .golang_based
   stage: test
   script:
     - make test
 
-# race_detector:
+# race-detector:
+#   extends:
+#     - .golang_based
 #   stage: test
 #   script:
 #     - make race
 
-# memory_sanitizer:
+# memory-sanitizer:
+#   extends:
+#     - .golang_based
 #   stage: test
 #   script:
 #     - make msan
 
-code_coverage:
-  tags:
-    - docker
+code-coverage:
+  extends:
+    - .golang_based
   stage: test
   script:
     - make cov
 
-code_coverage_report:
-  tags:
-    - docker
+code-coverage-report:
+  extends:
+    - .golang_based
   stage: test
   script:
     - make covhtml
-  only:
-  - master
+  rules:
+  - if: '$CI_COMMIT_BRANCH == "main"'
 
 # lint_code:
+#   extends:
+#     - .golang_based
 #   stage: test
 #   script:
 #     - make lint
 
 build:
-  tags:
-    - docker
+  extends:
+    - .golang_based
   stage: build
   script:
     - make
@@ -66,12 +70,15 @@ build:
     paths:
     - dkafka
 
-build-docker:
+build-publish-docker:
   tags:
     - docker
   stage: image
   variables:
     VERSION: "${CI_COMMIT_SHORT_SHA}"
+  image: docker:git
+  services:
+    - docker:19.03.12-dind
   rules:
     - if: $CI_COMMIT_TAG
       variables:
@@ -81,7 +88,7 @@ build-docker:
     - if: '$CI_COMMIT_BRANCH == "develop"'
   script:
     - docker login "quay.io" --username "${QUAY_USERNAME}" --password "${QUAY_PASSWORD}"
-    - docker build --no-cache --tag "quay.io/ultraio/dkafka:${VERSION}"
+    - docker build --no-cache --tag "quay.io/ultraio/dkafka:${VERSION}" .
     - docker push "quay.io/ultraio/dkafka:${VERSION}"
     - docker tag "quay.io/ultraio/dkafka:${VERSION}" "quay.io/ultraio/dkafka:latest"
     - docker push "quay.io/ultraio/dkafka:latest"
