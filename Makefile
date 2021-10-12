@@ -5,12 +5,15 @@ GO_FILES := $(shell find . -name '*.go' | grep -v /vendor/ | grep -v _test.go)
 BUILD_DIR := "./build"
 BINARY_PATH := $(BUILD_DIR)/$(PROJECT_NAME)
 COVERAGE_DIR := $(BUILD_DIR)
-INCLUDE_EXPRESSION ?= "executed && action=='create' && account=='eosio.nft.ft' && receiver=='eosio.nft.ft'"
+INCLUDE_EXPRESSION ?= "executed && action=='issue' && account=='eosio.nft.ft' && receiver=='eosio.nft.ft'"
 KEY_EXPRESSION ?= "[transaction_id]"
-COMPRESSION_TYPE ?= "none"
+COMPRESSION_TYPE ?= "snappy"
 COMPRESSION_LEVEL ?= -1
 KUBECONFIG ?= ~/.kube/dev.dfuse.kube
-START_BLOCK ?= 0
+START_BLOCK ?= 2272500
+STOP_BLOCK ?= 2272600
+MESSAGE_MAX ?= 10000000
+
 # Source:
 #   https://about.gitlab.com/blog/2017/11/27/go-tools-and-gitlab-how-to-do-continuous-integration-like-a-boss/
 #   https://gitlab.com/pantomath-io/demo-tools/-/tree/master
@@ -65,7 +68,24 @@ start: build up ## start dkafka localy
 		--event-type-expr="'TestNotification'" \
 		--kafka-compression-type=$(COMPRESSION_TYPE) \
 		--kafka-compression-level=$(COMPRESSION_LEVEL) \
-		--start-block-num=$(START_BLOCK)
+		--start-block-num=$(START_BLOCK) \
+		--kafka-message-max-bytes=$(MESSAGE_MAX)
+
+batch: build up ## run batch localy
+	$(BINARY_PATH) publish \
+		--dfuse-firehose-grpc-addr=localhost:9000 \
+		--abicodec-grpc-addr=localhost:9001 \
+		--fail-on-undecodable-db-op \
+		--batch-mode \
+		--kafka-topic="io.dkafka.test" \
+		--dfuse-firehose-include-expr=$(INCLUDE_EXPRESSION) \
+		--event-keys-expr=$(KEY_EXPRESSION) \
+		--event-type-expr="'TestNotification'" \
+		--kafka-compression-type=$(COMPRESSION_TYPE) \
+		--kafka-compression-level=$(COMPRESSION_LEVEL) \
+		--start-block-num=$(START_BLOCK) \
+		--stop-block-num=$(STOP_BLOCK) \
+		--kafka-message-max-bytes=$(MESSAGE_MAX)
 
 forward: ## open port forwarding on dfuse dev
 	KUBECONFIG=$(KUBECONFIG) kubectl -n ultra-dev port-forward firehose-v3-0 9000 &

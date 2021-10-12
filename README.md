@@ -2,7 +2,7 @@
 kafka cloudevent integration
 
 
-# Usage
+## Usage
 
 * Compile with `go install -v ./cmd/dkafka`
 * Run with:
@@ -20,8 +20,26 @@ kafka cloudevent integration
      --kafka-cursor-topic=_dkafka_cursor \
      --kafka-cursor-partition=0
 ```
- 
-# Notes on transaction status and meaning of 'executed' in EOSIO
+
+## Compression
+Some actions may produce a lot of `DBOps` which may lead to reach the limit of kafka max message size.
+Or you may just want to reduce the message size.
+As the default format of `dkafka` is JSON it can be well compressed. You can use the following options
+to play with the compression:
+```
+      --kafka-compression-level int8     Compression level parameter for compression type algorithm (default -1)
+      --kafka-compression-type string    Specify the compression type to use when produce messages (none|gzip|snappy|lz4|zstd) (default "none")
+      --kafka-message-max-bytes int      Maximum Kafka protocol request message size.
+                                         Due to differing framing overhead between protocol versions the producer is 
+                                         unable to reliably enforce a strict max message limit at produce time and 
+                                         may exceed the maximum size by one message in protocol ProduceRequests, 
+                                         the broker will enforce the the topic's max.message.bytes limit 
+                                         (see Apache Kafka documentation). (default 1000000)
+```
+Using the compression level and type is not enough if you right the max message size without compression.
+The max message size sounds to be computed before compression. So you need to increase the `kafka-message-max-bytes`
+to the max value before compression event if after your message is 10 times smaller...
+## Notes on transaction status and meaning of 'executed' in EOSIO
 
 * Reference: https://github.com/dfuse-io/dkafka/blob/main/pb/eosio-codec/codec.pb.go#L61-L68
 * Transaction status can be one of [NONE EXECUTED SOFTFAIL HARDFAIL DELAYED EXPIRED UNKNOWN CANCELED]
@@ -29,7 +47,7 @@ kafka cloudevent integration
 * There is an edge case where a transaction can have a status of SOFTFAIL, but includes an successful call to an error handler (account::action == `eosio::onerror`, handled by the receiver) -- in this case, the the actions of this transaction are actually applied to the chain, and should *probably* be treated the same way as the other *executed* transactoins.
 * If you want only include all actions that are *executed* in that sense (including the weird SOFTFAIL case), use the field `executed` in your CEL filtering or look for a 'true' value on the `executed` field in your event.
 
-# CEL expression language
+## CEL expression language
 
 * Reference: https://github.com/google/cel-spec/blob/master/doc/langdef.md
 
@@ -69,7 +87,7 @@ kafka cloudevent integration
     `--event-extensions-expr="ce_newaccount:account+':'+action=='eosio:newaccount'?'yes':'no'"`
 
 
-# Format of a kafka event PAYLOAD
+## Format of a kafka event PAYLOAD
 
 
 * reference: https://github.com/dfuse-io/dkafka/blob/main/app.go#L231-L246 (could change in the near future)
@@ -116,7 +134,7 @@ kafka cloudevent integration
 }
 ```
 
-# Decoding DBOps using ABIs
+## Decoding DBOps using ABIs
 
 * --local-abi-files flag allows you to specify local JSON files as ABIs for the contracts for which you want to decode DB operations, ex:
 ```

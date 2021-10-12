@@ -46,6 +46,7 @@ type Config struct {
 	KafkaSSLClientKeyFile  string
 	KafkaCompressionType   string
 	KafkaCompressionLevel  int
+	KafkaMessageMaxBytes   int
 
 	KafkaCursorConsumerGroupID string
 	KafkaTransactionID         string
@@ -112,7 +113,7 @@ func (a *App) Run() error {
 
 	var producer *kafka.Producer
 	if !a.config.BatchMode || !a.config.DryRun {
-		producer, err = getKafkaProducer(createKafkaConfigWithCompression(a.config), a.config.KafkaTransactionID)
+		producer, err = getKafkaProducer(createKafkaConfigForMessageProducer(a.config), a.config.KafkaTransactionID)
 		if err != nil {
 			return fmt.Errorf("getting kafka producer: %w", err)
 		}
@@ -414,11 +415,12 @@ func createKafkaConfig(appConf *Config) kafka.ConfigMap {
 	return conf
 }
 
-func createKafkaConfigWithCompression(appConf *Config) kafka.ConfigMap {
+func createKafkaConfigForMessageProducer(appConf *Config) kafka.ConfigMap {
 	conf := createKafkaConfig(appConf)
 	compressionType := appConf.KafkaCompressionType
 	conf["compression.type"] = compressionType
 	conf["compression.level"] = getCompressionLevel(compressionType, appConf)
+	conf["message.max.bytes"] = appConf.KafkaMessageMaxBytes
 	return conf
 }
 
