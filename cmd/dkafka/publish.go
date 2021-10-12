@@ -27,8 +27,12 @@ var compressionType string
 func init() {
 	RootCmd.AddCommand(PublishCmd)
 
-	PublishCmd.Flags().Var(compressionTypes, "kafka-compression-type", compressionTypes.Help("Specify the compression type to use when produce messages"))
-	PublishCmd.Flags().Int8("kafka-compression-level", int8(-1), "Compression level parameter for compression type algorithm")
+	PublishCmd.Flags().Var(compressionTypes, "kafka-compression-type", compressionTypes.Help("Specify the compression type to use for compressing message sets."))
+	PublishCmd.Flags().Int8("kafka-compression-level", int8(-1), `Compression level parameter for algorithm selected by configuration property 
+kafka-compression-type. Higher values will result in better compression at the 
+cost of more CPU usage. Usable range is algorithm-dependent: [0-9] for gzip; 
+[0-12] for lz4; only 0 for snappy; -1 = codec-dependent default compression 
+level.`)
 	PublishCmd.Flags().Int("kafka-message-max-bytes", 1000000, `Maximum Kafka protocol request message size.
 Due to differing framing overhead between protocol versions the producer is 
 unable to reliably enforce a strict max message limit at produce time and 
