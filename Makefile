@@ -5,15 +5,15 @@ GO_FILES := $(shell find . -name '*.go' | grep -v /vendor/ | grep -v _test.go)
 BUILD_DIR := "./build"
 BINARY_PATH := $(BUILD_DIR)/$(PROJECT_NAME)
 COVERAGE_DIR := $(BUILD_DIR)
-INCLUDE_EXPRESSION ?= "executed && action=='issue' && account=='eosio.nft.ft' && receiver=='eosio.nft.ft'"
-KEY_EXPRESSION ?= "[transaction_id]"
+KUBECONFIG ?= ~/.kube/dev.dfuse.kube
+INCLUDE_EXPRESSION ?= 'executed && (action=="resell" || action=="buy") && account=="eosio.nft.ft" && receiver=="eosio.nft.ft"'
+KEY_EXPRESSION ?= 'action=="resell"?[string(data.resell.token_id)] : [string(data.buy.token_id)]'
+MESSAGE_TYPE ?= 'action=="resell"?"EosioNftFtResellNotification" : "EosioNftFtBuyNotification"'
 COMPRESSION_TYPE ?= "snappy"
 COMPRESSION_LEVEL ?= -1
-KUBECONFIG ?= ~/.kube/dev.dfuse.kube
-START_BLOCK ?= 2272500
-STOP_BLOCK ?= 2272600
-MESSAGE_MAX ?= 10000000
-
+MESSAGE_MAX_SIZE ?= 10000000
+START_BLOCK ?= 2994800
+STOP_BLOCK ?= 3994800
 # Source:
 #   https://about.gitlab.com/blog/2017/11/27/go-tools-and-gitlab-how-to-do-continuous-integration-like-a-boss/
 #   https://gitlab.com/pantomath-io/demo-tools/-/tree/master
@@ -56,7 +56,7 @@ up: ## Launch docker compose
 	@docker-compose up -d
 
 
-start: build up ## start dkafka localy
+stream: build up ## start dkafka localy
 	$(BINARY_PATH) publish \
 		--dfuse-firehose-grpc-addr=localhost:9000 \
 		--abicodec-grpc-addr=localhost:9001 \
@@ -65,11 +65,11 @@ start: build up ## start dkafka localy
 		--kafka-topic="io.dkafka.test" \
 		--dfuse-firehose-include-expr=$(INCLUDE_EXPRESSION) \
 		--event-keys-expr=$(KEY_EXPRESSION) \
-		--event-type-expr="'TestNotification'" \
+		--event-type-expr=$(MESSAGE_TYPE) \
 		--kafka-compression-type=$(COMPRESSION_TYPE) \
 		--kafka-compression-level=$(COMPRESSION_LEVEL) \
 		--start-block-num=$(START_BLOCK) \
-		--kafka-message-max-bytes=$(MESSAGE_MAX)
+		--kafka-message-max-bytes=$(MESSAGE_MAX_SIZE)
 
 batch: build up ## run batch localy
 	$(BINARY_PATH) publish \
@@ -80,12 +80,12 @@ batch: build up ## run batch localy
 		--kafka-topic="io.dkafka.test" \
 		--dfuse-firehose-include-expr=$(INCLUDE_EXPRESSION) \
 		--event-keys-expr=$(KEY_EXPRESSION) \
-		--event-type-expr="'TestNotification'" \
+		--event-type-expr=$(MESSAGE_TYPE) \
 		--kafka-compression-type=$(COMPRESSION_TYPE) \
 		--kafka-compression-level=$(COMPRESSION_LEVEL) \
 		--start-block-num=$(START_BLOCK) \
 		--stop-block-num=$(STOP_BLOCK) \
-		--kafka-message-max-bytes=$(MESSAGE_MAX)
+		--kafka-message-max-bytes=$(MESSAGE_MAX_SIZE)
 
 forward: ## open port forwarding on dfuse dev
 	KUBECONFIG=$(KUBECONFIG) kubectl -n ultra-dev port-forward firehose-v3-0 9000 &
