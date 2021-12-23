@@ -18,6 +18,11 @@ type extension struct {
 
 var irreversibleOnly = false
 
+type Correlation struct {
+	Payer string `json:"payer"`
+	Id    string `json:"id"`
+}
+
 type ActionInfo struct {
 	Account        string           `json:"account"`
 	Receiver       string           `json:"receiver"`
@@ -29,13 +34,14 @@ type ActionInfo struct {
 }
 
 type event struct {
-	BlockNum      uint32     `json:"block_num"`
-	BlockID       string     `json:"block_id"`
-	Status        string     `json:"status"`
-	Executed      bool       `json:"executed"`
-	Step          string     `json:"block_step"`
-	TransactionID string     `json:"trx_id"`
-	ActionInfo    ActionInfo `json:"act_info"`
+	BlockNum      uint32       `json:"block_num"`
+	BlockID       string       `json:"block_id"`
+	Status        string       `json:"status"`
+	Executed      bool         `json:"executed"`
+	Step          string       `json:"block_step"`
+	Correlation   *Correlation `json:"correlation,omitempty"`
+	TransactionID string       `json:"trx_id"`
+	ActionInfo    ActionInfo   `json:"act_info"`
 }
 
 func (e event) JSON() []byte {

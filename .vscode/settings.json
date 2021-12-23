@@ -1,12 +1,30 @@
 {
     "cSpell.words": [
+        "abicodec",
         "bstream",
         "covhtml",
+        "DBOP",
+        "dbops",
+        "dedupe",
+        "dfuse",
+        "dgrpc",
         "dkafka",
+        "eosio",
         "gopkg",
+        "GRPC",
+        "memoizable",
         "mkdir",
         "msan",
         "pantomath",
-        "zlog"
+        "pbabicodec",
+        "pbbstream",
+        "pbcodec",
+        "pbgo",
+        "pbhealth",
+        "protobuf",
+        "ptypes",
+        "Undecodable",
+        "zlog",
+        "zstd"
     ]
 }

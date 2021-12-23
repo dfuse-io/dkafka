@@ -1,3 +1,5 @@
+# see https://docs.gitlab.com/ee/ci/caching/index.html#cache-go-dependencies
+
 cache:
   paths:
     - /apt-cache

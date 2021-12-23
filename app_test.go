@@ -1,6 +1,11 @@
 package dkafka
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+
+	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
+)
 
 func Test_getCompressionLevel(t *testing.T) {
 	type args struct {
@@ -31,6 +36,36 @@ func Test_getCompressionLevel(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := getCompressionLevel(tt.args.compressionType, tt.args.config); got != tt.want {
 				t.Errorf("getCompressionLevel() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_getCorrelation(t *testing.T) {
+	type args struct {
+		Actions []*pbcodec.ActionTrace
+	}
+	tests := []struct {
+		Name            string
+		Args            args
+		WantCorrelation *Correlation
+		WantErr         bool
+	}{
+		{"empty", args{}, nil, false},
+		{"not-empty-no-correlations", args{[]*pbcodec.ActionTrace{{Action: &pbcodec.Action{Account: "eosio.token", Name: "transfer"}}}}, nil, false},
+		{"not-empty-with-correlations-first", args{[]*pbcodec.ActionTrace{{Action: &pbcodec.Action{Account: "ultra.tools", Name: "correlate", JsonData: `{"payer":"ultra", "correlation_id":"123"}`}}, {Action: &pbcodec.Action{Account: "eosio.token", Name: "transfer"}}}}, &Correlation{"ultra", "123"}, false},
+		{"missing-correlations-json-data", args{[]*pbcodec.ActionTrace{{Action: &pbcodec.Action{Account: "ultra.tools", Name: "correlate"}}}}, nil, true},
+		{"not-empty-with-correlations-second", args{[]*pbcodec.ActionTrace{{Action: &pbcodec.Action{Account: "eosio.token", Name: "transfer"}}, {Action: &pbcodec.Action{Account: "ultra.tools", Name: "correlate", JsonData: `{"payer":"ultra", "correlation_id":"123"}`}}}}, &Correlation{"ultra", "123"}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.Name, func(t *testing.T) {
+			gotCorrelation, err := getCorrelation(tt.Args.Actions)
+			if (err != nil) != tt.WantErr {
+				t.Errorf("getCorrelation() error = %v, wantErr %v", err, tt.WantErr)
+				return
+			}
+			if !reflect.DeepEqual(gotCorrelation, tt.WantCorrelation) {
+				t.Errorf("getCorrelation() = %v, want %v", gotCorrelation, tt.WantCorrelation)
 			}
 		})
 	}

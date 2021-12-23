@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"github.com/dfuse-io/dfuse-eosio/filtering"
 	pbabicodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/abicodec/v1"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 	"github.com/eoscanada/eos-go"
@@ -34,6 +33,7 @@ type Config struct {
 
 	DryRun        bool // do not connect to Kafka, just print to stdout
 	BatchMode     bool
+	Capture       bool
 	StartBlockNum int64
 	StopBlockNum  uint64
 	StateFile     string
@@ -103,6 +103,12 @@ func (a *App) Run() error {
 		return fmt.Errorf("connecting to grpc address %s: %w", addr, err)
 	}
 
+	var saveBlock SaveBlock
+	saveBlock = saveBlockNoop
+	if a.config.Capture {
+		saveBlock = saveBlockJSON
+	}
+
 	client := pbbstream.NewBlockStreamV2Client(conn)
 
 	req := &pbbstream.BlocksRequestV2{
@@ -141,7 +147,7 @@ func (a *App) Run() error {
 	abiDecoder := NewABIDecoder(abiFiles, abiCodecClient)
 
 	if abiDecoder.IsNOOP() && a.config.FailOnUndecodableDBOP {
-		return fmt.Errorf("Invalid config: no abicodec GRPC address and no local ABI file has been set, but fail-on-undecodable-db-op is enabled")
+		return fmt.Errorf("invalid config: no abicodec GRPC address and no local ABI file has been set, but fail-on-undecodable-db-op is enabled")
 	}
 
 	var cp checkpointer
@@ -239,7 +245,25 @@ func (a *App) Run() error {
 		Value: []byte("application/json"),
 	}
 
+	mapper := newMapper(
+		s,
+		a.config.KafkaTopic,
+		saveBlock,
+		abiDecoder.DecodeDBOps,
+		a.config.FailOnUndecodableDBOP,
+		eventTypeProg,
+		eventKeyProg,
+		extensions,
+		[]kafka.Header{
+			sourceHeader,
+			specHeader,
+			contentTypeHeader,
+			dataContentTypeHeader,
+		},
+	)
+
 	// loop: receive block,  transform block, send message...
+	zlog.Info("Start looping over blocks...")
 	for {
 		msg, err := executor.Recv()
 		if err != nil {
@@ -248,147 +272,14 @@ func (a *App) Run() error {
 			}
 			return fmt.Errorf("error on receive: %w", err)
 		}
-
+		zlog.Debug("Receive new block", zap.String("cursor", msg.Cursor))
 		blk := &pbcodec.Block{}
 		if err := ptypes.UnmarshalAny(msg.Block, blk); err != nil {
 			return fmt.Errorf("decoding any of type %q: %w", msg.Block.TypeUrl, err)
 		}
+
 		blocksReceived.Inc()
-		step := sanitizeStep(msg.Step.String())
-
-		if blk.Number%100 == 0 {
-			zlog.Info("incoming block 1/100", zap.Uint32("blk_number", blk.Number), zap.String("step", step), zap.Int("length_filtered_trx_traces", len(blk.FilteredTransactionTraces)))
-		}
-		if blk.Number%10 == 0 {
-			zlog.Debug("incoming block 1/10", zap.Uint32("blk_number", blk.Number), zap.String("step", step), zap.Int("length_filtered_trx_traces", len(blk.FilteredTransactionTraces)))
-		}
-
-		for _, trx := range blk.TransactionTraces() {
-			transactionTracesReceived.Inc()
-			status := sanitizeStatus(trx.Receipt.Status.String())
-			memoizableTrxTrace := &filtering.MemoizableTrxTrace{TrxTrace: trx}
-			for _, act := range trx.ActionTraces {
-				if !act.FilteringMatched {
-					continue
-				}
-				actionTracesReceived.Inc()
-				var jsonData json.RawMessage
-				if act.Action.JsonData != "" {
-					jsonData = json.RawMessage(act.Action.JsonData)
-				}
-				activation := filtering.NewActionTraceActivation(
-					act,
-					memoizableTrxTrace,
-					msg.Step.String(),
-				)
-
-				var auths []string
-				for _, auth := range act.Action.Authorization {
-					auths = append(auths, auth.Authorization())
-				}
-
-				var globalSeq uint64
-				if act.Receipt != nil {
-					globalSeq = act.Receipt.GlobalSequence
-				}
-
-				decodedDBOps, err := abiDecoder.DecodeDBOps(trx.DBOpsForAction(act.ExecutionIndex), blk.Number)
-				if err != nil {
-					if a.config.FailOnUndecodableDBOP {
-						return err
-					}
-					zlog.Warn("cannot decode dbops", zap.Uint32("block_number", blk.Number), zap.Error(err))
-				}
-				eosioAction := event{
-					BlockNum:      blk.Number,
-					BlockID:       blk.Id,
-					Status:        status,
-					Executed:      !trx.HasBeenReverted(),
-					Step:          step,
-					TransactionID: trx.Id,
-					ActionInfo: ActionInfo{
-						Account:        act.Account(),
-						Receiver:       act.Receiver,
-						Action:         act.Name(),
-						JSONData:       &jsonData,
-						DBOps:          decodedDBOps,
-						Authorization:  auths,
-						GlobalSequence: globalSeq,
-					},
-				}
-
-				eventType, err := evalString(eventTypeProg, activation)
-				if err != nil {
-					return fmt.Errorf("error eventtype eval: %w", err)
-				}
-
-				extensionsKV := make(map[string]string)
-				for _, ext := range extensions {
-					val, err := evalString(ext.prog, activation)
-					if err != nil {
-						return fmt.Errorf("program: %w", err)
-					}
-					extensionsKV[ext.name] = val
-
-				}
-
-				eventKeys, err := evalStringArray(eventKeyProg, activation)
-				if err != nil {
-					return fmt.Errorf("event keyeval: %w", err)
-				}
-
-				dedupeMap := make(map[string]bool)
-				for _, eventKey := range eventKeys {
-					if dedupeMap[eventKey] {
-						continue
-					}
-					dedupeMap[eventKey] = true
-
-					headers := []kafka.Header{
-						{
-							Key:   "ce_id",
-							Value: hashString(fmt.Sprintf("%s%s%d%s%s", blk.Id, trx.Id, act.ExecutionIndex, msg.Step.String(), eventKey)),
-						},
-						sourceHeader,
-						specHeader,
-						{
-							Key:   "ce_type",
-							Value: []byte(eventType),
-						},
-						contentTypeHeader,
-						{
-							Key:   "ce_time",
-							Value: []byte(blk.MustTime().Format("2006-01-02T15:04:05.9Z")),
-						},
-						dataContentTypeHeader,
-						{
-							Key:   "ce_blkstep",
-							Value: []byte(step),
-						},
-					}
-					for k, v := range extensionsKV {
-						headers = append(headers, kafka.Header{
-							Key:   k,
-							Value: []byte(v),
-						})
-					}
-					msg := kafka.Message{
-						Key:     []byte(eventKey),
-						Headers: headers,
-						Value:   eosioAction.JSON(),
-						TopicPartition: kafka.TopicPartition{
-							Topic:     &a.config.KafkaTopic,
-							Partition: kafka.PartitionAny,
-						},
-					}
-					if err := s.Send(&msg); err != nil {
-						return fmt.Errorf("sending message: %w", err)
-					}
-					messagesSent.Inc()
-				}
-
-			}
-		}
+		mapper.transform(blk, msg.Step.String())
 		if a.IsTerminating() {
 			return s.Commit(context.Background(), msg.Cursor)
 		}
@@ -460,4 +351,21 @@ func getCompressionLevel(compressionType string, config *Config) int {
 		return -1
 	}
 	return level.normalize(compressionLevel)
+}
+
+func getCorrelation(actions []*pbcodec.ActionTrace) (correlation *Correlation, err error) {
+	for _, act := range actions {
+		if act.Account() == "ultra.tools" && act.Name() == "correlate" {
+			jsonString := act.Action.GetJsonData()
+			var out map[string]interface{}
+			err = json.Unmarshal([]byte(jsonString), &out)
+			if err != nil {
+				err = fmt.Errorf("decoding correlate action %q: %w", jsonString, err)
+				return
+			}
+			correlation = &Correlation{fmt.Sprint(out["payer"]), fmt.Sprint(out["correlation_id"])}
+			return
+		}
+	}
+	return
 }

@@ -57,6 +57,7 @@ events being sent. Must resolve to an array of strings`)
 start streaming from this block number (if negative, relative to HEAD)`)
 	PublishCmd.Flags().Uint64("stop-block-num", 0, "If non-zero, stop processing before this block number")
 	PublishCmd.Flags().String("state-file", "./dkafka.state.json", "progress will be saved into this file")
+	PublishCmd.Flags().Bool("capture", false, "Activate the capture mode where blocks are saved on the file system in json format.")
 
 	PublishCmd.Flags().StringSlice("local-abi-files", []string{}, `repeatable, ABI file definition in this format:
 '{account}:{path/to/filename}' (ex: 'eosio.token:/tmp/eosio_token.abi').
@@ -119,6 +120,7 @@ func publishRunE(cmd *cobra.Command, args []string) error {
 		StartBlockNum: viper.GetInt64("publish-cmd-start-block-num"),
 		StopBlockNum:  viper.GetUint64("publish-cmd-stop-block-num"),
 		StateFile:     viper.GetString("publish-cmd-state-file"),
+		Capture:       viper.GetBool("publish-cmd-capture"),
 
 		LocalABIFiles:         localABIFiles,
 		ABICodecGRPCAddr:      viper.GetString("publish-cmd-abicodec-grpc-addr"),

@@ -5,14 +5,14 @@ GO_FILES := $(shell find . -name '*.go' | grep -v /vendor/ | grep -v _test.go)
 BUILD_DIR := "./build"
 BINARY_PATH := $(BUILD_DIR)/$(PROJECT_NAME)
 COVERAGE_DIR := $(BUILD_DIR)
-KUBECONFIG ?= ~/.kube/dev.dfuse.kube
-INCLUDE_EXPRESSION ?= 'executed && (action=="resell" || action=="buy") && account=="eosio.nft.ft" && receiver=="eosio.nft.ft"'
-KEY_EXPRESSION ?= 'action=="resell"?[string(data.resell.token_id)] : [string(data.buy.token_id)]'
-MESSAGE_TYPE ?= 'action=="resell"?"EosioNftFtResellNotification" : "EosioNftFtBuyNotification"'
+KUBECONFIG ?= ~/.kube/dfuse.staging.kube
+INCLUDE_EXPRESSION ?= 'executed && action=="create" && account=="eosio.nft.ft" && receiver=="eosio.nft.ft"'
+KEY_EXPRESSION ?= '[transaction_id]'
+MESSAGE_TYPE ?= '"TestType"'
 COMPRESSION_TYPE ?= "snappy"
 COMPRESSION_LEVEL ?= -1
 MESSAGE_MAX_SIZE ?= 10000000
-START_BLOCK ?= 2994800
+START_BLOCK ?= 30080000
 STOP_BLOCK ?= 3994800
 # Source:
 #   https://about.gitlab.com/blog/2017/11/27/go-tools-and-gitlab-how-to-do-continuous-integration-like-a-boss/
@@ -88,8 +88,8 @@ batch: build up ## run batch localy
 		--kafka-message-max-bytes=$(MESSAGE_MAX_SIZE)
 
 forward: ## open port forwarding on dfuse dev
-	KUBECONFIG=$(KUBECONFIG) kubectl -n ultra-dev port-forward firehose-v3-0 9000 &
-	KUBECONFIG=$(KUBECONFIG) kubectl -n ultra-dev port-forward svc/abicodec-v3 9001:9000 &
+	KUBECONFIG=$(KUBECONFIG) kubectl -n ultra-prod-testnet port-forward firehose-v3-0 9000 &
+	KUBECONFIG=$(KUBECONFIG) kubectl -n ultra-prod-testnet port-forward svc/abicodec-v3 9001:9000 &
 
 help: ## Display this help screen
 	@grep -h -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
