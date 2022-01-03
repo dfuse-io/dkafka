@@ -1,1 +1,129 @@
-{"topic":"","headers":["ce_id","wlHYgcgvx/iopjXm50u7OzVGZYFyXj7SeoB+NCHKTVc=","ce_type","TestType","ce_time","2021-11-17T10:16:19Z","ce_blkstep","New"],"partition":0,"offset":0,"ts":0,"key":"a2a53dce154c2ccdca52a981318775938de02f7efef88926ae1d7fd992988530","payload":{"block_num":30080032,"block_id":"01cafc203bf4bf807266fe5ac12c4b9ef72bd6482367a6c95bff70161dbeb462","status":"EXECUTED","executed":true,"block_step":"New","trx_id":"a2a53dce154c2ccdca52a981318775938de02f7efef88926ae1d7fd992988530","act_info":{"account":"eosio.nft.ft","receiver":"eosio.nft.ft","action":"create","global_seq":80493723,"authorizations":["ultra.nft.ft@backend"],"db_ops":[{"operation":2,"code":"eosio.nft.ft","table_name":"next.factory","primary_key":"next.factory","old_payer":"eosio.nft.ft","new_payer":"eosio.nft.ft","old_data":"GgAAAAAAAAA=","new_data":"GwAAAAAAAAA=","new_json":{"value":27},"old_json":{"value":26}},{"operation":1,"code":"eosio.nft.ft","scope":"eosio.nft.ft","table_name":"factory.a","primary_key":"...........1e","new_payer":"ultra.nft.ft","new_data":"GgAAAAAAAACQF8hrAnNz1JAXyGsCc3PUAAAAAAAAAAAAAAAAAAAAAAAIVVNEAAAAAAJAKB5JiUMD1PQBQNIeron8Qtz0AQAAAAABAAAAAAABAAAAAAGQF8hrAnNz1AABfGh0dHBzOi8vczMudXMtZWFzdC0xLndhc2FiaXN5cy5jb20vdWx0cmFpby11bmlxLXN0YWdpbmcvZDZjOTk5YmJiZDVmM2MxMjJkMjI2MWUyYjc4N2FjYjNlMDNhYWM2YTE4NTIwMjRiOTY1NmM4NWQ3YTk5ZmFiZC56aXDWyZm7vV88Ei0iYeK3h6yz4DqsahhSAkuWVshdepn6vQEoAAAAAAAAAAAAAAA=","new_json":{"asset_creator":"ultra.nft.ft","asset_manager":"ultra.nft.ft","chosen_rate":[],"conditionless_receivers":["ultra.nft.ft"],"conversion_rate_oracle_contract":"","existing_tokens_no":0,"id":26,"lockup_time":0,"max_mintable_tokens":40,"meta_hash":"d6c999bbbd5f3c122d2261e2b787acb3e03aac6a1852024b9656c85d7a99fabd","meta_uris":["https://s3.us-east-1.wasabisys.com/ultraio-uniq-staging/d6c999bbbd5f3c122d2261e2b787acb3e03aac6a1852024b9656c85d7a99fabd.zip"],"minimum_resell_price":"0.00000000 USD","minted_tokens_no":0,"recall_window_start":0,"resale_shares":[{"basis_point":500,"receiver":"uk1ob2ed3so4"},{"basis_point":500,"receiver":"vl1jt2hi3vd4"}],"stat":0}}],"json_data":{"create":{"asset_creator":"ultra.nft.ft","asset_manager":"ultra.nft.ft","chosen_rate":null,"conditionless_receivers":["ultra.nft.ft"],"conversion_rate_oracle_contract":null,"lockup_time":0,"max_mintable_tokens":40,"memo":"b0b70c2f-5895-42b7-bfbf-0992bd815271","meta_hash":"d6c999bbbd5f3c122d2261e2b787acb3e03aac6a1852024b9656c85d7a99fabd","meta_uris":["https://s3.us-east-1.wasabisys.com/ultraio-uniq-staging/d6c999bbbd5f3c122d2261e2b787acb3e03aac6a1852024b9656c85d7a99fabd.zip"],"minimum_resell_price":"0.00000000 USD","mintable_window_end":null,"mintable_window_start":null,"recall_window_end":null,"recall_window_start":0,"resale_shares":[{"basis_point":500,"receiver":"uk1ob2ed3so4"},{"basis_point":500,"receiver":"vl1jt2hi3vd4"}],"stat":null,"trading_window_end":null,"trading_window_start":null,"version":0}}}}}
+{
+    "topic": "",
+    "headers": [
+        "ce_id",
+        "wlHYgcgvx/iopjXm50u7OzVGZYFyXj7SeoB+NCHKTVc=",
+        "ce_type",
+        "TestType",
+        "ce_time",
+        "2021-11-17T10:16:19Z",
+        "ce_blkstep",
+        "New"
+    ],
+    "partition": 0,
+    "offset": 0,
+    "ts": 0,
+    "key": "a2a53dce154c2ccdca52a981318775938de02f7efef88926ae1d7fd992988530",
+    "payload": {
+        "block_num": 30080032,
+        "block_id": "01cafc203bf4bf807266fe5ac12c4b9ef72bd6482367a6c95bff70161dbeb462",
+        "status": "EXECUTED",
+        "executed": true,
+        "block_step": "New",
+        "trx_id": "a2a53dce154c2ccdca52a981318775938de02f7efef88926ae1d7fd992988530",
+        "act_info": {
+            "account": "eosio.nft.ft",
+            "receiver": "eosio.nft.ft",
+            "action": "create",
+            "global_seq": 80493723,
+            "authorizations": [
+                "ultra.nft.ft@backend"
+            ],
+            "db_ops": [
+                {
+                    "operation": 2,
+                    "code": "eosio.nft.ft",
+                    "table_name": "next.factory",
+                    "primary_key": "next.factory",
+                    "old_payer": "eosio.nft.ft",
+                    "new_payer": "eosio.nft.ft",
+                    "old_data": "GgAAAAAAAAA=",
+                    "new_data": "GwAAAAAAAAA=",
+                    "new_json": {
+                        "value": 27
+                    },
+                    "old_json": {
+                        "value": 26
+                    }
+                },
+                {
+                    "operation": 1,
+                    "code": "eosio.nft.ft",
+                    "scope": "eosio.nft.ft",
+                    "table_name": "factory.a",
+                    "primary_key": "...........1e",
+                    "new_payer": "ultra.nft.ft",
+                    "new_data": "GgAAAAAAAACQF8hrAnNz1JAXyGsCc3PUAAAAAAAAAAAAAAAAAAAAAAAIVVNEAAAAAAJAKB5JiUMD1PQBQNIeron8Qtz0AQAAAAABAAAAAAABAAAAAAGQF8hrAnNz1AABfGh0dHBzOi8vczMudXMtZWFzdC0xLndhc2FiaXN5cy5jb20vdWx0cmFpby11bmlxLXN0YWdpbmcvZDZjOTk5YmJiZDVmM2MxMjJkMjI2MWUyYjc4N2FjYjNlMDNhYWM2YTE4NTIwMjRiOTY1NmM4NWQ3YTk5ZmFiZC56aXDWyZm7vV88Ei0iYeK3h6yz4DqsahhSAkuWVshdepn6vQEoAAAAAAAAAAAAAAA=",
+                    "new_json": {
+                        "asset_creator": "ultra.nft.ft",
+                        "asset_manager": "ultra.nft.ft",
+                        "chosen_rate": [],
+                        "conditionless_receivers": [
+                            "ultra.nft.ft"
+                        ],
+                        "conversion_rate_oracle_contract": "",
+                        "existing_tokens_no": 0,
+                        "id": 26,
+                        "lockup_time": 0,
+                        "max_mintable_tokens": 40,
+                        "meta_hash": "d6c999bbbd5f3c122d2261e2b787acb3e03aac6a1852024b9656c85d7a99fabd",
+                        "meta_uris": [
+                            "https://s3.us-east-1.wasabisys.com/ultraio-uniq-staging/d6c999bbbd5f3c122d2261e2b787acb3e03aac6a1852024b9656c85d7a99fabd.zip"
+                        ],
+                        "minimum_resell_price": "0.00000000 USD",
+                        "minted_tokens_no": 0,
+                        "recall_window_start": 0,
+                        "resale_shares": [
+                            {
+                                "basis_point": 500,
+                                "receiver": "uk1ob2ed3so4"
+                            },
+                            {
+                                "basis_point": 500,
+                                "receiver": "vl1jt2hi3vd4"
+                            }
+                        ],
+                        "stat": 0
+                    }
+                }
+            ],
+            "json_data": {
+                "create": {
+                    "asset_creator": "ultra.nft.ft",
+                    "asset_manager": "ultra.nft.ft",
+                    "chosen_rate": null,
+                    "conditionless_receivers": [
+                        "ultra.nft.ft"
+                    ],
+                    "conversion_rate_oracle_contract": null,
+                    "lockup_time": 0,
+                    "max_mintable_tokens": 40,
+                    "memo": "b0b70c2f-5895-42b7-bfbf-0992bd815271",
+                    "meta_hash": "d6c999bbbd5f3c122d2261e2b787acb3e03aac6a1852024b9656c85d7a99fabd",
+                    "meta_uris": [
+                        "https://s3.us-east-1.wasabisys.com/ultraio-uniq-staging/d6c999bbbd5f3c122d2261e2b787acb3e03aac6a1852024b9656c85d7a99fabd.zip"
+                    ],
+                    "minimum_resell_price": "0.00000000 USD",
+                    "mintable_window_end": null,
+                    "mintable_window_start": null,
+                    "recall_window_end": null,
+                    "recall_window_start": 0,
+                    "resale_shares": [
+                        {
+                            "basis_point": 500,
+                            "receiver": "uk1ob2ed3so4"
+                        },
+                        {
+                            "basis_point": 500,
+                            "receiver": "vl1jt2hi3vd4"
+                        }
+                    ],
+                    "stat": null,
+                    "trading_window_end": null,
+                    "trading_window_start": null,
+                    "version": 0
+                }
+            }
+        }
+    }
+}

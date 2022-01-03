@@ -1,12 +1,16 @@
 package dkafka
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
 	"testing"
+	"time"
 
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 )
 
@@ -45,7 +49,7 @@ func Test_mapper_transform(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unmarshal() error: %v", err)
 			}
-			var s sender = &dryRunSender{}
+			var s sender = &testSender{}
 			var localABIFiles = map[string]string{
 				"eosio.nft.ft": "testdata/eosio.nft.ft.abi",
 			}
@@ -79,4 +83,91 @@ func Test_mapper_transform(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Benchmark_mapper_transform(b *testing.B) {
+	tests := []struct {
+		name                  string
+		file                  string
+		failOnUndecodableDBOP bool
+		wantErr               bool
+	}{
+		{
+			"filter-out",
+			"testdata/block-30080030.json",
+			true,
+			false,
+		},
+		{
+			"filter-in",
+			"testdata/block-30080032.json",
+			true,
+			false,
+		},
+	}
+	for _, tt := range tests {
+		f, err := os.Open(tt.file)
+		if err != nil {
+			b.Fatalf("Open() error: %v", err)
+		}
+		defer f.Close()
+		// read block
+		byteValue, err := ioutil.ReadAll(f)
+		if err != nil {
+			b.Fatalf("ReadAll() error: %v", err)
+		}
+		block := &pbcodec.Block{}
+		// must delete rlimit_ops, valid_block_signing_authority_v2, active_schedule_v2
+		err = json.Unmarshal(byteValue, block)
+		if err != nil {
+			b.Fatalf("Unmarshal() error: %v", err)
+		}
+		var s sender = &testSender{}
+		var localABIFiles = map[string]string{
+			"eosio.nft.ft": "testdata/eosio.nft.ft.abi",
+		}
+		abiFiles, err := LoadABIFiles(localABIFiles)
+		if err != nil {
+			b.Fatalf("LoadABIFiles() error: %v", err)
+		}
+		abiDecoder := NewABIDecoder(abiFiles, nil)
+		eventTypeProg, err := exprToCelProgram("'TestType'")
+		if err != nil {
+			b.Fatalf("exprToCelProgram() error: %v", err)
+		}
+		eventKeyProg, err := exprToCelProgram("[transaction_id]")
+		if err != nil {
+			b.Fatalf("exprToCelProgram() error: %v", err)
+		}
+		m := mapper{
+			sender:                s,
+			topic:                 "test.topic",
+			saveBlock:             saveBlockNoop,
+			decodeDBOps:           abiDecoder.DecodeDBOps,
+			failOnUndecodableDBOP: tt.failOnUndecodableDBOP,
+			eventTypeProg:         eventTypeProg,
+			eventKeyProg:          eventKeyProg,
+			extensions:            nil,
+			headers:               nil,
+		}
+		b.Run(fmt.Sprintf("%s: %s", tt.name, path.Base(tt.file)), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				m.transform(block, "New")
+			}
+		})
+	}
+}
+
+type testSender struct{}
+
+func (s *testSender) Send(msg *kafka.Message) error {
+	return nil
+}
+
+func (s *testSender) CommitIfAfter(context.Context, string, time.Duration) error {
+	return nil
+}
+
+func (s *testSender) Commit(context.Context, string) error {
+	return nil
 }

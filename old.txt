@@ -1,0 +1,16 @@
+goos: linux
+goarch: amd64
+pkg: github.com/dfuse-io/dkafka
+cpu: AMD Ryzen 7 PRO 5850U with Radeon Graphics     
+Benchmark_mapper_transform/filter-out:_block-30080030.json-16         	 5451396	       212.1 ns/op
+Benchmark_mapper_transform/filter-out:_block-30080030.json-16         	 5757855	       212.8 ns/op
+Benchmark_mapper_transform/filter-out:_block-30080030.json-16         	 5416107	       219.4 ns/op
+Benchmark_mapper_transform/filter-out:_block-30080030.json-16         	 5487288	       222.8 ns/op
+Benchmark_mapper_transform/filter-out:_block-30080030.json-16         	 5326705	       222.3 ns/op
+Benchmark_mapper_transform/filter-in:_block-30080032.json-16          	   24594	     49192 ns/op
+Benchmark_mapper_transform/filter-in:_block-30080032.json-16          	   23872	     50007 ns/op
+Benchmark_mapper_transform/filter-in:_block-30080032.json-16          	   23096	     49213 ns/op
+Benchmark_mapper_transform/filter-in:_block-30080032.json-16          	   23395	     49848 ns/op
+Benchmark_mapper_transform/filter-in:_block-30080032.json-16          	   24493	     50232 ns/op
+PASS
+ok  	github.com/dfuse-io/dkafka	15.671s
