@@ -110,7 +110,7 @@ type fakeMessage struct {
 	Payload   json.RawMessage `json:"payload"`
 }
 
-func (s *dryRunSender) Send(msg *kafka.Message) error {
+func messageToJSON(msg *kafka.Message) (json.RawMessage, error) {
 	out := &fakeMessage{
 		Payload: json.RawMessage(msg.Value),
 		Key:     string(msg.Key),
@@ -118,7 +118,11 @@ func (s *dryRunSender) Send(msg *kafka.Message) error {
 	for _, h := range msg.Headers {
 		out.Headers = append(out.Headers, h.Key, string(h.Value))
 	}
-	outjson, err := json.Marshal(out)
+	return json.Marshal(out)
+}
+
+func (s *dryRunSender) Send(msg *kafka.Message) error {
+	outjson, err := messageToJSON(msg)
 	if err != nil {
 		return err
 	}

@@ -245,7 +245,7 @@ func (a *App) Run() error {
 		Value: []byte("application/json"),
 	}
 
-	mapper := newAdapter(
+	adapter := newAdapter(
 		a.config.KafkaTopic,
 		saveBlock,
 		abiDecoder.DecodeDBOps,
@@ -278,7 +278,7 @@ func (a *App) Run() error {
 		}
 
 		blocksReceived.Inc()
-		kafkaMsg, err := mapper.adapt(blk, msg.Step.String())
+		kafkaMsg, err := adapter.adapt(blk, msg.Step.String())
 		if err != nil {
 			return fmt.Errorf("transform to kafka message: %s, %w", msg.Cursor, err)
 		}
