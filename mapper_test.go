@@ -1,16 +1,13 @@
 package dkafka
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
 	"testing"
-	"time"
 
-	"github.com/confluentinc/confluent-kafka-go/kafka"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 )
 
@@ -49,7 +46,6 @@ func Test_mapper_transform(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unmarshal() error: %v", err)
 			}
-			var s sender = &testSender{}
 			var localABIFiles = map[string]string{
 				"eosio.nft.ft": "testdata/eosio.nft.ft.abi",
 			}
@@ -67,7 +63,6 @@ func Test_mapper_transform(t *testing.T) {
 				t.Fatalf("exprToCelProgram() error: %v", err)
 			}
 			m := mapper{
-				sender:                s,
 				topic:                 "test.topic",
 				saveBlock:             saveBlockNoop,
 				decodeDBOps:           abiDecoder.DecodeDBOps,
@@ -78,7 +73,7 @@ func Test_mapper_transform(t *testing.T) {
 				headers:               nil,
 			}
 
-			if err := m.transform(block, "New"); (err != nil) != tt.wantErr {
+			if _, err := m.transform(block, "New"); (err != nil) != tt.wantErr {
 				t.Errorf("mapper.transform() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -122,7 +117,6 @@ func Benchmark_mapper_transform(b *testing.B) {
 		if err != nil {
 			b.Fatalf("Unmarshal() error: %v", err)
 		}
-		var s sender = &testSender{}
 		var localABIFiles = map[string]string{
 			"eosio.nft.ft": "testdata/eosio.nft.ft.abi",
 		}
@@ -140,7 +134,6 @@ func Benchmark_mapper_transform(b *testing.B) {
 			b.Fatalf("exprToCelProgram() error: %v", err)
 		}
 		m := mapper{
-			sender:                s,
 			topic:                 "test.topic",
 			saveBlock:             saveBlockNoop,
 			decodeDBOps:           abiDecoder.DecodeDBOps,
@@ -156,18 +149,4 @@ func Benchmark_mapper_transform(b *testing.B) {
 			}
 		})
 	}
-}
-
-type testSender struct{}
-
-func (s *testSender) Send(msg *kafka.Message) error {
-	return nil
-}
-
-func (s *testSender) CommitIfAfter(context.Context, string, time.Duration) error {
-	return nil
-}
-
-func (s *testSender) Commit(context.Context, string) error {
-	return nil
 }

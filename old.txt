@@ -2,15 +2,19 @@ goos: linux
 goarch: amd64
 pkg: github.com/dfuse-io/dkafka
 cpu: AMD Ryzen 7 PRO 5850U with Radeon Graphics     
-Benchmark_mapper_transform/filter-out:_block-30080030.json-16         	 5451396	       212.1 ns/op
-Benchmark_mapper_transform/filter-out:_block-30080030.json-16         	 5757855	       212.8 ns/op
-Benchmark_mapper_transform/filter-out:_block-30080030.json-16         	 5416107	       219.4 ns/op
-Benchmark_mapper_transform/filter-out:_block-30080030.json-16         	 5487288	       222.8 ns/op
-Benchmark_mapper_transform/filter-out:_block-30080030.json-16         	 5326705	       222.3 ns/op
-Benchmark_mapper_transform/filter-in:_block-30080032.json-16          	   24594	     49192 ns/op
-Benchmark_mapper_transform/filter-in:_block-30080032.json-16          	   23872	     50007 ns/op
-Benchmark_mapper_transform/filter-in:_block-30080032.json-16          	   23096	     49213 ns/op
-Benchmark_mapper_transform/filter-in:_block-30080032.json-16          	   23395	     49848 ns/op
-Benchmark_mapper_transform/filter-in:_block-30080032.json-16          	   24493	     50232 ns/op
+Benchmark_mapper_transform/filter-out:_block-30080030.json-4         	 6821104	       175.8 ns/op
+Benchmark_mapper_transform/filter-out:_block-30080030.json-4         	 6687484	       175.4 ns/op
+Benchmark_mapper_transform/filter-out:_block-30080030.json-4         	 6778304	       179.6 ns/op
+Benchmark_mapper_transform/filter-out:_block-30080030.json-4         	 6428265	       186.2 ns/op
+Benchmark_mapper_transform/filter-out:_block-30080030.json-4         	 6570372	       185.3 ns/op
+Benchmark_mapper_transform/filter-out:_block-30080030.json-4         	 6327450	       191.8 ns/op
+Benchmark_mapper_transform/filter-out:_block-30080030.json-4         	 6236961	       183.8 ns/op
+Benchmark_mapper_transform/filter-in:_block-30080032.json-4          	   26169	     46035 ns/op
+Benchmark_mapper_transform/filter-in:_block-30080032.json-4          	   26876	     45845 ns/op
+Benchmark_mapper_transform/filter-in:_block-30080032.json-4          	   26036	     47374 ns/op
+Benchmark_mapper_transform/filter-in:_block-30080032.json-4          	   25462	     44473 ns/op
+Benchmark_mapper_transform/filter-in:_block-30080032.json-4          	   25485	     44150 ns/op
+Benchmark_mapper_transform/filter-in:_block-30080032.json-4          	   27076	     44626 ns/op
+Benchmark_mapper_transform/filter-in:_block-30080032.json-4          	   25304	     47314 ns/op
 PASS
-ok  	github.com/dfuse-io/dkafka	15.671s
+ok  	github.com/dfuse-io/dkafka	21.412s

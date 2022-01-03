@@ -34,7 +34,6 @@ func saveBlockJSON(block *pbcodec.Block) {
 }
 
 type mapper struct {
-	sender                sender
 	topic                 string
 	saveBlock             SaveBlock
 	decodeDBOps           DecodeDBOps
@@ -47,7 +46,6 @@ type mapper struct {
 }
 
 func newMapper(
-	sender sender,
 	topic string,
 	saveBlock SaveBlock,
 	decodeDBOps DecodeDBOps,
@@ -57,10 +55,10 @@ func newMapper(
 	extensions []*extension,
 	headers []kafka.Header,
 ) mapper {
-	return mapper{sender, topic, saveBlock, decodeDBOps, failOnUndecodableDBOP, eventTypeProg, eventKeyProg, extensions, headers}
+	return mapper{topic, saveBlock, decodeDBOps, failOnUndecodableDBOP, eventTypeProg, eventKeyProg, extensions, headers}
 }
 
-func (m mapper) transform(blk *pbcodec.Block, rawStep string) (err error) {
+func (m mapper) transform(blk *pbcodec.Block, rawStep string) (*kafka.Message, error) {
 	m.saveBlock(blk)
 	step := sanitizeStep(rawStep)
 
@@ -78,7 +76,7 @@ func (m mapper) transform(blk *pbcodec.Block, rawStep string) (err error) {
 		// manage correlation
 		correlation, err := getCorrelation(trx.ActionTraces)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		for _, act := range trx.ActionTraces {
 			if !act.FilteringMatched {
@@ -108,7 +106,7 @@ func (m mapper) transform(blk *pbcodec.Block, rawStep string) (err error) {
 			decodedDBOps, err := m.decodeDBOps(trx.DBOpsForAction(act.ExecutionIndex), blk.Number)
 			if err != nil {
 				if m.failOnUndecodableDBOP {
-					return err
+					return nil, err
 				}
 				zlog.Warn("cannot decode dbops", zap.Uint32("block_number", blk.Number), zap.Error(err))
 			}
@@ -133,14 +131,14 @@ func (m mapper) transform(blk *pbcodec.Block, rawStep string) (err error) {
 
 			eventType, err := evalString(m.eventTypeProg, activation)
 			if err != nil {
-				return fmt.Errorf("error eventtype eval: %w", err)
+				return nil, fmt.Errorf("error eventtype eval: %w", err)
 			}
 
 			extensionsKV := make(map[string]string)
 			for _, ext := range m.extensions {
 				val, err := evalString(ext.prog, activation)
 				if err != nil {
-					return fmt.Errorf("program: %w", err)
+					return nil, fmt.Errorf("program: %w", err)
 				}
 				extensionsKV[ext.name] = val
 
@@ -148,7 +146,7 @@ func (m mapper) transform(blk *pbcodec.Block, rawStep string) (err error) {
 
 			eventKeys, err := evalStringArray(m.eventKeyProg, activation)
 			if err != nil {
-				return fmt.Errorf("event keyeval: %w", err)
+				return nil, fmt.Errorf("event keyeval: %w", err)
 			}
 
 			dedupeMap := make(map[string]bool)
@@ -191,13 +189,14 @@ func (m mapper) transform(blk *pbcodec.Block, rawStep string) (err error) {
 						Partition: kafka.PartitionAny,
 					},
 				}
-				if err := m.sender.Send(msg); err != nil {
-					return fmt.Errorf("sending message: %w", err)
+				return msg, nil
+				// if err := m.sender.Send(msg); err != nil {
+				// 	return fmt.Errorf("sending message: %w", err), nil
 
-				}
-				messagesSent.Inc()
+				// }
+				// messagesSent.Inc()
 			}
 		}
 	}
-	return
+	return nil, nil
 }
