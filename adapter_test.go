@@ -11,7 +11,7 @@ import (
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 )
 
-func Test_mapper_transform(t *testing.T) {
+func Test_adapter_adapt(t *testing.T) {
 	tests := []struct {
 		file                  string
 		failOnUndecodableDBOP bool
@@ -62,7 +62,7 @@ func Test_mapper_transform(t *testing.T) {
 			if err != nil {
 				t.Fatalf("exprToCelProgram() error: %v", err)
 			}
-			m := mapper{
+			m := adapter{
 				topic:                 "test.topic",
 				saveBlock:             saveBlockNoop,
 				decodeDBOps:           abiDecoder.DecodeDBOps,
@@ -73,14 +73,14 @@ func Test_mapper_transform(t *testing.T) {
 				headers:               nil,
 			}
 
-			if _, err := m.transform(block, "New"); (err != nil) != tt.wantErr {
-				t.Errorf("mapper.transform() error = %v, wantErr %v", err, tt.wantErr)
+			if _, err := m.adapt(block, "New"); (err != nil) != tt.wantErr {
+				t.Errorf("adapter.adapt() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
 }
 
-func Benchmark_mapper_transform(b *testing.B) {
+func Benchmark_adapter_adapt(b *testing.B) {
 	tests := []struct {
 		name                  string
 		file                  string
@@ -133,7 +133,7 @@ func Benchmark_mapper_transform(b *testing.B) {
 		if err != nil {
 			b.Fatalf("exprToCelProgram() error: %v", err)
 		}
-		m := mapper{
+		m := adapter{
 			topic:                 "test.topic",
 			saveBlock:             saveBlockNoop,
 			decodeDBOps:           abiDecoder.DecodeDBOps,
@@ -145,7 +145,7 @@ func Benchmark_mapper_transform(b *testing.B) {
 		}
 		b.Run(fmt.Sprintf("%s: %s", tt.name, path.Base(tt.file)), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				m.transform(block, "New")
+				m.adapt(block, "New")
 			}
 		})
 	}

@@ -33,7 +33,7 @@ func saveBlockJSON(block *pbcodec.Block) {
 	}
 }
 
-type mapper struct {
+type adapter struct {
 	topic                 string
 	saveBlock             SaveBlock
 	decodeDBOps           DecodeDBOps
@@ -45,7 +45,7 @@ type mapper struct {
 	headers []kafka.Header
 }
 
-func newMapper(
+func newAdapter(
 	topic string,
 	saveBlock SaveBlock,
 	decodeDBOps DecodeDBOps,
@@ -54,11 +54,11 @@ func newMapper(
 	eventKeyProg cel.Program,
 	extensions []*extension,
 	headers []kafka.Header,
-) mapper {
-	return mapper{topic, saveBlock, decodeDBOps, failOnUndecodableDBOP, eventTypeProg, eventKeyProg, extensions, headers}
+) adapter {
+	return adapter{topic, saveBlock, decodeDBOps, failOnUndecodableDBOP, eventTypeProg, eventKeyProg, extensions, headers}
 }
 
-func (m mapper) transform(blk *pbcodec.Block, rawStep string) (*kafka.Message, error) {
+func (m adapter) adapt(blk *pbcodec.Block, rawStep string) (*kafka.Message, error) {
 	m.saveBlock(blk)
 	step := sanitizeStep(rawStep)
 
@@ -190,11 +190,6 @@ func (m mapper) transform(blk *pbcodec.Block, rawStep string) (*kafka.Message, e
 					},
 				}
 				return msg, nil
-				// if err := m.sender.Send(msg); err != nil {
-				// 	return fmt.Errorf("sending message: %w", err), nil
-
-				// }
-				// messagesSent.Inc()
 			}
 		}
 	}
