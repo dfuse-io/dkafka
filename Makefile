@@ -52,6 +52,16 @@ build: ## Build the binary file
 clean: ## Remove previous build
 	@rm -rf $(BUILD_DIR)
 
+bench: ## Run benchmark and save result in new.txt
+	@go test -bench=mapper -count 7 -cpu 4 | tee new.txt
+	@benchstat new.txt
+
+bench-compare: bench ## Compare previous benchmark with new one
+	@benchstat old.txt new.txt
+
+bench-save: ## Save last benchmark as the new reference
+	@mv new.txt old.txt
+
 up: ## Launch docker compose
 	@docker-compose up -d
 
