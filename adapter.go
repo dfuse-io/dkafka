@@ -1,12 +1,14 @@
 package dkafka
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"strings"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"github.com/dfuse-io/dfuse-eosio/filtering"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 	"github.com/google/cel-go/cel"
 	"go.uber.org/zap"
@@ -72,7 +74,6 @@ func (m adapter) adapt(blk *pbcodec.Block, rawStep string) (*kafka.Message, erro
 	for _, trx := range blk.TransactionTraces() {
 		transactionTracesReceived.Inc()
 		status := sanitizeStatus(trx.Receipt.Status.String())
-		memoizableTrxTrace := &filtering.MemoizableTrxTrace{TrxTrace: trx}
 		// manage correlation
 		correlation, err := getCorrelation(trx.ActionTraces)
 		if err != nil {
@@ -87,11 +88,6 @@ func (m adapter) adapt(blk *pbcodec.Block, rawStep string) (*kafka.Message, erro
 			if act.Action.JsonData != "" {
 				jsonData = json.RawMessage(act.Action.JsonData)
 			}
-			activation := filtering.NewActionTraceActivation(
-				act,
-				memoizableTrxTrace,
-				rawStep,
-			)
 
 			var authorizations []string
 			for _, auth := range act.Action.Authorization {
@@ -110,6 +106,21 @@ func (m adapter) adapt(blk *pbcodec.Block, rawStep string) (*kafka.Message, erro
 				}
 				zlog.Warn("cannot decode dbops", zap.Uint32("block_number", blk.Number), zap.Error(err))
 			}
+			// memoizableTrxTrace := &filtering.MemoizableTrxTrace{TrxTrace: trx}
+			// activation := filtering.NewActionTraceActivation(
+			// 	act,
+			// 	memoizableTrxTrace,
+			// 	rawStep,
+			// )
+
+			activation, err := NewActivation(step, trx,
+				act,
+				decodedDBOps,
+			)
+			if err != nil {
+				return nil, err
+			}
+
 			eosioAction := event{
 				BlockNum:      blk.Number,
 				BlockID:       blk.Id,
@@ -194,4 +205,17 @@ func (m adapter) adapt(blk *pbcodec.Block, rawStep string) (*kafka.Message, erro
 		}
 	}
 	return nil, nil
+}
+
+func hashString(data string) []byte {
+	h := sha256.New()
+	h.Write([]byte(data))
+	return []byte(base64.StdEncoding.EncodeToString(([]byte(h.Sum(nil)))))
+}
+
+func sanitizeStep(step string) string {
+	return strings.Title(strings.TrimPrefix(step, "STEP_"))
+}
+func sanitizeStatus(status string) string {
+	return strings.Title(strings.TrimPrefix(status, "TRANSACTIONSTATUS_"))
 }

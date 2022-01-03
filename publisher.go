@@ -1,11 +1,7 @@
 package dkafka
 
 import (
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
-	"reflect"
-	"strings"
 
 	"github.com/google/cel-go/cel"
 )
@@ -48,44 +44,4 @@ func (e event) JSON() []byte {
 	b, _ := json.Marshal(e)
 	return b
 
-}
-
-func hashString(data string) []byte {
-	h := sha256.New()
-	h.Write([]byte(data))
-	return []byte(base64.StdEncoding.EncodeToString(([]byte(h.Sum(nil)))))
-}
-
-var stringType = reflect.TypeOf("")
-var stringArrayType = reflect.TypeOf([]string{})
-
-func evalString(prog cel.Program, activation interface{}) (string, error) {
-	res, _, err := prog.Eval(activation)
-	if err != nil {
-		return "", err
-	}
-	out, err := res.ConvertToNative(stringType)
-	if err != nil {
-		return "", err
-	}
-	return out.(string), nil
-}
-
-func evalStringArray(prog cel.Program, activation interface{}) ([]string, error) {
-	res, _, err := prog.Eval(activation)
-	if err != nil {
-		return nil, err
-	}
-	out, err := res.ConvertToNative(stringArrayType)
-	if err != nil {
-		return nil, err
-	}
-	return out.([]string), nil
-}
-
-func sanitizeStep(step string) string {
-	return strings.Title(strings.TrimPrefix(step, "STEP_"))
-}
-func sanitizeStatus(status string) string {
-	return strings.Title(strings.TrimPrefix(status, "TRANSACTIONSTATUS_"))
 }

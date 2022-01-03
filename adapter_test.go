@@ -12,7 +12,7 @@ import (
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 )
 
-func readFileFromTestdata(t *testing.T, file string) []byte {
+func readFileFromTestdata(t testing.TB, file string) []byte {
 	f, err := os.Open(file)
 	if err != nil {
 		t.Fatalf("Open() error: %v", err)
