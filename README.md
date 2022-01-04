@@ -67,7 +67,7 @@ Using the compression level and type is not enough. The max message size is veri
   * `action`: name of the action, ex: `transfer`
   * `block_num`: block number, ex: 234522
   * `block_id`: unique ID for the block, ex: `0002332afef44aad7d8f49374398436349372fcdb`
-  * `block_time`: timestamp of the block
+  * `block_time`: timestamp of the block in ISO 8601 format
   * `step`: one of: `NEW`,`UNDO`,`IRREVERSIBLE`
   * `transaction_id`: unique ID for the transaction, ex: `6d0aae37ab3b81b6783b877f2d54d4708f9f137cc6b23374641be362ff010803`
   * `transaction_index`: position of that transaction in the block (ex: 5)
@@ -75,12 +75,12 @@ Using the compression level and type is not enough. The max message size is veri
   * `execution_index`: position of that action in the transaction, ordered by execution
   * `data`: map[string]Any corresponding to the params given to the action
   * `auth`: array of strings corresponding to the authorizations given to the action (who signed it?)
-  * `input`: bool, if true, the action is top-level (declared in the transaction, not a consequence of another action)
-  * `notif`: bool, if true, the action is a 'notification' (receiver!=account)
-  * `executed`: bool, if true, the action was executed successfully (including the error handling of a failed deferred transaction as a SOFTFAIL)
-  * `scheduled`: bool, if true, the action was scheduled (delayed or deferred)
-  * `trx_action_count`: number of actions within that transaction
-  * top5`_trx_actors`: array of the 5 most recurrent actors in a transaction (useful for big transactions with lots of actions)
+  * `input`: (Not yet supported) bool, if true, the action is top-level (declared in the transaction, not a consequence of another action)
+  * `notif`: (Not yet supported) bool, if true, the action is a 'notification' (receiver!=account)
+  * `executed`: (Not yet supported) bool, if true, the action was executed successfully (including the error handling of a failed deferred transaction as a SOFTFAIL)
+  * `scheduled`: (Not yet supported) bool, if true, the action was scheduled (delayed or deferred)
+  * `trx_action_count`: (Not yet supported) number of actions within that transaction
+  * `db_ops`: list of database operations executed by this action
 
 * examples:
   * to generate two events per action, one with 'account' as the key, one with the 'receiver' as the key (duplicates are removed automatically)
