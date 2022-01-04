@@ -75,11 +75,11 @@ Using the compression level and type is not enough. The max message size is veri
   * `execution_index`: position of that action in the transaction, ordered by execution
   * `data`: map[string]Any corresponding to the params given to the action
   * `auth`: array of strings corresponding to the authorizations given to the action (who signed it?)
-  * `input`: (Not yet supported) bool, if true, the action is top-level (declared in the transaction, not a consequence of another action)
-  * `notif`: (Not yet supported) bool, if true, the action is a 'notification' (receiver!=account)
-  * `executed`: (Not yet supported) bool, if true, the action was executed successfully (including the error handling of a failed deferred transaction as a SOFTFAIL)
-  * `scheduled`: (Not yet supported) bool, if true, the action was scheduled (delayed or deferred)
-  * `trx_action_count`: (Not yet supported) number of actions within that transaction
+  * `input`: (filter property only) bool, if true, the action is top-level (declared in the transaction, not a consequence of another action)
+  * `notif`: (filter property only) bool, if true, the action is a 'notification' (receiver!=account)
+  * `executed`: (filter property only) bool, if true, the action was executed successfully (including the error handling of a failed deferred transaction as a SOFTFAIL)
+  * `scheduled`: (filter property only) bool, if true, the action was scheduled (delayed or deferred)
+  * `trx_action_count`: (filter property only) number of actions within that transaction
   * `db_ops`: list of database operations executed by this action
 
 * examples:
