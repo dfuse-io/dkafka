@@ -53,7 +53,7 @@ clean: ## Remove previous build
 	@rm -rf $(BUILD_DIR)
 
 bench: ## Run benchmark and save result in new.txt
-	@go test -bench=adapter -count 7 -cpu 4 | tee new.txt
+	@go test -bench=adapter -benchmem -run="^$$" -count 7 -cpu 4 | tee new.txt
 	@benchstat new.txt
 
 bench-compare: bench ## Compare previous benchmark with new one
