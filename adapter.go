@@ -60,7 +60,7 @@ func newAdapter(
 	return adapter{topic, saveBlock, decodeDBOps, failOnUndecodableDBOP, eventTypeProg, eventKeyProg, extensions, headers}
 }
 
-func (m adapter) adapt(blk *pbcodec.Block, rawStep string) (*kafka.Message, error) {
+func (m *adapter) adapt(blk *pbcodec.Block, rawStep string) (*kafka.Message, error) {
 	m.saveBlock(blk)
 	step := sanitizeStep(rawStep)
 
