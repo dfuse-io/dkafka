@@ -58,7 +58,6 @@ Using the compression level and type is not enough. The max message size is veri
 * The following flags on dkafka accept CEL expressions to generate a string or an array of strings:
   * *--event-type-expr*  "CEL" --> `string`
   * *--event-keys-expr* "CEL" -->  `[array,of,strings]`
-  * *--event-extensions-expr* : "key1:CEL1[,key2:CEL2...]" where each CEL expression --> `string`
   * *--dfuse-firehose-include-expr*  "CEL" --> `bool`
 
 * the following names are available to be resolved from the EOS blocks, transactions, traces and actions.
@@ -87,8 +86,6 @@ Using the compression level and type is not enough. The max message size is veri
     `--event-keys-expr="[account,receiver]"`
   * to set the key to 'updateauth' when the action match, but 'account-{action}' for any other action:
     `--event-keys-expr="action=='updateauth'?[action] : [account+'-'+action]"`
-  * to add a header `ce_newaccount` in kafka mesage with the value "yes" it is the action eosio::newaccount "no" ortherwise:
-    `--event-extensions-expr="ce_newaccount:account+':'+action=='eosio:newaccount'?'yes':'no'"`
 
 
 ## Format of a kafka event PAYLOAD

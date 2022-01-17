@@ -42,7 +42,6 @@ type adapter struct {
 	failOnUndecodableDBOP bool
 	eventTypeProg         cel.Program
 	eventKeyProg          cel.Program
-	extensions            []*extension
 	// TODO merge all headers
 	headers []kafka.Header
 }
@@ -54,10 +53,9 @@ func newAdapter(
 	failOnUndecodableDBOP bool,
 	eventTypeProg cel.Program,
 	eventKeyProg cel.Program,
-	extensions []*extension,
 	headers []kafka.Header,
 ) adapter {
-	return adapter{topic, saveBlock, decodeDBOps, failOnUndecodableDBOP, eventTypeProg, eventKeyProg, extensions, headers}
+	return adapter{topic, saveBlock, decodeDBOps, failOnUndecodableDBOP, eventTypeProg, eventKeyProg, headers}
 }
 
 func (m *adapter) adapt(blk *pbcodec.Block, rawStep string) (*kafka.Message, error) {
@@ -145,16 +143,6 @@ func (m *adapter) adapt(blk *pbcodec.Block, rawStep string) (*kafka.Message, err
 				return nil, fmt.Errorf("error eventtype eval: %w", err)
 			}
 
-			extensionsKV := make(map[string]string)
-			for _, ext := range m.extensions {
-				val, err := evalString(ext.prog, activation)
-				if err != nil {
-					return nil, fmt.Errorf("program: %w", err)
-				}
-				extensionsKV[ext.name] = val
-
-			}
-
 			eventKeys, err := evalStringArray(m.eventKeyProg, activation)
 			if err != nil {
 				return nil, fmt.Errorf("event keyeval: %w", err)
@@ -185,12 +173,6 @@ func (m *adapter) adapt(blk *pbcodec.Block, rawStep string) (*kafka.Message, err
 						Value: []byte(step),
 					},
 				)
-				for k, v := range extensionsKV {
-					headers = append(headers, kafka.Header{
-						Key:   k,
-						Value: []byte(v),
-					})
-				}
 				msg := &kafka.Message{
 					Key:     []byte(eventKey),
 					Headers: headers,

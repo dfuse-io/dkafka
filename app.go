@@ -59,7 +59,6 @@ type Config struct {
 	EventSource          string
 	EventKeysExpr        string
 	EventTypeExpr        string
-	EventExtensions      map[string]string
 
 	LocalABIFiles         map[string]string
 	ABICodecGRPCAddr      string
@@ -214,20 +213,6 @@ func (a *App) Run() error {
 		return fmt.Errorf("cannot parse event-keys-expr: %w", err)
 	}
 
-	var extensions []*extension
-	for k, v := range a.config.EventExtensions {
-		prog, err := exprToCelProgram(v)
-		if err != nil {
-			return fmt.Errorf("cannot parse event-extension: %w", err)
-		}
-		extensions = append(extensions, &extension{
-			name: k,
-			expr: v,
-			prog: prog,
-		})
-
-	}
-
 	sourceHeader := kafka.Header{
 		Key:   "ce_source",
 		Value: []byte(a.config.EventSource),
@@ -252,7 +237,6 @@ func (a *App) Run() error {
 		a.config.FailOnUndecodableDBOP,
 		eventTypeProg,
 		eventKeyProg,
-		extensions,
 		[]kafka.Header{
 			sourceHeader,
 			specHeader,

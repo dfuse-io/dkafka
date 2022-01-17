@@ -49,9 +49,6 @@ match your producers (same apply for consumers)
 events being sent. Must resolve to an array of strings`)
 	PublishCmd.Flags().String("event-type-expr", "(notif?'!':'')+account+'/'+action", "CEL expression defining the event type. Must resolve to a string")
 
-	PublishCmd.Flags().StringSlice("event-extensions-expr", []string{}, `cloudevent extension definitions in this format:
-'{key}:{CEL expression}' (ex: 'blk:string(block_num)')`)
-
 	PublishCmd.Flags().Bool("batch-mode", false, "Batch mode will ignore cursor and always start from {start-block-num}.")
 	PublishCmd.Flags().Int64("start-block-num", 0, `If we are in {batch-mode} or no prior cursor exists,
 start streaming from this block number (if negative, relative to HEAD)`)
@@ -70,15 +67,6 @@ will never be fetched or updated`)
 
 func publishRunE(cmd *cobra.Command, args []string) error {
 	SetupLogger()
-
-	extensions := make(map[string]string)
-	for _, ext := range viper.GetStringSlice("publish-cmd-event-extensions-expr") {
-		kv := strings.SplitN(ext, ":", 2)
-		if len(kv) != 2 {
-			return fmt.Errorf("invalid value for extension: %s", ext)
-		}
-		extensions[kv[0]] = kv[1]
-	}
 
 	localABIFiles := make(map[string]string)
 	for _, ext := range viper.GetStringSlice("publish-cmd-local-abi-files") {
@@ -111,10 +99,9 @@ func publishRunE(cmd *cobra.Command, args []string) error {
 		KafkaMessageMaxBytes:       viper.GetInt("publish-cmd-kafka-message-max-bytes"),
 		CommitMinDelay:             viper.GetDuration("publish-cmd-delay-between-commits"),
 
-		EventSource:     viper.GetString("publish-cmd-event-source"),
-		EventKeysExpr:   viper.GetString("publish-cmd-event-keys-expr"),
-		EventTypeExpr:   viper.GetString("publish-cmd-event-type-expr"),
-		EventExtensions: extensions,
+		EventSource:   viper.GetString("publish-cmd-event-source"),
+		EventKeysExpr: viper.GetString("publish-cmd-event-keys-expr"),
+		EventTypeExpr: viper.GetString("publish-cmd-event-type-expr"),
 
 		BatchMode:     viper.GetBool("publish-cmd-batch-mode"),
 		StartBlockNum: viper.GetInt64("publish-cmd-start-block-num"),

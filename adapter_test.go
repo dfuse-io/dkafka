@@ -80,7 +80,6 @@ func Test_adapter_adapt(t *testing.T) {
 				failOnUndecodableDBOP: tt.failOnUndecodableDBOP,
 				eventTypeProg:         eventTypeProg,
 				eventKeyProg:          eventKeyProg,
-				extensions:            nil,
 				headers:               nil,
 			}
 
@@ -175,7 +174,6 @@ func Benchmark_adapter_adapt(b *testing.B) {
 			failOnUndecodableDBOP: tt.failOnUndecodableDBOP,
 			eventTypeProg:         eventTypeProg,
 			eventKeyProg:          eventKeyProg,
-			extensions:            nil,
 			headers:               nil,
 		}
 		b.Run(fmt.Sprintf("%s: %s", tt.name, path.Base(tt.file)), func(b *testing.B) {

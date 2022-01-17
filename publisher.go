@@ -2,15 +2,7 @@ package dkafka
 
 import (
 	"encoding/json"
-
-	"github.com/google/cel-go/cel"
 )
-
-type extension struct {
-	name string
-	expr string
-	prog cel.Program
-}
 
 var irreversibleOnly = false
 
