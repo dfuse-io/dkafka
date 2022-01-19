@@ -2,19 +2,26 @@ goos: linux
 goarch: amd64
 pkg: github.com/dfuse-io/dkafka
 cpu: AMD Ryzen 7 PRO 5850U with Radeon Graphics     
-Benchmark_adapter_adapt/filter-out:_block-30080030.json-4         	 6741021	       180.8 ns/op	     320 B/op	       2 allocs/op
-Benchmark_adapter_adapt/filter-out:_block-30080030.json-4         	 6634486	       179.8 ns/op	     320 B/op	       2 allocs/op
-Benchmark_adapter_adapt/filter-out:_block-30080030.json-4         	 6899128	       183.1 ns/op	     320 B/op	       2 allocs/op
-Benchmark_adapter_adapt/filter-out:_block-30080030.json-4         	 5825017	       185.6 ns/op	     320 B/op	       2 allocs/op
-Benchmark_adapter_adapt/filter-out:_block-30080030.json-4         	 6171928	       191.7 ns/op	     320 B/op	       2 allocs/op
-Benchmark_adapter_adapt/filter-out:_block-30080030.json-4         	 6589986	       186.0 ns/op	     320 B/op	       2 allocs/op
-Benchmark_adapter_adapt/filter-out:_block-30080030.json-4         	 6366729	       188.1 ns/op	     320 B/op	       2 allocs/op
-Benchmark_adapter_adapt/filter-in:_block-30080032.json-4          	   23665	     56502 ns/op	   19684 B/op	     237 allocs/op
-Benchmark_adapter_adapt/filter-in:_block-30080032.json-4          	   17910	     60987 ns/op	   19687 B/op	     237 allocs/op
-Benchmark_adapter_adapt/filter-in:_block-30080032.json-4          	   24169	     60658 ns/op	   19688 B/op	     237 allocs/op
-Benchmark_adapter_adapt/filter-in:_block-30080032.json-4          	   19087	     52428 ns/op	   19686 B/op	     237 allocs/op
-Benchmark_adapter_adapt/filter-in:_block-30080032.json-4          	   19174	     62611 ns/op	   19685 B/op	     237 allocs/op
-Benchmark_adapter_adapt/filter-in:_block-30080032.json-4          	   18595	     56771 ns/op	   19688 B/op	     237 allocs/op
-Benchmark_adapter_adapt/filter-in:_block-30080032.json-4          	   23863	     53475 ns/op	   19687 B/op	     237 allocs/op
+Benchmark_adapter_adapt/filter-out:_block-30080030.json-4         	10524108	       113.4 ns/op	     192 B/op	       1 allocs/op
+Benchmark_adapter_adapt/filter-out:_block-30080030.json-4         	10388295	       114.8 ns/op	     192 B/op	       1 allocs/op
+Benchmark_adapter_adapt/filter-out:_block-30080030.json-4         	10350880	       117.5 ns/op	     192 B/op	       1 allocs/op
+Benchmark_adapter_adapt/filter-out:_block-30080030.json-4         	 9545235	       116.8 ns/op	     192 B/op	       1 allocs/op
+Benchmark_adapter_adapt/filter-out:_block-30080030.json-4         	 9650526	       119.0 ns/op	     192 B/op	       1 allocs/op
+Benchmark_adapter_adapt/filter-out:_block-30080030.json-4         	10324912	       119.4 ns/op	     192 B/op	       1 allocs/op
+Benchmark_adapter_adapt/filter-out:_block-30080030.json-4         	 9989581	       120.9 ns/op	     192 B/op	       1 allocs/op
+Benchmark_adapter_adapt/filter-in:_block-30080032.json-4          	   26152	     46917 ns/op	   19625 B/op	     238 allocs/op
+Benchmark_adapter_adapt/filter-in:_block-30080032.json-4          	   25956	     47159 ns/op	   19633 B/op	     238 allocs/op
+Benchmark_adapter_adapt/filter-in:_block-30080032.json-4          	   26025	     45222 ns/op	   19629 B/op	     238 allocs/op
+Benchmark_adapter_adapt/filter-in:_block-30080032.json-4          	   26390	     45937 ns/op	   19625 B/op	     238 allocs/op
+Benchmark_adapter_adapt/filter-in:_block-30080032.json-4          	   25617	     45716 ns/op	   19622 B/op	     238 allocs/op
+Benchmark_adapter_adapt/filter-in:_block-30080032.json-4          	   26256	     45807 ns/op	   19625 B/op	     238 allocs/op
+Benchmark_adapter_adapt/filter-in:_block-30080032.json-4          	   25335	     45829 ns/op	   19629 B/op	     238 allocs/op
+Benchmark_adapter_adapt/filter-in-actions:_block-30080032.json-4  	   26840	     45072 ns/op	   19490 B/op	     233 allocs/op
+Benchmark_adapter_adapt/filter-in-actions:_block-30080032.json-4  	   25483	     45364 ns/op	   19493 B/op	     233 allocs/op
+Benchmark_adapter_adapt/filter-in-actions:_block-30080032.json-4  	   26404	     45812 ns/op	   19489 B/op	     233 allocs/op
+Benchmark_adapter_adapt/filter-in-actions:_block-30080032.json-4  	   26394	     44168 ns/op	   19495 B/op	     233 allocs/op
+Benchmark_adapter_adapt/filter-in-actions:_block-30080032.json-4  	   25818	     44745 ns/op	   19489 B/op	     233 allocs/op
+Benchmark_adapter_adapt/filter-in-actions:_block-30080032.json-4  	   26428	     46328 ns/op	   19494 B/op	     233 allocs/op
+Benchmark_adapter_adapt/filter-in-actions:_block-30080032.json-4  	   26164	     47339 ns/op	   19493 B/op	     233 allocs/op
 PASS
-ok  	github.com/dfuse-io/dkafka	22.328s
+ok  	github.com/dfuse-io/dkafka	32.494s

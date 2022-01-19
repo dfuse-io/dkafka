@@ -3,7 +3,6 @@ package dkafka
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -59,6 +58,7 @@ type Config struct {
 	EventSource          string
 	EventKeysExpr        string
 	EventTypeExpr        string
+	ActionsExpr          string
 
 	LocalABIFiles         map[string]string
 	ABICodecGRPCAddr      string
@@ -204,15 +204,6 @@ func (a *App) Run() error {
 
 	// setup the transformer, that will transform incoming blocks
 
-	eventTypeProg, err := exprToCelProgram(a.config.EventTypeExpr)
-	if err != nil {
-		return fmt.Errorf("cannot parse event-type-expr: %w", err)
-	}
-	eventKeyProg, err := exprToCelProgram(a.config.EventKeysExpr)
-	if err != nil {
-		return fmt.Errorf("cannot parse event-keys-expr: %w", err)
-	}
-
 	sourceHeader := kafka.Header{
 		Key:   "ce_source",
 		Value: []byte(a.config.EventSource),
@@ -229,21 +220,47 @@ func (a *App) Run() error {
 		Key:   "ce_datacontenttype",
 		Value: []byte("application/json"),
 	}
-
-	adapter := newAdapter(
-		a.config.KafkaTopic,
-		saveBlock,
-		abiDecoder.DecodeDBOps,
-		a.config.FailOnUndecodableDBOP,
-		eventTypeProg,
-		eventKeyProg,
-		[]kafka.Header{
-			sourceHeader,
-			specHeader,
-			contentTypeHeader,
-			dataContentTypeHeader,
-		},
-	)
+	var adapter adapter
+	if a.config.ActionsExpr != "" {
+		adapter, err = newActionsAdapter(a.config.KafkaTopic,
+			saveBlock,
+			abiDecoder.DecodeDBOps,
+			a.config.FailOnUndecodableDBOP,
+			a.config.ActionsExpr,
+			[]kafka.Header{
+				sourceHeader,
+				specHeader,
+				contentTypeHeader,
+				dataContentTypeHeader,
+			},
+		)
+		if err != nil {
+			return err
+		}
+	} else {
+		eventTypeProg, err := exprToCelProgram(a.config.EventTypeExpr)
+		if err != nil {
+			return fmt.Errorf("cannot parse event-type-expr: %w", err)
+		}
+		eventKeyProg, err := exprToCelProgram(a.config.EventKeysExpr)
+		if err != nil {
+			return fmt.Errorf("cannot parse event-keys-expr: %w", err)
+		}
+		adapter = newAdapter(
+			a.config.KafkaTopic,
+			saveBlock,
+			abiDecoder.DecodeDBOps,
+			a.config.FailOnUndecodableDBOP,
+			eventTypeProg,
+			eventKeyProg,
+			[]kafka.Header{
+				sourceHeader,
+				specHeader,
+				contentTypeHeader,
+				dataContentTypeHeader,
+			},
+		)
+	}
 
 	// loop: receive block,  transform block, send message...
 	zlog.Info("Start looping over blocks...")
@@ -344,21 +361,4 @@ func getCompressionLevel(compressionType string, config *Config) int {
 		return -1
 	}
 	return level.normalize(compressionLevel)
-}
-
-func getCorrelation(actions []*pbcodec.ActionTrace) (correlation *Correlation, err error) {
-	for _, act := range actions {
-		if act.Account() == "ultra.tools" && act.Name() == "correlate" {
-			jsonString := act.Action.GetJsonData()
-			var out map[string]interface{}
-			err = json.Unmarshal([]byte(jsonString), &out)
-			if err != nil {
-				err = fmt.Errorf("decoding correlate action %q: %w", jsonString, err)
-				return
-			}
-			correlation = &Correlation{fmt.Sprint(out["payer"]), fmt.Sprint(out["correlation_id"])}
-			return
-		}
-	}
-	return
 }

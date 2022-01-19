@@ -31,7 +31,7 @@ type ActionConf struct {
 
 type ActionsConf = map[string][]ActionConf
 
-func NewActionGenerator(config ActionsConf, skipKey ...bool) (Generator, error) {
+func NewActionsGenerator(config ActionsConf, skipKey ...bool) (Generator, error) {
 	handlersByAction := make(map[string][]actionHandler)
 	for actionName, actions := range config {
 		actionHandlers := make([]actionHandler, 0, 1)

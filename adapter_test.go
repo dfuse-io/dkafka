@@ -28,26 +28,40 @@ func readFileFromTestdata(t testing.TB, file string) []byte {
 
 func Test_adapter_adapt(t *testing.T) {
 	tests := []struct {
+		name                  string
 		file                  string
 		expected              string
 		failOnUndecodableDBOP bool
+		actionBased           bool
 		wantErr               bool
 	}{
 		{
+			"filter-out",
 			"testdata/block-30080030.json",
 			"",
 			true,
 			false,
+			false,
 		},
 		{
+			"filter-in-expr",
 			"testdata/block-30080032.json",
 			"testdata/block-30080032-expected.json",
+			true,
+			false,
+			false,
+		},
+		{
+			"filter-in-actions",
+			"testdata/block-30080032.json",
+			"testdata/block-30080032-expected.json",
+			true,
 			true,
 			false,
 		},
 	}
 	for _, tt := range tests {
-		t.Run(path.Base(tt.file), func(t *testing.T) {
+		t.Run(path.Base(tt.name), func(t *testing.T) {
 
 			byteValue := readFileFromTestdata(t, tt.file)
 
@@ -73,17 +87,33 @@ func Test_adapter_adapt(t *testing.T) {
 			if err != nil {
 				t.Fatalf("exprToCelProgram() error: %v", err)
 			}
-			m := newAdapter(
-				"test.topic",
-				saveBlockNoop,
-				abiDecoder.DecodeDBOps,
-				tt.failOnUndecodableDBOP,
-				eventTypeProg,
-				eventKeyProg,
-				nil,
-			)
+			var adp adapter
+			if tt.actionBased {
+				adp, err = newActionsAdapter(
+					"test.topic",
+					saveBlockNoop,
+					abiDecoder.DecodeDBOps,
+					tt.failOnUndecodableDBOP,
+					`{"create":[{"key":"transaction_id", "type":"TestType"}]}`,
+					nil,
+				)
+				if err != nil {
+					t.Fatalf("newActionsAdapter() error: %v", err)
+					return
+				}
+			} else {
+				adp = newAdapter(
+					"test.topic",
+					saveBlockNoop,
+					abiDecoder.DecodeDBOps,
+					tt.failOnUndecodableDBOP,
+					eventTypeProg,
+					eventKeyProg,
+					nil,
+				)
+			}
 
-			if msg, err := m.adapt(block, "New"); (err != nil) != tt.wantErr {
+			if msg, err := adp.adapt(block, "New"); (err != nil) != tt.wantErr {
 				t.Errorf("adapter.adapt() error = %v, wantErr %v", err, tt.wantErr)
 			} else {
 				if tt.expected != "" {
@@ -118,22 +148,37 @@ func Benchmark_adapter_adapt(b *testing.B) {
 	tests := []struct {
 		name                  string
 		file                  string
+		expected              string
 		failOnUndecodableDBOP bool
+		actionBased           bool
 		wantErr               bool
 	}{
 		{
 			"filter-out",
 			"testdata/block-30080030.json",
+			"",
 			true,
+			false,
 			false,
 		},
 		{
 			"filter-in",
 			"testdata/block-30080032.json",
+			"testdata/block-30080032-expected.json",
+			true,
+			false,
+			false,
+		},
+		{
+			"filter-in-actions",
+			"testdata/block-30080032.json",
+			"testdata/block-30080032-expected.json",
+			true,
 			true,
 			false,
 		},
 	}
+
 	for _, tt := range tests {
 		f, err := os.Open(tt.file)
 		if err != nil {
@@ -167,18 +212,34 @@ func Benchmark_adapter_adapt(b *testing.B) {
 		if err != nil {
 			b.Fatalf("exprToCelProgram() error: %v", err)
 		}
-		m := newAdapter(
-			"test.topic",
-			saveBlockNoop,
-			abiDecoder.DecodeDBOps,
-			tt.failOnUndecodableDBOP,
-			eventTypeProg,
-			eventKeyProg,
-			nil,
-		)
+		var adp adapter
+		if tt.actionBased {
+			adp, err = newActionsAdapter(
+				"test.topic",
+				saveBlockNoop,
+				abiDecoder.DecodeDBOps,
+				tt.failOnUndecodableDBOP,
+				`{"create":[{"key":"transaction_id", "type":"TestType"}]}`,
+				nil,
+			)
+			if err != nil {
+				b.Fatalf("newActionsAdapter() error: %v", err)
+				return
+			}
+		} else {
+			adp = newAdapter(
+				"test.topic",
+				saveBlockNoop,
+				abiDecoder.DecodeDBOps,
+				tt.failOnUndecodableDBOP,
+				eventTypeProg,
+				eventKeyProg,
+				nil,
+			)
+		}
 		b.Run(fmt.Sprintf("%s: %s", tt.name, path.Base(tt.file)), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				m.adapt(block, "New")
+				adp.adapt(block, "New")
 			}
 		})
 	}

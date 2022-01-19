@@ -48,6 +48,7 @@ match your producers (same apply for consumers)
 	PublishCmd.Flags().String("event-keys-expr", "[account]", `CEL expression defining the event keys. More then one key will result in multiple
 events being sent. Must resolve to an array of strings`)
 	PublishCmd.Flags().String("event-type-expr", "(notif?'!':'')+account+'/'+action", "CEL expression defining the event type. Must resolve to a string")
+	PublishCmd.Flags().String("actions-expr", "", "JSON object that describe how each action have to be handled.")
 
 	PublishCmd.Flags().Bool("batch-mode", false, "Batch mode will ignore cursor and always start from {start-block-num}.")
 	PublishCmd.Flags().Int64("start-block-num", 0, `If we are in {batch-mode} or no prior cursor exists,
@@ -102,6 +103,7 @@ func publishRunE(cmd *cobra.Command, args []string) error {
 		EventSource:   viper.GetString("publish-cmd-event-source"),
 		EventKeysExpr: viper.GetString("publish-cmd-event-keys-expr"),
 		EventTypeExpr: viper.GetString("publish-cmd-event-type-expr"),
+		ActionsExpr:   viper.GetString("publish-cmd-actions-expr"),
 
 		BatchMode:     viper.GetBool("publish-cmd-batch-mode"),
 		StartBlockNum: viper.GetInt64("publish-cmd-start-block-num"),

@@ -140,7 +140,7 @@ func Test_NewActionGenerator(t *testing.T) {
 			if actionsConf == nil {
 				return
 			}
-			got, err := NewActionGenerator(actionsConf, tt.skipKey)
+			got, err := NewActionsGenerator(actionsConf, tt.skipKey)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewActionGenerator() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -238,7 +238,7 @@ func Test_ActionGenerator_Apply(t *testing.T) {
 			}
 			abiDecoder := NewABIDecoder(abiFiles, nil)
 			actionsConfig := actionsConfFromJSON(t, tt.config)
-			generator, err := NewActionGenerator(actionsConfig)
+			generator, err := NewActionsGenerator(actionsConfig)
 			if err != nil {
 				t.Fatalf("NewActionGenerator() error: %v", err)
 			}

@@ -45,6 +45,26 @@ type adapter struct {
 	headers []kafka.Header
 }
 
+func newActionsAdapter(
+	topic string,
+	saveBlock SaveBlock,
+	decodeDBOps DecodeDBOps,
+	failOnUndecodableDBOP bool,
+	actionsConfJson string,
+	headers []kafka.Header,
+) (adapter, error) {
+	actionsConf := make(ActionsConf)
+	err := json.Unmarshal(json.RawMessage(actionsConfJson), &actionsConf)
+	if err != nil {
+		return adapter{}, err
+	}
+	generator, err := NewActionsGenerator(actionsConf)
+	if err != nil {
+		return adapter{}, err
+	}
+	return adapter{topic, saveBlock, decodeDBOps, failOnUndecodableDBOP, generator, headers}, nil
+}
+
 func newAdapter(
 	topic string,
 	saveBlock SaveBlock,
@@ -180,4 +200,21 @@ func sanitizeStep(step string) string {
 }
 func sanitizeStatus(status string) string {
 	return strings.Title(strings.TrimPrefix(status, "TRANSACTIONSTATUS_"))
+}
+
+func getCorrelation(actions []*pbcodec.ActionTrace) (correlation *Correlation, err error) {
+	for _, act := range actions {
+		if act.Account() == "ultra.tools" && act.Name() == "correlate" {
+			jsonString := act.Action.GetJsonData()
+			var out map[string]interface{}
+			err = json.Unmarshal([]byte(jsonString), &out)
+			if err != nil {
+				err = fmt.Errorf("decoding correlate action %q: %w", jsonString, err)
+				return
+			}
+			correlation = &Correlation{fmt.Sprint(out["payer"]), fmt.Sprint(out["correlation_id"])}
+			return
+		}
+	}
+	return
 }
