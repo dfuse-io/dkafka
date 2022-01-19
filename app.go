@@ -262,14 +262,16 @@ func (a *App) Run() error {
 		}
 
 		blocksReceived.Inc()
-		kafkaMsg, err := adapter.adapt(blk, msg.Step.String())
+		kafkaMsgs, err := adapter.adapt(blk, msg.Step.String())
 		if err != nil {
 			return fmt.Errorf("transform to kafka message: %s, %w", msg.Cursor, err)
 		}
-		if err := s.Send(kafkaMsg); err != nil {
-			return fmt.Errorf("sending message: %w", err)
+		for _, kafkaMsg := range kafkaMsgs {
+			if err := s.Send(kafkaMsg); err != nil {
+				return fmt.Errorf("sending message: %w", err)
+			}
+			messagesSent.Inc()
 		}
-		messagesSent.Inc()
 
 		if a.IsTerminating() {
 			return s.Commit(context.Background(), msg.Cursor)

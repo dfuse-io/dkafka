@@ -58,7 +58,7 @@ func newAdapter(
 	return adapter{topic, saveBlock, decodeDBOps, failOnUndecodableDBOP, eventTypeProg, eventKeyProg, headers}
 }
 
-func (m *adapter) adapt(blk *pbcodec.Block, rawStep string) (*kafka.Message, error) {
+func (m *adapter) adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message, error) {
 	m.saveBlock(blk)
 	step := sanitizeStep(rawStep)
 
@@ -104,12 +104,6 @@ func (m *adapter) adapt(blk *pbcodec.Block, rawStep string) (*kafka.Message, err
 				}
 				zlog.Warn("cannot decode dbops", zap.Uint32("block_number", blk.Number), zap.Error(err))
 			}
-			// memoizableTrxTrace := &filtering.MemoizableTrxTrace{TrxTrace: trx}
-			// activation := filtering.NewActionTraceActivation(
-			// 	act,
-			// 	memoizableTrxTrace,
-			// 	rawStep,
-			// )
 
 			activation, err := NewActivation(step, trx,
 				act,
@@ -182,7 +176,7 @@ func (m *adapter) adapt(blk *pbcodec.Block, rawStep string) (*kafka.Message, err
 						Partition: kafka.PartitionAny,
 					},
 				}
-				return msg, nil
+				return []*kafka.Message{msg}, nil
 			}
 		}
 	}

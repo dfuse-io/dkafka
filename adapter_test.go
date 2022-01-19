@@ -96,7 +96,7 @@ func Test_adapter_adapt(t *testing.T) {
 						t.Fatalf("Unmarshal() error: %v", err)
 					}
 
-					if rawJSON, err := messageToJSON(msg); err != nil {
+					if rawJSON, err := messageToJSON(msg[0]); err != nil {
 						t.Errorf("messageToJSON() error: %v", err)
 					} else {
 						var actualObjectMap map[string]interface{}
