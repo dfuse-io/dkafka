@@ -40,8 +40,7 @@ type adapter struct {
 	saveBlock             SaveBlock
 	decodeDBOps           DecodeDBOps
 	failOnUndecodableDBOP bool
-	eventTypeProg         cel.Program
-	eventKeyProg          cel.Program
+	generator             Generator
 	// TODO merge all headers
 	headers []kafka.Header
 }
@@ -55,7 +54,7 @@ func newAdapter(
 	eventKeyProg cel.Program,
 	headers []kafka.Header,
 ) adapter {
-	return adapter{topic, saveBlock, decodeDBOps, failOnUndecodableDBOP, eventTypeProg, eventKeyProg, headers}
+	return adapter{topic, saveBlock, decodeDBOps, failOnUndecodableDBOP, NewExpressionsGenerator(eventKeyProg, eventTypeProg), headers}
 }
 
 func (m *adapter) adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message, error) {
@@ -105,58 +104,43 @@ func (m *adapter) adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message, e
 				zlog.Warn("cannot decode dbops", zap.Uint32("block_number", blk.Number), zap.Error(err))
 			}
 
-			activation, err := NewActivation(step, trx,
+			// generation
+			generations, err := m.generator.Apply(step, trx,
 				act,
-				decodedDBOps,
-			)
+				decodedDBOps)
+
 			if err != nil {
 				return nil, err
 			}
-
-			eosioAction := event{
-				BlockNum:      blk.Number,
-				BlockID:       blk.Id,
-				Status:        status,
-				Executed:      !trx.HasBeenReverted(),
-				Step:          step,
-				Correlation:   correlation,
-				TransactionID: trx.Id,
-				ActionInfo: ActionInfo{
-					Account:        act.Account(),
-					Receiver:       act.Receiver,
-					Action:         act.Name(),
-					JSONData:       &jsonData,
-					DBOps:          decodedDBOps,
-					Authorization:  authorizations,
-					GlobalSequence: globalSeq,
-				},
-			}
-
-			eventType, err := evalString(m.eventTypeProg, activation)
-			if err != nil {
-				return nil, fmt.Errorf("error eventtype eval: %w", err)
-			}
-
-			eventKeys, err := evalStringArray(m.eventKeyProg, activation)
-			if err != nil {
-				return nil, fmt.Errorf("event keyeval: %w", err)
-			}
-
-			dedupeMap := make(map[string]bool)
-			for _, eventKey := range eventKeys {
-				if dedupeMap[eventKey] {
-					continue
+			msgs := make([]*kafka.Message, 0, 1)
+			for _, generation := range generations {
+				eosioAction := event{
+					BlockNum:      blk.Number,
+					BlockID:       blk.Id,
+					Status:        status,
+					Executed:      !trx.HasBeenReverted(),
+					Step:          step,
+					Correlation:   correlation,
+					TransactionID: trx.Id,
+					ActionInfo: ActionInfo{
+						Account:        act.Account(),
+						Receiver:       act.Receiver,
+						Action:         act.Name(),
+						JSONData:       &jsonData,
+						DBOps:          generation.DecodedDBOps,
+						Authorization:  authorizations,
+						GlobalSequence: globalSeq,
+					},
 				}
-				dedupeMap[eventKey] = true
 
 				headers := append(m.headers,
 					kafka.Header{
 						Key:   "ce_id",
-						Value: hashString(fmt.Sprintf("%s%s%d%s%s", blk.Id, trx.Id, act.ExecutionIndex, rawStep, eventKey)),
+						Value: hashString(fmt.Sprintf("%s%s%d%s%s", blk.Id, trx.Id, act.ExecutionIndex, rawStep, generation.Key)),
 					},
 					kafka.Header{
 						Key:   "ce_type",
-						Value: []byte(eventType),
+						Value: []byte(generation.CeType),
 					},
 					kafka.Header{
 						Key:   "ce_time",
@@ -168,7 +152,7 @@ func (m *adapter) adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message, e
 					},
 				)
 				msg := &kafka.Message{
-					Key:     []byte(eventKey),
+					Key:     []byte(generation.Key),
 					Headers: headers,
 					Value:   eosioAction.JSON(),
 					TopicPartition: kafka.TopicPartition{
@@ -176,8 +160,10 @@ func (m *adapter) adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message, e
 						Partition: kafka.PartitionAny,
 					},
 				}
-				return []*kafka.Message{msg}, nil
+				msgs = append(msgs, msg)
 			}
+
+			return msgs, nil
 		}
 	}
 	return nil, nil

@@ -73,15 +73,15 @@ func Test_adapter_adapt(t *testing.T) {
 			if err != nil {
 				t.Fatalf("exprToCelProgram() error: %v", err)
 			}
-			m := adapter{
-				topic:                 "test.topic",
-				saveBlock:             saveBlockNoop,
-				decodeDBOps:           abiDecoder.DecodeDBOps,
-				failOnUndecodableDBOP: tt.failOnUndecodableDBOP,
-				eventTypeProg:         eventTypeProg,
-				eventKeyProg:          eventKeyProg,
-				headers:               nil,
-			}
+			m := newAdapter(
+				"test.topic",
+				saveBlockNoop,
+				abiDecoder.DecodeDBOps,
+				tt.failOnUndecodableDBOP,
+				eventTypeProg,
+				eventKeyProg,
+				nil,
+			)
 
 			if msg, err := m.adapt(block, "New"); (err != nil) != tt.wantErr {
 				t.Errorf("adapter.adapt() error = %v, wantErr %v", err, tt.wantErr)
@@ -167,15 +167,15 @@ func Benchmark_adapter_adapt(b *testing.B) {
 		if err != nil {
 			b.Fatalf("exprToCelProgram() error: %v", err)
 		}
-		m := adapter{
-			topic:                 "test.topic",
-			saveBlock:             saveBlockNoop,
-			decodeDBOps:           abiDecoder.DecodeDBOps,
-			failOnUndecodableDBOP: tt.failOnUndecodableDBOP,
-			eventTypeProg:         eventTypeProg,
-			eventKeyProg:          eventKeyProg,
-			headers:               nil,
-		}
+		m := newAdapter(
+			"test.topic",
+			saveBlockNoop,
+			abiDecoder.DecodeDBOps,
+			tt.failOnUndecodableDBOP,
+			eventTypeProg,
+			eventKeyProg,
+			nil,
+		)
 		b.Run(fmt.Sprintf("%s: %s", tt.name, path.Base(tt.file)), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				m.adapt(block, "New")
