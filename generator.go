@@ -2,6 +2,8 @@ package dkafka
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 	"github.com/google/cel-go/cel"
@@ -25,6 +27,7 @@ type Generator interface {
 type ActionConf struct {
 	Group  []string `json:"group,omitempty"`
 	Filter []string `json:"filter,omitempty"`
+	First  string   `json:"first,omitempty"`
 	Key    string   `json:"key"`
 	CeType string   `json:"type"`
 }
@@ -41,16 +44,32 @@ func NewActionsGenerator(config ActionsConf, skipKey ...bool) (Generator, error)
 			}
 			var operation operation
 			if action.Group != nil {
+				matchers, err := expressionsToMatchers(action.Group)
+				if err != nil {
+					return nil, fmt.Errorf("invalid group expression: %v, error: %w", action.Group, err)
+				}
 				operation = group{
-					tables: action.Group,
+					matchers: matchers,
 				}
 			} else if action.Filter != nil {
+				matchers, err := expressionsToMatchers(action.Filter)
+				if err != nil {
+					return nil, fmt.Errorf("invalid filter expression: %v, error: %w", action.Filter, err)
+				}
 				operation = filter{
-					tables: action.Filter,
+					matchers: matchers,
+				}
+			} else if action.First != "" {
+				matcher, err := expressionToMatcher(action.First)
+				if err != nil {
+					return nil, fmt.Errorf("invalid filter expression: %v, error: %w", action.First, err)
+				}
+				operation = first{
+					table: matcher,
 				}
 			} else {
-				// indenty dbops operation
-				operation = indenty{}
+				// indentity dbops operation
+				operation = indentity{}
 			}
 			skipK := (len(skipKey) > 0 && skipKey[0])
 			var keyExtractor cel.Program
@@ -80,6 +99,41 @@ func NewActionsGenerator(config ActionsConf, skipKey ...bool) (Generator, error)
 	}, nil
 }
 
+func expressionsToMatchers(expressions []string) ([]matcher, error) {
+	matchers := make([]matcher, len(expressions))
+	for i, expression := range expressions {
+		matcher, err := expressionToMatcher(expression)
+		if err != nil {
+			return nil, err
+		}
+		matchers[i] = matcher
+	}
+	return matchers, nil
+}
+
+func expressionToMatcher(expression string) (matcher, error) {
+	tokens := strings.Split(expression, ":")
+	if len(tokens) == 1 {
+		return tableNameMatcher{tokens[0]}, nil
+	} else if tokens[0] == "*" && tokens[1] == "*" {
+		return nil, fmt.Errorf("unsupported table matcher expression: %s, you must at least fix on of them", expression)
+	} else if tokens[0] == "*" {
+		return tableNameMatcher{tokens[1]}, nil
+	} else if tokens[1] == "*" {
+		op, err := strconv.Atoi(tokens[0])
+		if err != nil || op < 0 || op > 3 {
+			return nil, fmt.Errorf("invalid operation matcher value must be a uint between [0..3], on: %s, with error: %w", expression, err)
+		}
+		return operationMatcher{pbcodec.DBOp_Operation(op)}, nil
+	} else {
+		op, err := strconv.Atoi(tokens[0])
+		if err != nil || op < 0 || op > 3 {
+			return nil, fmt.Errorf("invalid operation matcher value must be a uint between [0..3]")
+		}
+		return operationOnTableMatcher{op: pbcodec.DBOp_Operation(op), name: tokens[1]}, nil
+	}
+}
+
 func NewExpressionsGenerator(
 	eventKeyProg cel.Program,
 	eventTypeProg cel.Program,
@@ -94,15 +148,28 @@ type operation interface {
 	on(decodedDBOps []*decodedDBOp) [][]*decodedDBOp
 }
 
+type first struct {
+	table matcher
+}
+
+func (f first) on(decodedDBOps []*decodedDBOp) [][]*decodedDBOp {
+	for _, dbOp := range decodedDBOps {
+		if f.table.match(dbOp.DBOp) {
+			return [][]*decodedDBOp{{dbOp}}
+		}
+	}
+	return nil
+}
+
 type filter struct {
-	tables []string
+	matchers []matcher
 }
 
 func (f filter) on(decodedDBOps []*decodedDBOp) [][]*decodedDBOp {
 	var filteredDBOps []*decodedDBOp = make([]*decodedDBOp, 0, 1)
 	for _, dbOp := range decodedDBOps {
-		for _, table := range f.tables {
-			if dbOp.TableName == table {
+		for _, matcher := range f.matchers {
+			if matcher.match(dbOp.DBOp) {
 				filteredDBOps = append(filteredDBOps, dbOp)
 			}
 		}
@@ -110,24 +177,53 @@ func (f filter) on(decodedDBOps []*decodedDBOp) [][]*decodedDBOp {
 	return [][]*decodedDBOp{filteredDBOps}
 }
 
-type indenty struct {
+type matcher interface {
+	match(value *pbcodec.DBOp) bool
 }
 
-func (i indenty) on(decodedDBOps []*decodedDBOp) [][]*decodedDBOp {
+type tableNameMatcher struct {
+	name string
+}
+
+func (m tableNameMatcher) match(value *pbcodec.DBOp) bool {
+	return m.name == value.TableName
+}
+
+type operationMatcher struct {
+	op pbcodec.DBOp_Operation
+}
+
+func (m operationMatcher) match(value *pbcodec.DBOp) bool {
+	return m.op == value.Operation
+}
+
+type operationOnTableMatcher struct {
+	name string
+	op   pbcodec.DBOp_Operation
+}
+
+func (m operationOnTableMatcher) match(value *pbcodec.DBOp) bool {
+	return m.op == value.Operation && m.name == value.TableName
+}
+
+type indentity struct {
+}
+
+func (i indentity) on(decodedDBOps []*decodedDBOp) [][]*decodedDBOp {
 	return [][]*decodedDBOp{decodedDBOps}
 }
 
 type group struct {
-	tables []string
+	matchers []matcher
 }
 
 func (g group) on(decodedDBOps []*decodedDBOp) [][]*decodedDBOp {
 	groups := make([][]*decodedDBOp, 0, 1)
-	groupSize := len(g.tables)
+	groupSize := len(g.matchers)
 	groupCursor := 0
 	group := make([]*decodedDBOp, 0, 1)
 	for _, dbOp := range decodedDBOps {
-		if dbOp.TableName == g.tables[groupCursor] {
+		if g.matchers[groupCursor].match(dbOp.DBOp) {
 			group = append(group, dbOp)
 			groupCursor++
 		}

@@ -8,6 +8,10 @@ COVERAGE_DIR := $(BUILD_DIR)
 KUBECONFIG ?= ~/.kube/dfuse.staging.kube
 INCLUDE_EXPRESSION ?= 'executed && action=="create" && account=="eosio.nft.ft" && receiver=="eosio.nft.ft"'
 KEY_EXPRESSION ?= '[transaction_id]'
+ACTIONS_EXPRESSION ?= '{"create":[{"key":"transaction_id", "type":"TestType"}]}'
+# ACTIONS_EXPRESSION ?= '{"create":[{"filter": ["factory.a"], "key":"transaction_id", "type":"TestType"}]}'
+# ACTIONS_EXPRESSION ?= '{"create":[{"filter": ["factory.a"], "key":"string(db_ops[0].new_json.id)", "type":"TestType"}]}'
+# ACTIONS_EXPRESSION ?= '{"create":[{"filter": ["1:factory.a"], "key":"string(db_ops[0].new_json.id)", "type":"TestType"}]}'
 MESSAGE_TYPE ?= '"TestType"'
 COMPRESSION_TYPE ?= "snappy"
 COMPRESSION_LEVEL ?= -1
@@ -65,8 +69,7 @@ bench-save: ## Save last benchmark as the new reference
 up: ## Launch docker compose
 	@docker-compose up -d
 
-
-stream: build up ## start dkafka localy
+stream: build up ## stream expression based localy
 	$(BINARY_PATH) publish \
 		--dfuse-firehose-grpc-addr=localhost:9000 \
 		--abicodec-grpc-addr=localhost:9001 \
@@ -76,6 +79,20 @@ stream: build up ## start dkafka localy
 		--dfuse-firehose-include-expr=$(INCLUDE_EXPRESSION) \
 		--event-keys-expr=$(KEY_EXPRESSION) \
 		--event-type-expr=$(MESSAGE_TYPE) \
+		--kafka-compression-type=$(COMPRESSION_TYPE) \
+		--kafka-compression-level=$(COMPRESSION_LEVEL) \
+		--start-block-num=$(START_BLOCK) \
+		--kafka-message-max-bytes=$(MESSAGE_MAX_SIZE)
+
+stream-act: build up ## stream actions based localy
+	$(BINARY_PATH) publish \
+		--dfuse-firehose-grpc-addr=localhost:9000 \
+		--abicodec-grpc-addr=localhost:9001 \
+		--fail-on-undecodable-db-op \
+		--kafka-cursor-topic="cursor" \
+		--kafka-topic="io.dkafka.test" \
+		--dfuse-firehose-include-expr=$(INCLUDE_EXPRESSION) \
+		--actions-expr=$(ACTIONS_EXPRESSION) \
 		--kafka-compression-type=$(COMPRESSION_TYPE) \
 		--kafka-compression-level=$(COMPRESSION_LEVEL) \
 		--start-block-num=$(START_BLOCK) \
@@ -100,6 +117,9 @@ batch: build up ## run batch localy
 forward: ## open port forwarding on dfuse dev
 	KUBECONFIG=$(KUBECONFIG) kubectl -n ultra-prod-testnet port-forward firehose-v3-0 9000 &
 	KUBECONFIG=$(KUBECONFIG) kubectl -n ultra-prod-testnet port-forward svc/abicodec-v3 9001:9000 &
+
+forward-stop: ## stop port fowarding to dfuse
+	@ps -aux | grep forward | awk '{ print $$2 }' | xargs kill
 
 help: ## Display this help screen
 	@grep -h -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'

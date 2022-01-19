@@ -26,7 +26,7 @@ func Test_NewActionGenerator(t *testing.T) {
 				actions: map[string][]actionHandler{
 					"buy": {actionHandler{
 						operation: group{
-							tables: []string{"table1", "table2"},
+							matchers: []matcher{tableNameMatcher{"table1"}, tableNameMatcher{"table2"}},
 						},
 						ceType: "TestEvent",
 					}},
@@ -42,7 +42,7 @@ func Test_NewActionGenerator(t *testing.T) {
 				actions: map[string][]actionHandler{
 					"buy": {actionHandler{
 						operation: filter{
-							tables: []string{"table1", "table2"},
+							matchers: []matcher{tableNameMatcher{"table1"}, tableNameMatcher{"table2"}},
 						},
 						ceType: "TestEvent",
 					}},
@@ -57,7 +57,7 @@ func Test_NewActionGenerator(t *testing.T) {
 			want: ActionGenerator{
 				actions: map[string][]actionHandler{
 					"buy": {actionHandler{
-						operation: indenty{},
+						operation: indentity{},
 						ceType:    "TestEvent",
 					}},
 				},
@@ -66,20 +66,20 @@ func Test_NewActionGenerator(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "multy-operations",
+			name: "multi-operations",
 			args: `{"buy":[{"filter":["table1", "table2"],"key":"db_ops[0].table_name", "type":"TestEvent1"},{"group":["table3"],"key":"db_ops[0].table_name", "type":"TestEvent2"}]}`,
 			want: ActionGenerator{
 				actions: map[string][]actionHandler{
 					"buy": {
 						actionHandler{
 							operation: filter{
-								tables: []string{"table1", "table2"},
+								matchers: []matcher{tableNameMatcher{"table1"}, tableNameMatcher{"table2"}},
 							},
 							ceType: "TestEvent1",
 						},
 						actionHandler{
 							operation: group{
-								tables: []string{"table3"},
+								matchers: []matcher{tableNameMatcher{"table3"}},
 							},
 							ceType: "TestEvent2",
 						},
@@ -90,14 +90,14 @@ func Test_NewActionGenerator(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "multy-actions",
+			name: "multi-actions",
 			args: `{"buy":[{"filter":["table1", "table2"],"key":"db_ops[0].table_name", "type":"TestEvent1"}],"issue":[{"group":["table3"],"key":"db_ops[0].table_name", "type":"TestEvent2"}]}`,
 			want: ActionGenerator{
 				actions: map[string][]actionHandler{
 					"buy": {
 						actionHandler{
 							operation: filter{
-								tables: []string{"table1", "table2"},
+								matchers: []matcher{tableNameMatcher{"table1"}, tableNameMatcher{"table2"}},
 							},
 							ceType: "TestEvent1",
 						},
@@ -105,7 +105,7 @@ func Test_NewActionGenerator(t *testing.T) {
 					"issue": {
 						actionHandler{
 							operation: group{
-								tables: []string{"table3"},
+								matchers: []matcher{tableNameMatcher{"table3"}},
 							},
 							ceType: "TestEvent2",
 						},
@@ -670,7 +670,7 @@ func Test_operation_on(t *testing.T) {
 	}{
 		{
 			name: "identity",
-			op:   func() operation { return indenty{} },
+			op:   func() operation { return indentity{} },
 			args: args{
 				decodedDBOps: DB_OPS_2,
 			},
@@ -678,7 +678,7 @@ func Test_operation_on(t *testing.T) {
 		},
 		{
 			name: "group-first",
-			op:   func() operation { return group{[]string{"next.factory"}} },
+			op:   func() operation { return group{[]matcher{tableNameMatcher{"next.factory"}}} },
 			args: args{
 				decodedDBOps: DB_OPS_2,
 			},
@@ -686,7 +686,7 @@ func Test_operation_on(t *testing.T) {
 		},
 		{
 			name: "group-last",
-			op:   func() operation { return group{[]string{"factory.a"}} },
+			op:   func() operation { return group{[]matcher{tableNameMatcher{"factory.a"}}} },
 			args: args{
 				decodedDBOps: DB_OPS_2,
 			},
@@ -694,7 +694,9 @@ func Test_operation_on(t *testing.T) {
 		},
 		{
 			name: "group-multi",
-			op:   func() operation { return group{[]string{"next.factory", "factory.a"}} },
+			op: func() operation {
+				return group{[]matcher{tableNameMatcher{"next.factory"}, tableNameMatcher{"factory.a"}}}
+			},
 			args: args{
 				decodedDBOps: DB_OPS_4,
 			},
@@ -702,7 +704,7 @@ func Test_operation_on(t *testing.T) {
 		},
 		{
 			name: "filter-first",
-			op:   func() operation { return filter{[]string{"next.factory"}} },
+			op:   func() operation { return filter{[]matcher{tableNameMatcher{"next.factory"}}} },
 			args: args{
 				decodedDBOps: DB_OPS_2,
 			},
@@ -710,7 +712,7 @@ func Test_operation_on(t *testing.T) {
 		},
 		{
 			name: "filter-last",
-			op:   func() operation { return filter{[]string{"factory.a"}} },
+			op:   func() operation { return filter{[]matcher{tableNameMatcher{"factory.a"}}} },
 			args: args{
 				decodedDBOps: DB_OPS_2,
 			},
@@ -718,7 +720,7 @@ func Test_operation_on(t *testing.T) {
 		},
 		{
 			name: "filter-multi",
-			op:   func() operation { return filter{[]string{"next.factory"}} },
+			op:   func() operation { return filter{[]matcher{tableNameMatcher{"next.factory"}}} },
 			args: args{
 				decodedDBOps: DB_OPS_4,
 			},
@@ -735,56 +737,169 @@ func Test_operation_on(t *testing.T) {
 	}
 }
 
-func jsonToDBOps(dbops string) (result []*decodedDBOp) {
-	err := json.Unmarshal(json.RawMessage(dbops), &result)
+func jsonToDBOp(dbop string) (result *decodedDBOp) {
+	err := json.Unmarshal(json.RawMessage(dbop), &result)
 	if err != nil {
-		panic(fmt.Sprintf("Unmarshal() error: %v, on: %s", err, dbops))
+		panic(fmt.Sprintf("Unmarshal() error: %v, on: %s", err, dbop))
 	}
 	return
 }
 
-func jsonToGroupedDBOps(dbops string) (result [][]*decodedDBOp) {
-	err := json.Unmarshal(json.RawMessage(dbops), &result)
+func jsonToDBOps(dbop string) (result []*decodedDBOp) {
+	err := json.Unmarshal(json.RawMessage(dbop), &result)
 	if err != nil {
-		panic(fmt.Sprintf("Unmarshal() error: %v, on: %s", err, dbops))
+		panic(fmt.Sprintf("Unmarshal() error: %v, on: %s", err, dbop))
 	}
 	return
 }
 
-// func TestExpressionsGenerator_Apply(t *testing.T) {
-// 	type fields struct {
-// 		keyExtractor    cel.Program
-// 		ceTypeExtractor cel.Program
-// 	}
-// 	type args struct {
-// 		stepName     string
-// 		transaction  *pbcodec.TransactionTrace
-// 		trace        *pbcodec.ActionTrace
-// 		decodedDBOps []*decodedDBOp
-// 	}
-// 	tests := []struct {
-// 		name    string
-// 		fields  fields
-// 		args    args
-// 		want    []Generation
-// 		wantErr bool
-// 	}{
-// 		// TODO: Add test cases.
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			g := ExpressionsGenerator{
-// 				keyExtractor:    tt.fields.keyExtractor,
-// 				ceTypeExtractor: tt.fields.ceTypeExtractor,
-// 			}
-// 			got, err := g.Apply(tt.args.stepName, tt.args.transaction, tt.args.trace, tt.args.decodedDBOps)
-// 			if (err != nil) != tt.wantErr {
-// 				t.Errorf("ExpressionsGenerator.Apply() error = %v, wantErr %v", err, tt.wantErr)
-// 				return
-// 			}
-// 			if !reflect.DeepEqual(got, tt.want) {
-// 				t.Errorf("ExpressionsGenerator.Apply() = %v, want %v", got, tt.want)
-// 			}
-// 		})
-// 	}
-// }
+func jsonToGroupedDBOps(dbop string) (result [][]*decodedDBOp) {
+	err := json.Unmarshal(json.RawMessage(dbop), &result)
+	if err != nil {
+		panic(fmt.Sprintf("Unmarshal() error: %v, on: %s", err, dbop))
+	}
+	return
+}
+
+var DB_OP string = `
+{
+	"operation": 2,
+	"code": "eosio.nft.ft",
+	"table_name": "next.factory",
+	"primary_key": "next.factory",
+	"old_payer": "eosio.nft.ft",
+	"new_payer": "eosio.nft.ft",
+	"old_data": "GgAAAAAAAAA=",
+	"new_data": "GwAAAAAAAAA=",
+	"new_json": {
+		"value": 27
+	},
+	"old_json": {
+		"value": 26
+	}
+}
+`
+
+func Benchmark_matcher_match(b *testing.B) {
+	tests := []struct {
+		name       string
+		expression string
+	}{
+		{
+			"tablename-match",
+			"next.factory",
+		},
+		{
+			"tablename-match-op*",
+			"*:next.factory",
+		},
+		{
+			"tablename-no-match",
+			"next.vincent",
+		},
+		{
+			"operation-match",
+			"2:*",
+		},
+		{
+			"operation-match-no",
+			"0:*",
+		},
+		{
+			"table-operation-match",
+			"2:next.factory",
+		},
+		{
+			"table-operation-no-match-op",
+			"0:next.factory",
+		},
+		{
+			"table-operation-no-match-table",
+			"2:next.factories",
+		},
+	}
+	dbop := jsonToDBOp(DB_OP)
+	var value bool
+	b.Run("wattermark", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			value = dbop.TableName == tests[0].expression
+		}
+	})
+
+	for _, tt := range tests {
+		matcher, err := expressionToMatcher(tt.expression)
+		if err != nil {
+			b.Fatalf("expressionToMatcher() error: %v, on: %s", err, tt.expression)
+		}
+		b.Run(tt.name, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				value = matcher.match(dbop.DBOp)
+			}
+		})
+	}
+	b.Log(value)
+}
+
+func Test_expressionToMatcher(t *testing.T) {
+	tests := []struct {
+		name       string
+		expression string
+		want       matcher
+		wantErr    bool
+	}{
+		{
+			"short-tablename",
+			"vincent",
+			tableNameMatcher{"vincent"},
+			false,
+		},
+		{
+			"tablename",
+			"*:vincent",
+			tableNameMatcher{"vincent"},
+			false,
+		},
+		{
+			"operation",
+			"2:*",
+			operationMatcher{2},
+			false,
+		},
+		{
+			"operation-out-range-upper",
+			"4:*",
+			nil,
+			true,
+		},
+		{
+			"operation-out-range-lower",
+			"-1:*",
+			nil,
+			true,
+		},
+		{
+			"operation-on-table",
+			"2:vincent",
+			operationOnTableMatcher{"vincent", 2},
+			false,
+		},
+		{
+			"unknown",
+			"*:*",
+			nil,
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := expressionToMatcher(tt.expression)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("expressionToMatcher() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("expressionToMatcher() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
