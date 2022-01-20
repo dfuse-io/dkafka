@@ -25,7 +25,7 @@ func Test_NewActionGenerator(t *testing.T) {
 			want: ActionGenerator{
 				actions: map[string][]actionHandler{
 					"buy": {actionHandler{
-						operation: group{
+						projection: group{
 							matchers: []matcher{tableNameMatcher{"table1"}, tableNameMatcher{"table2"}},
 						},
 						ceType: "TestEvent",
@@ -41,7 +41,7 @@ func Test_NewActionGenerator(t *testing.T) {
 			want: ActionGenerator{
 				actions: map[string][]actionHandler{
 					"buy": {actionHandler{
-						operation: filter{
+						projection: filter{
 							matchers: []matcher{tableNameMatcher{"table1"}, tableNameMatcher{"table2"}},
 						},
 						ceType: "TestEvent",
@@ -57,8 +57,8 @@ func Test_NewActionGenerator(t *testing.T) {
 			want: ActionGenerator{
 				actions: map[string][]actionHandler{
 					"buy": {actionHandler{
-						operation: indentity{},
-						ceType:    "TestEvent",
+						projection: indentity{},
+						ceType:     "TestEvent",
 					}},
 				},
 			},
@@ -72,13 +72,13 @@ func Test_NewActionGenerator(t *testing.T) {
 				actions: map[string][]actionHandler{
 					"buy": {
 						actionHandler{
-							operation: filter{
+							projection: filter{
 								matchers: []matcher{tableNameMatcher{"table1"}, tableNameMatcher{"table2"}},
 							},
 							ceType: "TestEvent1",
 						},
 						actionHandler{
-							operation: group{
+							projection: group{
 								matchers: []matcher{tableNameMatcher{"table3"}},
 							},
 							ceType: "TestEvent2",
@@ -96,7 +96,7 @@ func Test_NewActionGenerator(t *testing.T) {
 				actions: map[string][]actionHandler{
 					"buy": {
 						actionHandler{
-							operation: filter{
+							projection: filter{
 								matchers: []matcher{tableNameMatcher{"table1"}, tableNameMatcher{"table2"}},
 							},
 							ceType: "TestEvent1",
@@ -104,7 +104,7 @@ func Test_NewActionGenerator(t *testing.T) {
 					},
 					"issue": {
 						actionHandler{
-							operation: group{
+							projection: group{
 								matchers: []matcher{tableNameMatcher{"table3"}},
 							},
 							ceType: "TestEvent2",
@@ -664,13 +664,13 @@ func Test_operation_on(t *testing.T) {
 	}
 	tests := []struct {
 		name string
-		op   func() operation
+		op   func() projection
 		args args
 		want string
 	}{
 		{
 			name: "identity",
-			op:   func() operation { return indentity{} },
+			op:   func() projection { return indentity{} },
 			args: args{
 				decodedDBOps: DB_OPS_2,
 			},
@@ -678,7 +678,7 @@ func Test_operation_on(t *testing.T) {
 		},
 		{
 			name: "group-first",
-			op:   func() operation { return group{[]matcher{tableNameMatcher{"next.factory"}}} },
+			op:   func() projection { return group{[]matcher{tableNameMatcher{"next.factory"}}} },
 			args: args{
 				decodedDBOps: DB_OPS_2,
 			},
@@ -686,7 +686,7 @@ func Test_operation_on(t *testing.T) {
 		},
 		{
 			name: "group-last",
-			op:   func() operation { return group{[]matcher{tableNameMatcher{"factory.a"}}} },
+			op:   func() projection { return group{[]matcher{tableNameMatcher{"factory.a"}}} },
 			args: args{
 				decodedDBOps: DB_OPS_2,
 			},
@@ -694,7 +694,7 @@ func Test_operation_on(t *testing.T) {
 		},
 		{
 			name: "group-multi",
-			op: func() operation {
+			op: func() projection {
 				return group{[]matcher{tableNameMatcher{"next.factory"}, tableNameMatcher{"factory.a"}}}
 			},
 			args: args{
@@ -704,7 +704,7 @@ func Test_operation_on(t *testing.T) {
 		},
 		{
 			name: "filter-first",
-			op:   func() operation { return filter{[]matcher{tableNameMatcher{"next.factory"}}} },
+			op:   func() projection { return filter{[]matcher{tableNameMatcher{"next.factory"}}} },
 			args: args{
 				decodedDBOps: DB_OPS_2,
 			},
@@ -712,7 +712,7 @@ func Test_operation_on(t *testing.T) {
 		},
 		{
 			name: "filter-last",
-			op:   func() operation { return filter{[]matcher{tableNameMatcher{"factory.a"}}} },
+			op:   func() projection { return filter{[]matcher{tableNameMatcher{"factory.a"}}} },
 			args: args{
 				decodedDBOps: DB_OPS_2,
 			},
@@ -720,7 +720,7 @@ func Test_operation_on(t *testing.T) {
 		},
 		{
 			name: "filter-multi",
-			op:   func() operation { return filter{[]matcher{tableNameMatcher{"next.factory"}}} },
+			op:   func() projection { return filter{[]matcher{tableNameMatcher{"next.factory"}}} },
 			args: args{
 				decodedDBOps: DB_OPS_4,
 			},

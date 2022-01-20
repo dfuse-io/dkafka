@@ -39,16 +39,18 @@ func NewActionsGenerator(config ActionsConf, skipKey ...bool) (Generator, error)
 	for actionName, actions := range config {
 		actionHandlers := make([]actionHandler, 0, 1)
 		for _, action := range actions {
-			if action.Group != nil && action.Filter != nil {
-				return nil, fmt.Errorf("only one operation at a time per action handler is supported. Action:%s", actionName)
+			if (action.Group != nil && action.Filter != nil) ||
+				(action.Group != nil && action.First != "") ||
+				(action.First != "" && action.Filter != nil) {
+				return nil, fmt.Errorf("only one projection operator at a time per action handler is supported. Action:%s", actionName)
 			}
-			var operation operation
+			var proj projection
 			if action.Group != nil {
 				matchers, err := expressionsToMatchers(action.Group)
 				if err != nil {
 					return nil, fmt.Errorf("invalid group expression: %v, error: %w", action.Group, err)
 				}
-				operation = group{
+				proj = group{
 					matchers: matchers,
 				}
 			} else if action.Filter != nil {
@@ -56,20 +58,20 @@ func NewActionsGenerator(config ActionsConf, skipKey ...bool) (Generator, error)
 				if err != nil {
 					return nil, fmt.Errorf("invalid filter expression: %v, error: %w", action.Filter, err)
 				}
-				operation = filter{
+				proj = filter{
 					matchers: matchers,
 				}
 			} else if action.First != "" {
 				matcher, err := expressionToMatcher(action.First)
 				if err != nil {
-					return nil, fmt.Errorf("invalid filter expression: %v, error: %w", action.First, err)
+					return nil, fmt.Errorf("invalid first expression: %v, error: %w", action.First, err)
 				}
-				operation = first{
+				proj = first{
 					table: matcher,
 				}
 			} else {
-				// indentity dbops operation
-				operation = indentity{}
+				// indentity dbops projection
+				proj = indentity{}
 			}
 			skipK := (len(skipKey) > 0 && skipKey[0])
 			var keyExtractor cel.Program
@@ -86,7 +88,7 @@ func NewActionsGenerator(config ActionsConf, skipKey ...bool) (Generator, error)
 				return nil, fmt.Errorf("missing type string for action: %s", actionName)
 			}
 			actionHandlers = append(actionHandlers, actionHandler{
-				operation:    operation,
+				projection:   proj,
 				ceType:       action.CeType,
 				keyExtractor: keyExtractor,
 			})
@@ -111,24 +113,51 @@ func expressionsToMatchers(expressions []string) ([]matcher, error) {
 	return matchers, nil
 }
 
+var operationTypeByName map[string]pbcodec.DBOp_Operation = map[string]pbcodec.DBOp_Operation{
+	"UNKNOWN": 0,
+	"INSERT":  1,
+	"UPDATE":  2,
+	"DELETE":  3,
+}
+
+func stringAsDBOpOperation(s string) (op pbcodec.DBOp_Operation, err error) {
+	if len(s) > 1 { // string representation of the operation
+		var found bool
+		op, found = operationTypeByName[strings.ToUpper(s)]
+		if !found {
+			err = fmt.Errorf("invalid operation matcher value must be one of: {UNKNOWN|INSERT|UPDATE|DELETE}, on: %s", s)
+		}
+	} else { // numerical representation of the operation [0..3]
+		// ParseUint
+		var op64 uint64
+		op64, err = strconv.ParseUint(s, 10, 32)
+		if err != nil || op64 > 3 {
+			err = fmt.Errorf("invalid operation matcher value must be a uint between [0..3], on: %s, with error: %w", s, err)
+		} else {
+			op = pbcodec.DBOp_Operation(op64)
+		}
+	}
+	return
+}
+
 func expressionToMatcher(expression string) (matcher, error) {
 	tokens := strings.Split(expression, ":")
-	if len(tokens) == 1 {
+	if len(tokens) == 1 { // <- table name only short expression (legacy) => table-name
 		return tableNameMatcher{tokens[0]}, nil
-	} else if tokens[0] == "*" && tokens[1] == "*" {
+	} else if tokens[0] == "*" && tokens[1] == "*" { // <- invalid expression => *:*
 		return nil, fmt.Errorf("unsupported table matcher expression: %s, you must at least fix on of them", expression)
-	} else if tokens[0] == "*" {
+	} else if tokens[0] == "*" { // <- table name only long expression => *:table-name
 		return tableNameMatcher{tokens[1]}, nil
-	} else if tokens[1] == "*" {
-		op, err := strconv.Atoi(tokens[0])
-		if err != nil || op < 0 || op > 3 {
-			return nil, fmt.Errorf("invalid operation matcher value must be a uint between [0..3], on: %s, with error: %w", expression, err)
+	} else if tokens[1] == "*" { // <- operation only expression => 1:*, INSERT:*
+		op, err := stringAsDBOpOperation(tokens[0])
+		if err != nil {
+			return nil, err
 		}
-		return operationMatcher{pbcodec.DBOp_Operation(op)}, nil
+		return operationMatcher{op}, nil
 	} else {
-		op, err := strconv.Atoi(tokens[0])
-		if err != nil || op < 0 || op > 3 {
-			return nil, fmt.Errorf("invalid operation matcher value must be a uint between [0..3]")
+		op, err := stringAsDBOpOperation(tokens[0])
+		if err != nil {
+			return nil, err
 		}
 		return operationOnTableMatcher{op: pbcodec.DBOp_Operation(op), name: tokens[1]}, nil
 	}
@@ -144,7 +173,7 @@ func NewExpressionsGenerator(
 	}
 }
 
-type operation interface {
+type projection interface {
 	on(decodedDBOps []*decodedDBOp) [][]*decodedDBOp
 }
 
@@ -240,7 +269,7 @@ func (g group) on(decodedDBOps []*decodedDBOp) [][]*decodedDBOp {
 }
 
 type actionHandler struct {
-	operation    operation
+	projection   projection
 	keyExtractor cel.Program
 	ceType       string
 }
@@ -257,7 +286,7 @@ func (g ActionGenerator) Apply(stepName string,
 	if actionHandlers, ok := g.actions[trace.Action.Name]; ok {
 		var generations []Generation = make([]Generation, 0, 1)
 		for i, actionHandler := range actionHandlers {
-			for _, ops := range actionHandler.operation.on(decodedDBOps) {
+			for _, ops := range actionHandler.projection.on(decodedDBOps) {
 
 				activation, err := NewActivation(stepName, transaction,
 					trace,

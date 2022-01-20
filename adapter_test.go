@@ -9,8 +9,14 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 )
+
+var default_headers = []kafka.Header{{
+	Key:   "ce_source",
+	Value: []byte("dkafka-test"),
+}}
 
 func readFileFromTestdata(t testing.TB, file string) []byte {
 	f, err := os.Open(file)
@@ -95,7 +101,7 @@ func Test_adapter_adapt(t *testing.T) {
 					abiDecoder.DecodeDBOps,
 					tt.failOnUndecodableDBOP,
 					`{"create":[{"key":"transaction_id", "type":"TestType"}]}`,
-					nil,
+					default_headers,
 				)
 				if err != nil {
 					t.Fatalf("newActionsAdapter() error: %v", err)
@@ -109,7 +115,7 @@ func Test_adapter_adapt(t *testing.T) {
 					tt.failOnUndecodableDBOP,
 					eventTypeProg,
 					eventKeyProg,
-					nil,
+					default_headers,
 				)
 			}
 
@@ -220,7 +226,7 @@ func Benchmark_adapter_adapt(b *testing.B) {
 				abiDecoder.DecodeDBOps,
 				tt.failOnUndecodableDBOP,
 				`{"create":[{"key":"transaction_id", "type":"TestType"}]}`,
-				nil,
+				default_headers,
 			)
 			if err != nil {
 				b.Fatalf("newActionsAdapter() error: %v", err)

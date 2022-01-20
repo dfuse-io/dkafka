@@ -132,6 +132,15 @@ func (m *adapter) adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message, e
 			if err != nil {
 				return nil, err
 			}
+			var source string
+			for _, entry := range m.headers {
+				if entry.Key == "ce_source" {
+					source = string(entry.Value)
+				}
+			}
+			if source == "" {
+				return nil, fmt.Errorf("ce_source is missing")
+			}
 			msgs := make([]*kafka.Message, 0, 1)
 			for _, generation := range generations {
 				eosioAction := event{
@@ -156,7 +165,7 @@ func (m *adapter) adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message, e
 				headers := append(m.headers,
 					kafka.Header{
 						Key:   "ce_id",
-						Value: hashString(fmt.Sprintf("%s%s%d%s%s", blk.Id, trx.Id, act.ExecutionIndex, rawStep, generation.Key)),
+						Value: hashString(fmt.Sprintf("%s%s%s%d%s%s", source, blk.Id, trx.Id, act.ExecutionIndex, rawStep, generation.Key)),
 					},
 					kafka.Header{
 						Key:   "ce_type",

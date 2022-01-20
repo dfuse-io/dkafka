@@ -1,8 +1,10 @@
 {
     "topic": "",
     "headers": [
+        "ce_source",
+        "dkafka-test",
         "ce_id",
-        "wlHYgcgvx/iopjXm50u7OzVGZYFyXj7SeoB+NCHKTVc=",
+        "v1dvGVOwO/McmrMsours8ZvHkUQFyHCGPRg8xSB0NPI=",
         "ce_type",
         "TestType",
         "ce_time",

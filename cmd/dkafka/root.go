@@ -47,7 +47,8 @@ func init() {
 
 	RootCmd.PersistentFlags().String("log-format", "text", "Format for logging to stdout. Either 'text' or 'stackdriver'")
 	RootCmd.PersistentFlags().CountP("verbose", "v", "Enables verbose output (-vvvv for max verbosity)")
-	RootCmd.PersistentFlags().String("log-level-switcher-listen-addr", "localhost:1065", "If non-empty, the process will listen on this address for json-formatted requests to change different logger levels (see DEBUG.md for more info)")
+	RootCmd.PersistentFlags().String("log-level-switcher-listen-addr", "localhost:1065", `If non-empty, the process will listen on this address for json-formatted requests
+to change different logger levels (see DEBUG.md for more info)`)
 }
 
 func initConfig() {

@@ -164,3 +164,68 @@ dkafka publish \
 ```
 
 * --fail-on-undecodable-db-op flag allows you to specify if you want dkafka to fail any time it cannot decode a given dbop to JSON
+
+## Actions expressions
+In this section I will explain how you can use the `--actions-expr`. This feature is for advance usage when you want to implement
+an action based dfuse to kafka communication.
+
+For that, you will use the `--actions-expr` option.
+It's a JSON object that describe how each action have to be handled.
+This feature allow you to fan-out multiple messages for a give action.
+For example, on a NFT issue action you may want to send one message for 
+the update of the state of the NFT factory and one message per newly 
+created NFT.
+The first level of properties is the name of the actions you filter in 
+`--dfuse-firehose-include-expr`. Then for each action you specify an array 
+of (one or many) projections. A projection is an JSON object who defines 
+an expression for the key of the kafka message and the CloudEvents type 
+(ce_type header). Those 2 properties are mandatory. Optionally, you can 
+specify one of the projection functions on the db_ops: `(filter|group|first)`.
+- group: is configured by a list of db_op matcher. It traverses the db_ops 
+  and every time a sequence of matcher is respected is emit a message with 
+  the resulting group. It is useful when an action insert multiple entries 
+  in a table and you want to emit a message per entry like when you issue 
+  multiple NFTs in a raw and want a message per created NTF with the associated 
+  to the id of the newly create NTF.
+- first: It's a single message output projection. It's configured with a single 
+  db_op matcher. It traverses the db_ops and stop at the first occurrence of 
+  the given matcher and return this only db_ops to build a single message.
+- filter: It's a single message output projection. It's configured by a list of 
+  db_op matcher. It traverses the db_ops and return a single group of db_ops 
+  with the non matching db_ops filter out to build an single the message.
+
+A Table matcher is defined by an string expression `(<operation>:)<table-name>` where:
+- "<operation>:" an optional matching property. The operation string value can be 
+  one of the following: (UNKNOWN|INSERT|UPDATE|DELETE) or a numerical positive 
+  value between [0..3] where 0 => UNKNOWN, 1 => INSERT, 2 => UPDATE, 3 => DELETE.
+  You can use a special character to represent any operation => '*'. It allow
+  you to write a matcher like this: "*:a.factory" where any operation of the 
+  "a.factory" table will match. 
+- "<table-name>": a mandatory name of a given table involved into the action.
+
+Warning: this configuration option as a precedence on the `--event-type-expr` and 
+`--event-keys-expr` options. Therefore if specified then the 2 others are omitted
+
+Examples:
+- simple action matching without db_ops specific projection (identity projection operator).
+  this is equivalent to the combined usage of --event-type-expr and --event-keys-expr:
+```
+  --actions-expr='{"create":[{"key":"transaction_id", "type":"NftFtCreatedNotification"}]}'
+```
+- first db_ops projection and db_ops property usage for key definition:
+```
+  --actions-expr='{"create":[{"first": "1:factory.a", "key":"string(db_ops[0].new_json.id)",
+  "type":"NftFtCreatedNotification"}]}'
+```
+- multi actions projection:
+```
+  --actions-expr='{"create":[{"first": "1:factory.a", "key":"string(db_ops[0].new_json.id)",
+  "type":"NftFtCreatedNotification"}], "issue":[{"group": ["2:factory.a"],
+  "key":"string(db_ops[0].new_json.id)", "type":"NftFtUpdatedNotification"}]}'
+```
+
+
+## TODO
+- [x] add source to the `ce_id`
+- [ ] avro codec
+- [ ] avro schema generation

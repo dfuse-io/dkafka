@@ -7,11 +7,14 @@ BINARY_PATH := $(BUILD_DIR)/$(PROJECT_NAME)
 COVERAGE_DIR := $(BUILD_DIR)
 KUBECONFIG ?= ~/.kube/dfuse.staging.kube
 INCLUDE_EXPRESSION ?= 'executed && action=="create" && account=="eosio.nft.ft" && receiver=="eosio.nft.ft"'
+# INCLUDE_EXPRESSION ?= 'executed && (action=="create" || action=="issue") && account=="eosio.nft.ft" && receiver=="eosio.nft.ft"'
 KEY_EXPRESSION ?= '[transaction_id]'
 ACTIONS_EXPRESSION ?= '{"create":[{"key":"transaction_id", "type":"TestType"}]}'
 # ACTIONS_EXPRESSION ?= '{"create":[{"filter": ["factory.a"], "key":"transaction_id", "type":"TestType"}]}'
 # ACTIONS_EXPRESSION ?= '{"create":[{"filter": ["factory.a"], "key":"string(db_ops[0].new_json.id)", "type":"TestType"}]}'
 # ACTIONS_EXPRESSION ?= '{"create":[{"filter": ["1:factory.a"], "key":"string(db_ops[0].new_json.id)", "type":"TestType"}]}'
+# ACTIONS_EXPRESSION ?= '{"create":[{"first": "1:factory.a", "key":"string(db_ops[0].new_json.id)", "type":"NftFtCreatedNotification"}], "issue":[{"group": ["2:factory.a"], "key":"string(db_ops[0].new_json.id)", "type":"NftFtUpdatedNotification"}]}'
+
 MESSAGE_TYPE ?= '"TestType"'
 COMPRESSION_TYPE ?= "snappy"
 COMPRESSION_LEVEL ?= -1
