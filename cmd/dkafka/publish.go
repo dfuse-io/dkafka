@@ -48,58 +48,64 @@ match your producers (same apply for consumers)
 	PublishCmd.Flags().String("event-keys-expr", "[account]", `CEL expression defining the event keys. More then one key will result in multiple
 events being sent. Must resolve to an array of strings`)
 	PublishCmd.Flags().String("event-type-expr", "(notif?'!':'')+account+'/'+action", "CEL expression defining the event type. Must resolve to a string")
-	PublishCmd.Flags().String("actions-expr", "", `JSON object that describe how each action have to be handled.
-This feature allow you to fan-out multiple messages for a give action.
-For example, on a NFT issue action you may want to send one message for 
-the update of the state of the NFT factory and one message per newly 
-created NFT.
-The first level of properties is the name of the actions you filter in 
---dfuse-firehose-include-expr. Then for each action you specify an array 
-of (one or many) projections. A projection is an JSON object who defines 
-an expression for the key of the kafka message and the CloudEvents type 
-(ce_type header). Those 2 properties are mandatory. Optionally, you can 
-specify one of the projection functions on the db_ops: (filter|group|first).
-- group: is configured by a list of db_op matcher. It traverses the db_ops 
-  and every time a sequence of matcher is respected is emit a message with 
-  the resulting group. It is useful when an action insert multiple entries 
-  in a table and you want to emit a message per entry like when you issue 
-  multiple NFTs in a raw and want a message per created NTF with the associated 
-  to the id of the newly create NTF.
-- first: It's a single message output projection. It's configured with a single 
-  db_op matcher. It traverses the db_ops and stop at the first occurrence of 
-  the given matcher and return this only db_ops to build a single message.
-- filter: It's a single message output projection. It's configured by a list of 
-  db_op matcher. It traverses the db_ops and return a single group of db_ops 
-  with the non matching db_ops filter out to build an single the message.
+	PublishCmd.Flags().String("actions-expr", "", `For that, you will use the '--actions-expr' option.
+	It's a JSON object that describe how each action have to be handled.
+	This feature allow you to fan-out multiple messages for a give action.
+	For example, on a NFT issue action you may want to send one message per
+	update of the state of the NFT factories and one message per newly 
+	created NFTs.
+	The first level of properties is the name of the actions you filter in 
+	'--dfuse-firehose-include-expr'. Then for each action you specify an array 
+	of (one or many) projections. A projection is an JSON object who defines 
+	an expression for the 'key' of the kafka message and the CloudEvents 'type' 
+	(ce_type header). Those 2 properties are mandatory. Optionally, you can 
+	specify one of the projection functions on the db_ops: '(filter|first)'.
+	- first: It's a single message output projection. It's configured with a single 
+	  db_op matcher. It traverses the db_ops and stop at the first matching 
+	  occurrence and return this only db_ops to build a single message.
+	- filter: It's a single message output projection. It's configured with a
+	  db_op matcher. It traverses the db_ops and return the matching db_ops.
+	Additionally you can 'split' the resulting db_ops through the 'split' property
+	to send as many message as there is db_ops result. It is useful when an action 
+	insert or update or delete multiple entries in a table and you want to emit 
+	a message per entry like when you issue multiple NFTs in a raw and want a 
+	message per created NTF with the associated to the id of the newly create NTF.
+	
+	A Table matcher is defined by an string expression '(<operation>:)<table-name>' where:
+	- "<operation>:" an optional matching property. The operation string value can be 
+	  one of the following: (UNKNOWN|INSERT|UPDATE|DELETE) or a numerical positive 
+	  value between [0..3] where 0 => UNKNOWN, 1 => INSERT, 2 => UPDATE, 3 => DELETE.
+	  You can use a special character to represent any operation => '*'. It allow
+	  you to write a matcher like this: "*:a.factory" where any operation of the 
+	  "a.factory" table will match. 
+	- "<table-name>": a mandatory name of a given table involved into the action.
+	  It's an exact matcher.
+	
+	Warning: this configuration option as a precedence on the '--event-type-expr' and 
+	'--event-keys-expr' options. Therefore if specified then the 2 others are omitted
+	
+	Examples:
+	- simple action matching without db_ops specific projection (identity projection operator).
+	  this is equivalent to the combined usage of --event-type-expr and --event-keys-expr:
+	{"create":[{"key":"transaction_id", "type":"NftFtCreatedNotification"}]}
 
-A Table matcher is defined by an string expression "(<operation>:)<table-name>" where:
-- "<operation>:" an optional matching property. The operation string value can be 
-  one of the following: (UNKNOWN|INSERT|UPDATE|DELETE) or a numerical positive 
-  value between [0..3] where 0 => UNKNOWN, 1 => INSERT, 2 => UPDATE, 3 => DELETE.
-  You can use a special character to represent any operation => '*'. It allow
-  you to write a matcher like this: "*:a.factory" where any operation of the 
-  "a.factory" table will match. 
-- "<table-name>": a mandatory name of a given table involved into the action.
+	- first db_ops projection and db_ops property usage for key definition:
+	{
+	  "create":[
+		{"first": "1:factory.a", "key":"string(db_ops[0].new_json.id)", "type":"NftFtCreatedNotification"}
+	  ]
+	}
 
-Warning: this configuration option as a precedence on the --event-type-expr and 
---event-keys-expr options. Therefore if specified then the 2 others are omitted
-
-Examples:
-- simple action matching without db_ops specific projection (identity projection operator).
-  this is equivalent to the combined usage of --event-type-expr and --event-keys-expr:
-
-  --actions-expr='{"create":[{"key":"transaction_id", "type":"NftFtCreatedNotification"}]}'
-
-- first db_ops projection and db_ops property usage for key definition:
-
-  --actions-expr='{"create":[{"first": "1:factory.a", "key":"string(db_ops[0].new_json.id)",
-  "type":"NftFtCreatedNotification"}]}'
-  
-- multi actions projection:
-  
-  --actions-expr='{"create":[{"first": "1:factory.a", "key":"string(db_ops[0].new_json.id)",
-  "type":"NftFtCreatedNotification"}], "issue":[{"group": ["2:factory.a"],
-  "key":"string(db_ops[0].new_json.id)", "type":"NftFtUpdatedNotification"}]}'
+	- multi actions projection:
+	{
+	  "create":[
+		{"first": "insert:factory.a", "key":"string(db_ops[0].new_json.id)", "type":"NftFtCreatedNotification"}
+	  ], 
+	  "issue":[
+		{"filter": "update:factory.a", "split": true, "key":"string(db_ops[0].new_json.id)", "type":"NftFtUpdatedNotification"}
+	  ]
+	}
+	
 `)
 
 	PublishCmd.Flags().Bool("batch-mode", false, "Batch mode will ignore cursor and always start from {start-block-num}.")

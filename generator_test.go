@@ -20,15 +20,16 @@ func Test_NewActionGenerator(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "group",
-			args: `{"buy":[{"group":["table1", "table2"],"key":"db_ops[0].table_name", "type":"TestEvent"}]}`,
+			name: "filter-split",
+			args: `{"buy":[{"split": true, "filter":"table1","key":"db_ops[0].table_name", "type":"TestEvent"}]}`,
 			want: ActionGenerator{
 				actions: map[string][]actionHandler{
 					"buy": {actionHandler{
-						projection: group{
-							matchers: []matcher{tableNameMatcher{"table1"}, tableNameMatcher{"table2"}},
+						projection: filter{
+							matcher: tableNameMatcher{"table1"},
 						},
 						ceType: "TestEvent",
+						split:  true,
 					}},
 				},
 			},
@@ -37,12 +38,12 @@ func Test_NewActionGenerator(t *testing.T) {
 		},
 		{
 			name: "filter",
-			args: `{"buy":[{"filter":["table1", "table2"],"key":"db_ops[0].table_name", "type":"TestEvent"}]}`,
+			args: `{"buy":[{"filter":"table1","key":"db_ops[0].table_name", "type":"TestEvent"}]}`,
 			want: ActionGenerator{
 				actions: map[string][]actionHandler{
 					"buy": {actionHandler{
 						projection: filter{
-							matchers: []matcher{tableNameMatcher{"table1"}, tableNameMatcher{"table2"}},
+							matcher: tableNameMatcher{"table1"},
 						},
 						ceType: "TestEvent",
 					}},
@@ -66,22 +67,23 @@ func Test_NewActionGenerator(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "multi-operations",
-			args: `{"buy":[{"filter":["table1", "table2"],"key":"db_ops[0].table_name", "type":"TestEvent1"},{"group":["table3"],"key":"db_ops[0].table_name", "type":"TestEvent2"}]}`,
+			name: "multi-projections",
+			args: `{"buy":[{"filter":"table1","key":"db_ops[0].table_name", "type":"TestEvent1"},{"filter":"table3","split": true,"key":"db_ops[0].table_name", "type":"TestEvent2"}]}`,
 			want: ActionGenerator{
 				actions: map[string][]actionHandler{
 					"buy": {
 						actionHandler{
 							projection: filter{
-								matchers: []matcher{tableNameMatcher{"table1"}, tableNameMatcher{"table2"}},
+								matcher: tableNameMatcher{"table1"},
 							},
 							ceType: "TestEvent1",
 						},
 						actionHandler{
-							projection: group{
-								matchers: []matcher{tableNameMatcher{"table3"}},
+							projection: filter{
+								matcher: tableNameMatcher{"table3"},
 							},
 							ceType: "TestEvent2",
+							split:  true,
 						},
 					},
 				},
@@ -91,23 +93,24 @@ func Test_NewActionGenerator(t *testing.T) {
 		},
 		{
 			name: "multi-actions",
-			args: `{"buy":[{"filter":["table1", "table2"],"key":"db_ops[0].table_name", "type":"TestEvent1"}],"issue":[{"group":["table3"],"key":"db_ops[0].table_name", "type":"TestEvent2"}]}`,
+			args: `{"buy":[{"filter":"table2","key":"db_ops[0].table_name", "type":"TestEvent1"}],"issue":[{"filter":"table3", "split": true,"key":"db_ops[0].table_name", "type":"TestEvent2"}]}`,
 			want: ActionGenerator{
 				actions: map[string][]actionHandler{
 					"buy": {
 						actionHandler{
 							projection: filter{
-								matchers: []matcher{tableNameMatcher{"table1"}, tableNameMatcher{"table2"}},
+								matcher: tableNameMatcher{"table2"},
 							},
 							ceType: "TestEvent1",
 						},
 					},
 					"issue": {
 						actionHandler{
-							projection: group{
-								matchers: []matcher{tableNameMatcher{"table3"}},
+							projection: filter{
+								matcher: tableNameMatcher{"table3"},
 							},
 							ceType: "TestEvent2",
+							split:  true,
 						},
 					},
 				},
@@ -117,19 +120,19 @@ func Test_NewActionGenerator(t *testing.T) {
 		},
 		{
 			name:    "missing-key",
-			args:    `{"buy":[{"filter":["table1", "table2"], "type":"TestEvent"}]}`,
+			args:    `{"buy":[{"filter":"table1", "type":"TestEvent"}]}`,
 			skipKey: false,
 			wantErr: true,
 		},
 		{
 			name:    "missing-type",
-			args:    `{"buy":[{"filter":["table1", "table2"],"key":"db_ops[0].table_name"}]}`,
+			args:    `{"buy":[{"filter":"table1","key":"db_ops[0].table_name"}]}`,
 			skipKey: false,
 			wantErr: true,
 		},
 		{
 			name:    "too-many-operations",
-			args:    `{"buy":[{"filter":["table1", "table2"],"group":["table1", "table2"],"key":"db_ops[0].table_name", "type":"TestEvent"}]}`,
+			args:    `{"buy":[{"filter":"table1","first":"table2","key":"db_ops[0].table_name", "type":"TestEvent"}]}`,
 			skipKey: false,
 			wantErr: true,
 		},
@@ -216,6 +219,25 @@ func Test_ActionGenerator_Apply(t *testing.T) {
 			`{"issue":[{"key":"transaction_id", "type":"TestType"}]}`,
 			nil,
 			false,
+		},
+		{
+			"action-filter-no-matching",
+			"testdata/block-30080032.json",
+			`{"create":[{"filter":"unknown","key":"transaction_id", "type":"TestType"}]}`,
+			[]Generation{
+				{
+					Key:    "a2a53dce154c2ccdca52a981318775938de02f7efef88926ae1d7fd992988530",
+					CeType: "TestType",
+				},
+			},
+			false,
+		},
+		{
+			"action-filter-no-matching-error",
+			"testdata/block-30080032.json",
+			`{"create":[{"filter":"unknown","key":"string(db_ops[0].new_json.id)", "type":"TestType"}]}`,
+			nil,
+			true,
 		},
 	}
 	for _, tt := range tests {
@@ -321,8 +343,8 @@ var DB_OPS_2 string = `
 ]
 `
 
-var DB_OPS_2_OP_FIRST string = `
-[[
+var DB_OPS_NEXT_FACTORY string = `
+[
 	{
 		"operation": 2,
 		"code": "eosio.nft.ft",
@@ -339,11 +361,11 @@ var DB_OPS_2_OP_FIRST string = `
 			"value": 26
 		}
 	}
-]]
+]
 `
 
-var DB_OPS_2_OP_LAST string = `
-[[
+var DB_OPS_FACTORY_A string = `
+[
 	{
 		"operation": 1,
 		"code": "eosio.nft.ft",
@@ -384,7 +406,7 @@ var DB_OPS_2_OP_LAST string = `
 			"stat": 0
 		}
 	}
-]]
+]
 `
 
 var DB_OPS_4 string = `
@@ -504,125 +526,8 @@ var DB_OPS_4 string = `
 ]
 `
 
-var DB_OPS_4_GROUP string = `
-[[
-	{
-		"operation": 2,
-		"code": "eosio.nft.ft",
-		"table_name": "next.factory",
-		"primary_key": "next.factory",
-		"old_payer": "eosio.nft.ft",
-		"new_payer": "eosio.nft.ft",
-		"old_data": "GgAAAAAAAAA=",
-		"new_data": "GwAAAAAAAAA=",
-		"new_json": {
-			"value": 27
-		},
-		"old_json": {
-			"value": 26
-		}
-	},
-	{
-		"operation": 1,
-		"code": "eosio.nft.ft",
-		"scope": "eosio.nft.ft",
-		"table_name": "factory.a",
-		"primary_key": "...........1e",
-		"new_payer": "ultra.nft.ft",
-		"new_data": "GgAAAAAAAACQF8hrAnNz1JAXyGsCc3PUAAAAAAAAAAAAAAAAAAAAAAAIVVNEAAAAAAJAKB5JiUMD1PQBQNIeron8Qtz0AQAAAAABAAAAAAABAAAAAAGQF8hrAnNz1AABfGh0dHBzOi8vczMudXMtZWFzdC0xLndhc2FiaXN5cy5jb20vdWx0cmFpby11bmlxLXN0YWdpbmcvZDZjOTk5YmJiZDVmM2MxMjJkMjI2MWUyYjc4N2FjYjNlMDNhYWM2YTE4NTIwMjRiOTY1NmM4NWQ3YTk5ZmFiZC56aXDWyZm7vV88Ei0iYeK3h6yz4DqsahhSAkuWVshdepn6vQEoAAAAAAAAAAAAAAA=",
-		"new_json": {
-			"asset_creator": "ultra.nft.ft",
-			"asset_manager": "ultra.nft.ft",
-			"chosen_rate": [],
-			"conditionless_receivers": [
-				"ultra.nft.ft"
-			],
-			"conversion_rate_oracle_contract": "",
-			"existing_tokens_no": 0,
-			"id": 26,
-			"lockup_time": 0,
-			"max_mintable_tokens": 40,
-			"meta_hash": "d6c999bbbd5f3c122d2261e2b787acb3e03aac6a1852024b9656c85d7a99fabd",
-			"meta_uris": [
-				"https://s3.us-east-1.wasabisys.com/ultraio-uniq-staging/d6c999bbbd5f3c122d2261e2b787acb3e03aac6a1852024b9656c85d7a99fabd.zip"
-			],
-			"minimum_resell_price": "0.00000000 USD",
-			"minted_tokens_no": 0,
-			"recall_window_start": 0,
-			"resale_shares": [
-				{
-					"basis_point": 500,
-					"receiver": "uk1ob2ed3so4"
-				},
-				{
-					"basis_point": 500,
-					"receiver": "vl1jt2hi3vd4"
-				}
-			],
-			"stat": 0
-		}
-	}],
-	[{
-		"operation": 2,
-		"code": "eosio.nft.ft",
-		"table_name": "next.factory",
-		"primary_key": "next.factory",
-		"old_payer": "eosio.nft.ft",
-		"new_payer": "eosio.nft.ft",
-		"old_data": "GgAAAAAAAAA=",
-		"new_data": "GwAAAAAAAAA=",
-		"new_json": {
-			"value": 28
-		},
-		"old_json": {
-			"value": 27
-		}
-	},
-	{
-		"operation": 1,
-		"code": "eosio.nft.ft",
-		"scope": "eosio.nft.ft",
-		"table_name": "factory.a",
-		"primary_key": "...........1e",
-		"new_payer": "ultra.nft.ft",
-		"new_data": "GgAAAAAAAACQF8hrAnNz1JAXyGsCc3PUAAAAAAAAAAAAAAAAAAAAAAAIVVNEAAAAAAJAKB5JiUMD1PQBQNIeron8Qtz0AQAAAAABAAAAAAABAAAAAAGQF8hrAnNz1AABfGh0dHBzOi8vczMudXMtZWFzdC0xLndhc2FiaXN5cy5jb20vdWx0cmFpby11bmlxLXN0YWdpbmcvZDZjOTk5YmJiZDVmM2MxMjJkMjI2MWUyYjc4N2FjYjNlMDNhYWM2YTE4NTIwMjRiOTY1NmM4NWQ3YTk5ZmFiZC56aXDWyZm7vV88Ei0iYeK3h6yz4DqsahhSAkuWVshdepn6vQEoAAAAAAAAAAAAAAA=",
-		"new_json": {
-			"asset_creator": "ultra.nft.ft",
-			"asset_manager": "ultra.nft.ft",
-			"chosen_rate": [],
-			"conditionless_receivers": [
-				"ultra.nft.ft"
-			],
-			"conversion_rate_oracle_contract": "",
-			"existing_tokens_no": 0,
-			"id": 27,
-			"lockup_time": 0,
-			"max_mintable_tokens": 40,
-			"meta_hash": "d6c999bbbd5f3c122d2261e2b787acb3e03aac6a1852024b9656c85d7a99fabd",
-			"meta_uris": [
-				"https://s3.us-east-1.wasabisys.com/ultraio-uniq-staging/d6c999bbbd5f3c122d2261e2b787acb3e03aac6a1852024b9656c85d7a99fabd.zip"
-			],
-			"minimum_resell_price": "0.00000000 USD",
-			"minted_tokens_no": 0,
-			"recall_window_start": 0,
-			"resale_shares": [
-				{
-					"basis_point": 500,
-					"receiver": "uk1ob2ed3so4"
-				},
-				{
-					"basis_point": 500,
-					"receiver": "vl1jt2hi3vd4"
-				}
-			],
-			"stat": 0
-		}
-	}
-]]
-`
-
 var DB_OPS_4_FILTER string = `
-[[
+[
 	{
 		"operation": 2,
 		"code": "eosio.nft.ft",
@@ -655,7 +560,7 @@ var DB_OPS_4_FILTER string = `
 			"value": 27
 		}
 	}
-]]
+]
 `
 
 func Test_operation_on(t *testing.T) {
@@ -674,64 +579,54 @@ func Test_operation_on(t *testing.T) {
 			args: args{
 				decodedDBOps: DB_OPS_2,
 			},
-			want: "[" + DB_OPS_2 + "]",
-		},
-		{
-			name: "group-first",
-			op:   func() projection { return group{[]matcher{tableNameMatcher{"next.factory"}}} },
-			args: args{
-				decodedDBOps: DB_OPS_2,
-			},
-			want: DB_OPS_2_OP_FIRST,
-		},
-		{
-			name: "group-last",
-			op:   func() projection { return group{[]matcher{tableNameMatcher{"factory.a"}}} },
-			args: args{
-				decodedDBOps: DB_OPS_2,
-			},
-			want: DB_OPS_2_OP_LAST,
-		},
-		{
-			name: "group-multi",
-			op: func() projection {
-				return group{[]matcher{tableNameMatcher{"next.factory"}, tableNameMatcher{"factory.a"}}}
-			},
-			args: args{
-				decodedDBOps: DB_OPS_4,
-			},
-			want: DB_OPS_4_GROUP,
+			want: DB_OPS_2,
 		},
 		{
 			name: "filter-first",
-			op:   func() projection { return filter{[]matcher{tableNameMatcher{"next.factory"}}} },
+			op:   func() projection { return filter{tableNameMatcher{"next.factory"}} },
 			args: args{
 				decodedDBOps: DB_OPS_2,
 			},
-			want: DB_OPS_2_OP_FIRST,
+			want: DB_OPS_NEXT_FACTORY,
 		},
 		{
 			name: "filter-last",
-			op:   func() projection { return filter{[]matcher{tableNameMatcher{"factory.a"}}} },
+			op:   func() projection { return filter{tableNameMatcher{"factory.a"}} },
 			args: args{
 				decodedDBOps: DB_OPS_2,
 			},
-			want: DB_OPS_2_OP_LAST,
+			want: DB_OPS_FACTORY_A,
 		},
 		{
 			name: "filter-multi",
-			op:   func() projection { return filter{[]matcher{tableNameMatcher{"next.factory"}}} },
+			op:   func() projection { return filter{tableNameMatcher{"next.factory"}} },
 			args: args{
 				decodedDBOps: DB_OPS_4,
 			},
 			want: DB_OPS_4_FILTER,
 		},
+		{
+			name: "first-next.factory",
+			op:   func() projection { return first{tableNameMatcher{"next.factory"}} },
+			args: args{
+				decodedDBOps: DB_OPS_4,
+			},
+			want: DB_OPS_NEXT_FACTORY,
+		},
+		{
+			name: "first-factory-a",
+			op:   func() projection { return first{tableNameMatcher{"factory.a"}} },
+			args: args{
+				decodedDBOps: DB_OPS_4,
+			},
+			want: DB_OPS_FACTORY_A,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			want := jsonToGroupedDBOps(tt.want)
+			want := jsonToDBOps(tt.want)
 			if got := tt.op().on(jsonToDBOps(tt.args.decodedDBOps)); !reflect.DeepEqual(got, want) {
-				t.Errorf("group.on() = %+v, want %+v", got, want)
+				t.Errorf("projection.on() = %+v\nwant = %+v", got, want)
 			}
 		})
 	}
@@ -746,14 +641,6 @@ func jsonToDBOp(dbop string) (result *decodedDBOp) {
 }
 
 func jsonToDBOps(dbop string) (result []*decodedDBOp) {
-	err := json.Unmarshal(json.RawMessage(dbop), &result)
-	if err != nil {
-		panic(fmt.Sprintf("Unmarshal() error: %v, on: %s", err, dbop))
-	}
-	return
-}
-
-func jsonToGroupedDBOps(dbop string) (result [][]*decodedDBOp) {
 	err := json.Unmarshal(json.RawMessage(dbop), &result)
 	if err != nil {
 		panic(fmt.Sprintf("Unmarshal() error: %v, on: %s", err, dbop))

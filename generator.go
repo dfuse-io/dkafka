@@ -25,11 +25,11 @@ type Generator interface {
 }
 
 type ActionConf struct {
-	Group  []string `json:"group,omitempty"`
-	Filter []string `json:"filter,omitempty"`
-	First  string   `json:"first,omitempty"`
-	Key    string   `json:"key"`
-	CeType string   `json:"type"`
+	Filter string `json:"filter,omitempty"`
+	First  string `json:"first,omitempty"`
+	Split  bool   `json:"split,omitempty"`
+	Key    string `json:"key"`
+	CeType string `json:"type"`
 }
 
 type ActionsConf = map[string][]ActionConf
@@ -39,27 +39,17 @@ func NewActionsGenerator(config ActionsConf, skipKey ...bool) (Generator, error)
 	for actionName, actions := range config {
 		actionHandlers := make([]actionHandler, 0, 1)
 		for _, action := range actions {
-			if (action.Group != nil && action.Filter != nil) ||
-				(action.Group != nil && action.First != "") ||
-				(action.First != "" && action.Filter != nil) {
+			if action.Filter != "" && action.First != "" {
 				return nil, fmt.Errorf("only one projection operator at a time per action handler is supported. Action:%s", actionName)
 			}
 			var proj projection
-			if action.Group != nil {
-				matchers, err := expressionsToMatchers(action.Group)
-				if err != nil {
-					return nil, fmt.Errorf("invalid group expression: %v, error: %w", action.Group, err)
-				}
-				proj = group{
-					matchers: matchers,
-				}
-			} else if action.Filter != nil {
-				matchers, err := expressionsToMatchers(action.Filter)
+			if action.Filter != "" {
+				matcher, err := expressionToMatcher(action.Filter)
 				if err != nil {
 					return nil, fmt.Errorf("invalid filter expression: %v, error: %w", action.Filter, err)
 				}
 				proj = filter{
-					matchers: matchers,
+					matcher: matcher,
 				}
 			} else if action.First != "" {
 				matcher, err := expressionToMatcher(action.First)
@@ -91,6 +81,7 @@ func NewActionsGenerator(config ActionsConf, skipKey ...bool) (Generator, error)
 				projection:   proj,
 				ceType:       action.CeType,
 				keyExtractor: keyExtractor,
+				split:        action.Split,
 			})
 		}
 
@@ -99,18 +90,6 @@ func NewActionsGenerator(config ActionsConf, skipKey ...bool) (Generator, error)
 	return ActionGenerator{
 		actions: handlersByAction,
 	}, nil
-}
-
-func expressionsToMatchers(expressions []string) ([]matcher, error) {
-	matchers := make([]matcher, len(expressions))
-	for i, expression := range expressions {
-		matcher, err := expressionToMatcher(expression)
-		if err != nil {
-			return nil, err
-		}
-		matchers[i] = matcher
-	}
-	return matchers, nil
 }
 
 var operationTypeByName map[string]pbcodec.DBOp_Operation = map[string]pbcodec.DBOp_Operation{
@@ -174,36 +153,34 @@ func NewExpressionsGenerator(
 }
 
 type projection interface {
-	on(decodedDBOps []*decodedDBOp) [][]*decodedDBOp
+	on(decodedDBOps []*decodedDBOp) []*decodedDBOp
 }
 
 type first struct {
 	table matcher
 }
 
-func (f first) on(decodedDBOps []*decodedDBOp) [][]*decodedDBOp {
+func (f first) on(decodedDBOps []*decodedDBOp) []*decodedDBOp {
 	for _, dbOp := range decodedDBOps {
 		if f.table.match(dbOp.DBOp) {
-			return [][]*decodedDBOp{{dbOp}}
+			return []*decodedDBOp{dbOp}
 		}
 	}
 	return nil
 }
 
 type filter struct {
-	matchers []matcher
+	matcher matcher
 }
 
-func (f filter) on(decodedDBOps []*decodedDBOp) [][]*decodedDBOp {
+func (f filter) on(decodedDBOps []*decodedDBOp) []*decodedDBOp {
 	var filteredDBOps []*decodedDBOp = make([]*decodedDBOp, 0, 1)
 	for _, dbOp := range decodedDBOps {
-		for _, matcher := range f.matchers {
-			if matcher.match(dbOp.DBOp) {
-				filteredDBOps = append(filteredDBOps, dbOp)
-			}
+		if f.matcher.match(dbOp.DBOp) {
+			filteredDBOps = append(filteredDBOps, dbOp)
 		}
 	}
-	return [][]*decodedDBOp{filteredDBOps}
+	return filteredDBOps
 }
 
 type matcher interface {
@@ -238,44 +215,44 @@ func (m operationOnTableMatcher) match(value *pbcodec.DBOp) bool {
 type indentity struct {
 }
 
-func (i indentity) on(decodedDBOps []*decodedDBOp) [][]*decodedDBOp {
-	return [][]*decodedDBOp{decodedDBOps}
-}
-
-type group struct {
-	matchers []matcher
-}
-
-func (g group) on(decodedDBOps []*decodedDBOp) [][]*decodedDBOp {
-	groups := make([][]*decodedDBOp, 0, 1)
-	groupSize := len(g.matchers)
-	groupCursor := 0
-	group := make([]*decodedDBOp, 0, 1)
-	for _, dbOp := range decodedDBOps {
-		if g.matchers[groupCursor].match(dbOp.DBOp) {
-			group = append(group, dbOp)
-			groupCursor++
-		}
-		if groupCursor == groupSize {
-			groupCursor = 0
-			groups = append(groups, group)
-			group = make([]*decodedDBOp, 0, 1)
-		}
-	}
-	if groupCursor > 0 {
-		groups = append(groups, group)
-	}
-	return groups
+func (i indentity) on(decodedDBOps []*decodedDBOp) []*decodedDBOp {
+	return decodedDBOps
 }
 
 type actionHandler struct {
 	projection   projection
 	keyExtractor cel.Program
 	ceType       string
+	split        bool
 }
 
 type ActionGenerator struct {
 	actions map[string][]actionHandler
+}
+
+func (a actionHandler) evalGeneration(stepName string,
+	transaction *pbcodec.TransactionTrace,
+	trace *pbcodec.ActionTrace,
+	ops []*decodedDBOp) (Generation, error) {
+	activation, err := NewActivation(stepName, transaction,
+		trace,
+		ops,
+	)
+	if err != nil {
+		return Generation{}, err
+	}
+	ceType := a.ceType
+
+	key, err := evalString(a.keyExtractor, activation)
+	if err != nil {
+		return Generation{}, fmt.Errorf("action:%s, event keyeval: %w", trace.Action.Name, err)
+	}
+
+	return Generation{
+		key,
+		ceType,
+		ops,
+	}, nil
 }
 
 func (g ActionGenerator) Apply(stepName string,
@@ -284,32 +261,26 @@ func (g ActionGenerator) Apply(stepName string,
 	decodedDBOps []*decodedDBOp,
 ) ([]Generation, error) {
 	if actionHandlers, ok := g.actions[trace.Action.Name]; ok {
-		var generations []Generation = make([]Generation, 0, 1)
-		for i, actionHandler := range actionHandlers {
-			for _, ops := range actionHandler.projection.on(decodedDBOps) {
-
-				activation, err := NewActivation(stepName, transaction,
-					trace,
-					ops,
-				)
-				if err != nil {
-					return nil, err
+		for _, actionHandler := range actionHandlers {
+			projection := actionHandler.projection.on(decodedDBOps)
+			if actionHandler.split {
+				var generations []Generation = make([]Generation, 0, 1)
+				for i := range projection {
+					generation, err := actionHandler.evalGeneration(stepName, transaction, trace, projection[i:i+1])
+					if err != nil {
+						return nil, fmt.Errorf("actionHandler.evalGeneration() error: %w", err)
+					}
+					generations = append(generations, generation)
 				}
-				ceType := actionHandler.ceType
-
-				key, err := evalString(actionHandler.keyExtractor, activation)
+				return generations, nil
+			} else {
+				generation, err := actionHandler.evalGeneration(stepName, transaction, trace, projection)
 				if err != nil {
-					return nil, fmt.Errorf("action:%s, index:%d event keyeval: %w", trace.Action.Name, i, err)
+					return nil, fmt.Errorf("actionHandler.evalGeneration() error: %w", err)
 				}
-				generations = append(generations, Generation{
-					key,
-					ceType,
-					ops,
-				})
+				return []Generation{generation}, nil
 			}
-
 		}
-		return generations, nil
 	}
 	return nil, nil
 }
