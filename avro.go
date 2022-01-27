@@ -1,5 +1,7 @@
 package dkafka
 
+import "github.com/iancoleman/strcase"
+
 // Schema is represented in JSON by one of:
 // - A JSON string, naming a defined type.
 // - A JSON object, of the form:
@@ -29,6 +31,8 @@ type Field struct {
 }
 
 type Record struct {
+	// type always equal to "record"
+	Type string `json:"type"`
 	// Name a JSON string providing the name of the record (required)
 	Name string `json:"name"`
 	// Namespace a JSON string that qualifies the name
@@ -39,11 +43,24 @@ type Record struct {
 	Fields []Field `json:"fields,omitempty"`
 }
 
+func newRecordS(name string, fields []Field) Record {
+	return newRecordFQN("", name, fields)
+}
+
+func newRecordFQN(np string, name string, fields []Field) Record {
+	return Record{
+		Type:      "record",
+		Name:      strcase.ToCamel(name),
+		Namespace: np,
+		Fields:    fields,
+	}
+}
+
 type Array struct {
 	// type always equal to "array"
 	Type string `json:"type"`
 	// items the schema of the array's items.
-	Items Schema
+	Items Schema `json:"items"`
 	// todo manage default
 }
 

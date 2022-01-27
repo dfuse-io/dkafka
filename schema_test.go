@@ -125,7 +125,8 @@ func Test_resolveFieldTypeSchema(t *testing.T) {
 				}},
 			}},
 			want: Record{
-				Name: "my_struct",
+				Type: "record",
+				Name: "MyStruct",
 				Fields: []Field{
 					{
 						Name: "fieldA",
@@ -197,7 +198,8 @@ func TestActionToRecord(t *testing.T) {
 				"my_action",
 			},
 			Record{
-				Name: "my_action",
+				Type: "record",
+				Name: "MyAction",
 				Fields: []Field{
 					{
 						Name: "fieldA",
@@ -279,7 +281,8 @@ func TestTableToRecord(t *testing.T) {
 				"my.table",
 			},
 			Record{
-				Name: "my_table_struct",
+				Type: "record",
+				Name: "MyTableStruct",
 				Fields: []Field{
 					{
 						Name: "fieldA",

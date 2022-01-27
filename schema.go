@@ -23,6 +23,86 @@ type AvroSchemaGenOptions struct {
 	AbiSpec   AbiSpec
 }
 
+type ActionSchemaGenOptions struct {
+	Action    string
+	Namespace string
+	Version   string
+	AbiSpec   AbiSpec
+}
+
+type TableSchemaGenOptions struct {
+	Table     string
+	Namespace string
+	Version   string
+	AbiSpec   AbiSpec
+}
+
+type NamedSchemaGenOptions struct {
+	Name      string
+	Namespace string
+	Version   string
+	AbiSpec   AbiSpec
+}
+
+func getNamespace(namespace string, abi AbiSpec) string {
+	if namespace == "" {
+		namespace = strcase.ToDelimited(abi.Account, '.')
+	}
+	return namespace
+}
+
+func GenerateActionSchema(options NamedSchemaGenOptions) (Message, error) {
+	actionCamelCase := strcase.ToCamel(options.Name)
+
+	namespace := getNamespace(options.Namespace, options.AbiSpec)
+	ceType := fmt.Sprintf("%sActionNotification", actionCamelCase)
+	actionInfoRecordName := fmt.Sprintf("%sActionInfo", actionCamelCase)
+	actionParamsRecordName := fmt.Sprintf("%sActionParams", actionCamelCase)
+
+	zlog.Debug(
+		"generate action avro schema with following names:",
+		zap.String("namespace", namespace),
+		zap.String("ce_type", ceType),
+		zap.String("actionInfo", actionInfoRecordName),
+		zap.String("actionParams", actionParamsRecordName),
+	)
+
+	actionParamsSchema, err := ActionToRecord(options.AbiSpec.Abi, eos.ActionName(options.Name))
+	if err != nil {
+		return Message{}, err
+	}
+	actionParamsSchema.Name = actionParamsRecordName
+	schema := newActionNotificationSchema(ceType, namespace, options.Version, newActionInfo2Schema(actionInfoRecordName, actionParamsSchema))
+
+	return schema, nil
+}
+
+func GenerateTableSchema(options NamedSchemaGenOptions) (Message, error) {
+	tableCamelCase := strcase.ToCamel(options.Name)
+	ceType := fmt.Sprintf("%sTableNotification", tableCamelCase)
+	namespace := getNamespace(options.Namespace, options.AbiSpec)
+	dbOpInfoRecordName := fmt.Sprintf("%sTableOpInfo", tableCamelCase)
+	dbOpRecordName := fmt.Sprintf("%sTableOp", tableCamelCase)
+
+	zlog.Debug(
+		"generate table avro schema with following names:",
+		zap.String("namespace", namespace),
+		zap.String("ce_type", ceType),
+		zap.String("TableOpInfo", dbOpInfoRecordName),
+		zap.String("TableOp", dbOpRecordName),
+	)
+
+	dbOpSchema, err := TableToRecord(options.AbiSpec.Abi, eos.TableName(options.Name))
+	if err != nil {
+		return Message{}, err
+	}
+	dbOpSchema.Name = dbOpRecordName
+	dbOpInfoSchema := newDBOpInfoRecord(dbOpInfoRecordName, dbOpSchema)
+	schema := newTableNotificationSchema(ceType, namespace, options.Version, dbOpInfoSchema)
+
+	return schema, nil
+}
+
 func GenerateSchema(options AvroSchemaGenOptions) (Message, error) {
 	actionCamelCase := strcase.ToCamel(options.Action)
 	tableCamelCase := strcase.ToCamel(options.Table)
@@ -40,7 +120,7 @@ func GenerateSchema(options AvroSchemaGenOptions) (Message, error) {
 	dbOpRecordName := fmt.Sprintf("%sDBOp", baseName)
 	dbOpInfoRecordName := fmt.Sprintf("%sDBOpInfo", baseName)
 
-	zlog.Info(
+	zlog.Debug(
 		"generate avro schema with following names for the records",
 		zap.String("namespace", namespace),
 		zap.String("ce_type", ceType),
@@ -93,10 +173,10 @@ func structToRecord(abi *eos.ABI, structName string) (Record, error) {
 	if err != nil {
 		return Record{}, err
 	}
-	return Record{
-		Name:   s.Name,
-		Fields: fields,
-	}, nil
+	return newRecordS(
+		s.Name,
+		fields,
+	), nil
 }
 
 func abiFieldsToRecordFields(abi *eos.ABI, fieldDefs []eos.FieldDef) ([]Field, error) {
