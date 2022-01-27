@@ -166,8 +166,9 @@ dkafka publish \
 * --fail-on-undecodable-db-op flag allows you to specify if you want dkafka to fail any time it cannot decode a given dbop to JSON
 
 ## Actions expressions
-In this section I will explain how you can use the `--actions-expr`. This feature is for advance usage when you want to implement
-an action based dfuse to kafka communication.
+
+In this section I will explain how you can use the `--actions-expr`.
+This feature is for advance usage to implement an action-based communication.
 
 For that, you will use the `--actions-expr` option.
 It's a JSON object that describe how each action have to be handled.
@@ -233,6 +234,9 @@ Examples:
 
 
 ## TODO
-- [x] add source to the `ce_id`
+- [x] user ce_type instead of source for the `ce_id`
+- [ ] schema registry integration
 - [ ] avro codec
-- [ ] avro schema generation
+- [x] avro schema generation
+- [x] parametrize the record name with the ce_type
+- [x] add meta info in avro schema `meta: {compatibility: FORWARD, type: notification version: 1.2.1}

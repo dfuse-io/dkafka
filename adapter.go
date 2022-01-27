@@ -1,7 +1,7 @@
 package dkafka
 
 import (
-	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -165,7 +165,7 @@ func (m *adapter) adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message, e
 				headers := append(m.headers,
 					kafka.Header{
 						Key:   "ce_id",
-						Value: hashString(fmt.Sprintf("%s%s%s%d%s%s", source, blk.Id, trx.Id, act.ExecutionIndex, rawStep, generation.Key)),
+						Value: hashString(fmt.Sprintf("%s%s%d%s%s%s", blk.Id, trx.Id, act.ExecutionIndex, generation.CeType, rawStep, generation.Key)),
 					},
 					kafka.Header{
 						Key:   "ce_type",
@@ -199,7 +199,7 @@ func (m *adapter) adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message, e
 }
 
 func hashString(data string) []byte {
-	h := sha256.New()
+	h := sha512.New()
 	h.Write([]byte(data))
 	return []byte(base64.StdEncoding.EncodeToString(([]byte(h.Sum(nil)))))
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	pbabicodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/abicodec/v1"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
@@ -21,21 +22,49 @@ func (a *ABIDecoder) IsNOOP() bool {
 	return a.overrides == nil && a.abiCodecCli == nil
 }
 
+func ParseABIFileSpecs(specs []string) (abiFileSpecs map[string]string, err error) {
+	abiFileSpecs = make(map[string]string)
+	for _, ext := range specs {
+		account, abiPath, err := ParseABIFileSpec(ext)
+		if err != nil {
+			break
+		}
+		abiFileSpecs[account] = abiPath
+	}
+	return
+}
+
+func ParseABIFileSpec(spec string) (account string, abiPath string, err error) {
+	kv := strings.SplitN(spec, ":", 2)
+	if len(kv) != 2 {
+		err = fmt.Errorf("invalid value for local ABI file: %s", spec)
+	} else {
+		account = kv[0]
+		abiPath = kv[1]
+	}
+	return
+}
+
 // LoadABIFiles will load ABIs for different accounts from JSON files
 func LoadABIFiles(abiFiles map[string]string) (map[string]*eos.ABI, error) {
 	out := make(map[string]*eos.ABI)
 	for contract, abiFile := range abiFiles {
-		f, err := os.Open(abiFile)
-		if err != nil {
-			return nil, fmt.Errorf("opening abi file %s: %w", abiFile, err)
-		}
-		abi, err := eos.NewABI(f)
+		abi, err := LoadABIFile(abiFile)
 		if err != nil {
 			return nil, fmt.Errorf("reading abi file %s: %w", abiFile, err)
 		}
 		out[contract] = abi
 	}
 	return out, nil
+}
+
+func LoadABIFile(abiFile string) (abi *eos.ABI, err error) {
+	f, err := os.Open(abiFile)
+	if err == nil {
+		defer f.Close()
+		abi, err = eos.NewABI(f)
+	}
+	return
 }
 
 func NewABIDecoder(

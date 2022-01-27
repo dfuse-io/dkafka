@@ -1,6 +1,7 @@
 {
     "cSpell.words": [
         "abicodec",
+        "avsc",
         "bstream",
         "covhtml",
         "DBOP",
@@ -10,6 +11,7 @@
         "dgrpc",
         "dkafka",
         "eosio",
+        "goavro",
         "gopkg",
         "GRPC",
         "memoizable",
@@ -23,6 +25,8 @@
         "pbhealth",
         "protobuf",
         "ptypes",
+        "ricardian",
+        "Structs",
         "Undecodable",
         "zlog",
         "zstd"

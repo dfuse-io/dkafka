@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/dfuse-io/dkafka"
@@ -129,11 +128,11 @@ func publishRunE(cmd *cobra.Command, args []string) error {
 
 	localABIFiles := make(map[string]string)
 	for _, ext := range viper.GetStringSlice("publish-cmd-local-abi-files") {
-		kv := strings.SplitN(ext, ":", 2)
-		if len(kv) != 2 {
-			return fmt.Errorf("invalid value for local ABI file: %s", ext)
+		account, abiPath, err := dkafka.ParseABIFileSpec(ext)
+		if err != nil {
+			return err
 		}
-		localABIFiles[kv[0]] = kv[1]
+		localABIFiles[account] = abiPath
 	}
 
 	conf := &dkafka.Config{

@@ -9,6 +9,7 @@ require (
 	github.com/eoscanada/eos-go v0.9.1-0.20210812015252-984fc96878b6
 	github.com/golang/protobuf v1.5.2
 	github.com/google/cel-go v0.6.0
+	github.com/iancoleman/strcase v0.2.0 // indirect
 	github.com/klauspost/compress v1.11.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
