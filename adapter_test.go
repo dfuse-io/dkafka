@@ -2,7 +2,6 @@ package dkafka
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
@@ -99,7 +98,7 @@ func Test_adapter_adapt(t *testing.T) {
 					"test.topic",
 					saveBlockNoop,
 					abiDecoder.DecodeDBOps,
-					tt.failOnUndecodableDBOP,
+					true,
 					`{"create":[{"key":"transaction_id", "type":"TestType"}]}`,
 					default_headers,
 				)
@@ -112,7 +111,7 @@ func Test_adapter_adapt(t *testing.T) {
 					"test.topic",
 					saveBlockNoop,
 					abiDecoder.DecodeDBOps,
-					tt.failOnUndecodableDBOP,
+					true,
 					eventTypeProg,
 					eventKeyProg,
 					default_headers,
@@ -150,38 +149,45 @@ func Test_adapter_adapt(t *testing.T) {
 	}
 }
 
+type AdapterType = int
+
+const (
+	DEFAULT_ADAPTER AdapterType = iota
+	ACTION_ADAPTER
+	CDC_TABLE_ADAPTER
+	CDC_ACTION_ADAPTER
+)
+
 func Benchmark_adapter_adapt(b *testing.B) {
 	tests := []struct {
-		name                  string
-		file                  string
-		expected              string
-		failOnUndecodableDBOP bool
-		actionBased           bool
-		wantErr               bool
+		name        string
+		file        string
+		actionBased AdapterType
 	}{
 		{
 			"filter-out",
 			"testdata/block-30080030.json",
-			"",
-			true,
-			false,
-			false,
+			DEFAULT_ADAPTER,
 		},
 		{
 			"filter-in",
 			"testdata/block-30080032.json",
-			"testdata/block-30080032-expected.json",
-			true,
-			false,
-			false,
+			DEFAULT_ADAPTER,
 		},
 		{
 			"filter-in-actions",
 			"testdata/block-30080032.json",
-			"testdata/block-30080032-expected.json",
-			true,
-			true,
-			false,
+			ACTION_ADAPTER,
+		},
+		{
+			"cdc-tables",
+			"testdata/block-30080032.json",
+			CDC_TABLE_ADAPTER,
+		},
+		{
+			"cdc-actions",
+			"testdata/block-30080032.json",
+			CDC_TABLE_ADAPTER,
 		},
 	}
 
@@ -218,13 +224,14 @@ func Benchmark_adapter_adapt(b *testing.B) {
 		if err != nil {
 			b.Fatalf("exprToCelProgram() error: %v", err)
 		}
-		var adp *adapter
-		if tt.actionBased {
+		var adp Adapter
+		switch adapterType := tt.actionBased; adapterType {
+		case ACTION_ADAPTER:
 			adp, err = newActionsAdapter(
 				"test.topic",
 				saveBlockNoop,
 				abiDecoder.DecodeDBOps,
-				tt.failOnUndecodableDBOP,
+				true,
 				`{"create":[{"key":"transaction_id", "type":"TestType"}]}`,
 				default_headers,
 			)
@@ -232,18 +239,42 @@ func Benchmark_adapter_adapt(b *testing.B) {
 				b.Fatalf("newActionsAdapter() error: %v", err)
 				return
 			}
-		} else {
+		case DEFAULT_ADAPTER:
 			adp = newAdapter(
 				"test.topic",
 				saveBlockNoop,
 				abiDecoder.DecodeDBOps,
-				tt.failOnUndecodableDBOP,
+				true,
 				eventTypeProg,
 				eventKeyProg,
 				nil,
 			)
+		case CDC_TABLE_ADAPTER:
+			adp = &CdCAdapter{
+				topic:     "test.topic",
+				saveBlock: saveBlockNoop,
+				generator: TableGenerator{
+					decodeDBOp: abiDecoder.DecodeDBOp,
+					tableNames: map[string]void{"factory.a": empty},
+				},
+				headers: default_headers,
+			}
+		case CDC_ACTION_ADAPTER:
+			actionKeyExpressions, err := createCdcKeyExpressions(`{"create":"transaction_id"}`, ActionDeclarations)
+			if err != nil {
+				b.Fatalf("createCdcKeyExpressions() error: %v", err)
+				return
+			}
+			adp = &CdCAdapter{
+				topic:     "test.topic",
+				saveBlock: saveBlockNoop,
+				generator: ActionGenerator2{
+					keyExtractors: actionKeyExpressions,
+				},
+				headers: default_headers,
+			}
 		}
-		b.Run(fmt.Sprintf("%s: %s", tt.name, path.Base(tt.file)), func(b *testing.B) {
+		b.Run(tt.name, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				adp.Adapt(block, "New")
 			}

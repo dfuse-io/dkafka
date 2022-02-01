@@ -2,26 +2,40 @@ goos: linux
 goarch: amd64
 pkg: github.com/dfuse-io/dkafka
 cpu: AMD Ryzen 7 PRO 5850U with Radeon Graphics     
-Benchmark_adapter_adapt/filter-out:_block-30080030.json-4         	10524108	       113.4 ns/op	     192 B/op	       1 allocs/op
-Benchmark_adapter_adapt/filter-out:_block-30080030.json-4         	10388295	       114.8 ns/op	     192 B/op	       1 allocs/op
-Benchmark_adapter_adapt/filter-out:_block-30080030.json-4         	10350880	       117.5 ns/op	     192 B/op	       1 allocs/op
-Benchmark_adapter_adapt/filter-out:_block-30080030.json-4         	 9545235	       116.8 ns/op	     192 B/op	       1 allocs/op
-Benchmark_adapter_adapt/filter-out:_block-30080030.json-4         	 9650526	       119.0 ns/op	     192 B/op	       1 allocs/op
-Benchmark_adapter_adapt/filter-out:_block-30080030.json-4         	10324912	       119.4 ns/op	     192 B/op	       1 allocs/op
-Benchmark_adapter_adapt/filter-out:_block-30080030.json-4         	 9989581	       120.9 ns/op	     192 B/op	       1 allocs/op
-Benchmark_adapter_adapt/filter-in:_block-30080032.json-4          	   26152	     46917 ns/op	   19625 B/op	     238 allocs/op
-Benchmark_adapter_adapt/filter-in:_block-30080032.json-4          	   25956	     47159 ns/op	   19633 B/op	     238 allocs/op
-Benchmark_adapter_adapt/filter-in:_block-30080032.json-4          	   26025	     45222 ns/op	   19629 B/op	     238 allocs/op
-Benchmark_adapter_adapt/filter-in:_block-30080032.json-4          	   26390	     45937 ns/op	   19625 B/op	     238 allocs/op
-Benchmark_adapter_adapt/filter-in:_block-30080032.json-4          	   25617	     45716 ns/op	   19622 B/op	     238 allocs/op
-Benchmark_adapter_adapt/filter-in:_block-30080032.json-4          	   26256	     45807 ns/op	   19625 B/op	     238 allocs/op
-Benchmark_adapter_adapt/filter-in:_block-30080032.json-4          	   25335	     45829 ns/op	   19629 B/op	     238 allocs/op
-Benchmark_adapter_adapt/filter-in-actions:_block-30080032.json-4  	   26840	     45072 ns/op	   19490 B/op	     233 allocs/op
-Benchmark_adapter_adapt/filter-in-actions:_block-30080032.json-4  	   25483	     45364 ns/op	   19493 B/op	     233 allocs/op
-Benchmark_adapter_adapt/filter-in-actions:_block-30080032.json-4  	   26404	     45812 ns/op	   19489 B/op	     233 allocs/op
-Benchmark_adapter_adapt/filter-in-actions:_block-30080032.json-4  	   26394	     44168 ns/op	   19495 B/op	     233 allocs/op
-Benchmark_adapter_adapt/filter-in-actions:_block-30080032.json-4  	   25818	     44745 ns/op	   19489 B/op	     233 allocs/op
-Benchmark_adapter_adapt/filter-in-actions:_block-30080032.json-4  	   26428	     46328 ns/op	   19494 B/op	     233 allocs/op
-Benchmark_adapter_adapt/filter-in-actions:_block-30080032.json-4  	   26164	     47339 ns/op	   19493 B/op	     233 allocs/op
+Benchmark_adapter_adapt/filter-out-4         	11596772	       101.3 ns/op	     192 B/op	       1 allocs/op
+Benchmark_adapter_adapt/filter-out-4         	11162642	       104.3 ns/op	     192 B/op	       1 allocs/op
+Benchmark_adapter_adapt/filter-out-4         	11611354	       101.8 ns/op	     192 B/op	       1 allocs/op
+Benchmark_adapter_adapt/filter-out-4         	11082273	       102.3 ns/op	     192 B/op	       1 allocs/op
+Benchmark_adapter_adapt/filter-out-4         	11500376	       105.1 ns/op	     192 B/op	       1 allocs/op
+Benchmark_adapter_adapt/filter-out-4         	11433333	       105.4 ns/op	     192 B/op	       1 allocs/op
+Benchmark_adapter_adapt/filter-out-4         	11364684	       107.2 ns/op	     192 B/op	       1 allocs/op
+Benchmark_adapter_adapt/filter-in-4          	   28306	     55818 ns/op	   15222 B/op	     219 allocs/op
+Benchmark_adapter_adapt/filter-in-4          	   25020	     48804 ns/op	   15221 B/op	     219 allocs/op
+Benchmark_adapter_adapt/filter-in-4          	   24700	     52925 ns/op	   15222 B/op	     219 allocs/op
+Benchmark_adapter_adapt/filter-in-4          	   24810	     55010 ns/op	   15220 B/op	     219 allocs/op
+Benchmark_adapter_adapt/filter-in-4          	   24343	     58889 ns/op	   15221 B/op	     219 allocs/op
+Benchmark_adapter_adapt/filter-in-4          	   22420	     56014 ns/op	   15221 B/op	     219 allocs/op
+Benchmark_adapter_adapt/filter-in-4          	   25735	     57285 ns/op	   15221 B/op	     219 allocs/op
+Benchmark_adapter_adapt/filter-in-actions-4  	   16706	     85783 ns/op	   19729 B/op	     234 allocs/op
+Benchmark_adapter_adapt/filter-in-actions-4  	   14763	     83138 ns/op	   19730 B/op	     234 allocs/op
+Benchmark_adapter_adapt/filter-in-actions-4  	   14922	     81198 ns/op	   19729 B/op	     234 allocs/op
+Benchmark_adapter_adapt/filter-in-actions-4  	   14580	     77509 ns/op	   19720 B/op	     234 allocs/op
+Benchmark_adapter_adapt/filter-in-actions-4  	   16303	     81000 ns/op	   19722 B/op	     234 allocs/op
+Benchmark_adapter_adapt/filter-in-actions-4  	   14881	     80366 ns/op	   19731 B/op	     234 allocs/op
+Benchmark_adapter_adapt/filter-in-actions-4  	   14433	     76938 ns/op	   19729 B/op	     234 allocs/op
+Benchmark_adapter_adapt/cdc-tables-4         	   26176	     59413 ns/op	   13757 B/op	     186 allocs/op
+Benchmark_adapter_adapt/cdc-tables-4         	   22448	     59947 ns/op	   13759 B/op	     186 allocs/op
+Benchmark_adapter_adapt/cdc-tables-4         	   19622	     59943 ns/op	   13755 B/op	     186 allocs/op
+Benchmark_adapter_adapt/cdc-tables-4         	   21103	     60258 ns/op	   13757 B/op	     186 allocs/op
+Benchmark_adapter_adapt/cdc-tables-4         	   19808	     60846 ns/op	   13755 B/op	     186 allocs/op
+Benchmark_adapter_adapt/cdc-tables-4         	   20608	     60739 ns/op	   13758 B/op	     186 allocs/op
+Benchmark_adapter_adapt/cdc-tables-4         	   20704	     60853 ns/op	   13757 B/op	     186 allocs/op
+Benchmark_adapter_adapt/cdc-actions-4        	   21460	     60572 ns/op	   13760 B/op	     186 allocs/op
+Benchmark_adapter_adapt/cdc-actions-4        	   21583	     56080 ns/op	   13759 B/op	     186 allocs/op
+Benchmark_adapter_adapt/cdc-actions-4        	   23200	     47745 ns/op	   13758 B/op	     186 allocs/op
+Benchmark_adapter_adapt/cdc-actions-4        	   40704	     56901 ns/op	   13756 B/op	     186 allocs/op
+Benchmark_adapter_adapt/cdc-actions-4        	   19017	     60664 ns/op	   13756 B/op	     186 allocs/op
+Benchmark_adapter_adapt/cdc-actions-4        	   20114	     58670 ns/op	   13757 B/op	     186 allocs/op
+Benchmark_adapter_adapt/cdc-actions-4        	   20695	     57701 ns/op	   13758 B/op	     186 allocs/op
 PASS
-ok  	github.com/dfuse-io/dkafka	32.494s
+ok  	github.com/dfuse-io/dkafka	62.837s
