@@ -1,6 +1,10 @@
 package dkafka
 
-import "github.com/iancoleman/strcase"
+import (
+	"encoding/json"
+
+	"github.com/iancoleman/strcase"
+)
 
 // Schema is represented in JSON by one of:
 // - A JSON string, naming a defined type.
@@ -13,7 +17,7 @@ type Schema = interface{}
 type Meta struct {
 	Compatibility string `json:"name"`
 	Type          string `json:"type"`
-	Version       string `json:"version"`
+	Version       string `json:"version,omitempty"`
 }
 
 type Message struct {
@@ -28,6 +32,22 @@ type Field struct {
 	Doc string `json:"doc,omitempty"`
 	// Type a schema, as defined above
 	Type Schema `json:"type"`
+	// A default value for this field, only used when reading instances that lack the field for schema evolution purposes.
+	Default json.RawMessage `json:"default,omitempty"`
+}
+
+var _defaultNull = json.RawMessage("null")
+
+func NewNullableField(n string, t Schema) Field {
+	return Field{
+		Name:    n,
+		Type:    t,
+		Default: _defaultNull,
+	}
+}
+
+func NewOptionalField(n string, t Schema) Field {
+	return NewNullableField(n, NewOptional(t))
 }
 
 type Record struct {
@@ -51,7 +71,7 @@ func newRecordFQN(np string, name string, fields []Field) Record {
 	return Record{
 		Type:      "record",
 		Name:      strcase.ToCamel(name),
-		Namespace: np,
+		Namespace: strcase.ToDelimited(np, '.'),
 		Fields:    fields,
 	}
 }

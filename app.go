@@ -3,6 +3,7 @@ package dkafka
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 	"github.com/eoscanada/eos-go"
 	"github.com/golang/protobuf/ptypes"
+	"github.com/google/cel-go/cel"
 	"github.com/streamingfast/bstream/forkable"
 	"github.com/streamingfast/dgrpc"
 	pbbstream "github.com/streamingfast/pbgo/dfuse/bstream/v1"
@@ -25,6 +27,9 @@ import (
 
 	"github.com/streamingfast/shutter"
 )
+
+const TABLES_CDC_TYPE = "tables"
+const ACTIONS_CDC_TYPE = "actions"
 
 type Config struct {
 	DfuseGRPCEndpoint string
@@ -51,18 +56,26 @@ type Config struct {
 	KafkaTransactionID         string
 	CommitMinDelay             time.Duration
 
-	IncludeFilterExpr    string
 	KafkaTopic           string
 	KafkaCursorTopic     string
 	KafkaCursorPartition int32
 	EventSource          string
-	EventKeysExpr        string
-	EventTypeExpr        string
-	ActionsExpr          string
+
+	IncludeFilterExpr string
+	EventKeysExpr     string
+	EventTypeExpr     string
+	ActionsExpr       string
 
 	LocalABIFiles         map[string]string
 	ABICodecGRPCAddr      string
 	FailOnUndecodableDBOP bool
+
+	CdCType           string
+	Account           string
+	ActionExpressions string
+	TableNames        []string
+	Executed          bool
+	Irreversible      bool
 }
 
 type App struct {
@@ -78,7 +91,7 @@ func New(config *Config) *App {
 	}
 }
 
-func (a *App) Run() error {
+func (a *App) Run() (err error) {
 	go startPrometheusMetrics("/metrics", ":9102")
 	// get and setup the dfuse fetcher that gets a stream of blocks, includes the filter, will include the auth token resolver/refresher
 	addr := a.config.DfuseGRPCEndpoint
@@ -95,33 +108,11 @@ func (a *App) Run() error {
 		credential := oauth.NewOauthAccess(&oauth2.Token{AccessToken: a.config.DfuseToken, TokenType: "Bearer"})
 		dialOptions = append(dialOptions, grpc.WithPerRPCCredentials(credential))
 	}
-	conn, err := grpc.Dial(addr,
-		dialOptions...,
-	)
-	if err != nil {
-		return fmt.Errorf("connecting to grpc address %s: %w", addr, err)
-	}
 
 	var saveBlock SaveBlock
 	saveBlock = saveBlockNoop
 	if a.config.Capture {
 		saveBlock = saveBlockJSON
-	}
-
-	client := pbbstream.NewBlockStreamV2Client(conn)
-
-	req := &pbbstream.BlocksRequestV2{
-		IncludeFilterExpr: a.config.IncludeFilterExpr,
-		StartBlockNum:     a.config.StartBlockNum,
-		StopBlockNum:      a.config.StopBlockNum,
-	}
-
-	var producer *kafka.Producer
-	if !a.config.BatchMode || !a.config.DryRun {
-		producer, err = getKafkaProducer(createKafkaConfigForMessageProducer(a.config), a.config.KafkaTransactionID)
-		if err != nil {
-			return fmt.Errorf("getting kafka producer: %w", err)
-		}
 	}
 
 	var abiFiles map[string]*eos.ABI
@@ -147,6 +138,119 @@ func (a *App) Run() error {
 
 	if abiDecoder.IsNOOP() && a.config.FailOnUndecodableDBOP {
 		return fmt.Errorf("invalid config: no abicodec GRPC address and no local ABI file has been set, but fail-on-undecodable-db-op is enabled")
+	}
+
+	// setup the transformer, that will transform incoming blocks
+
+	sourceHeader := kafka.Header{
+		Key:   "ce_source",
+		Value: []byte(a.config.EventSource),
+	}
+	specHeader := kafka.Header{
+		Key:   "ce_specversion",
+		Value: []byte("1.0"),
+	}
+	contentTypeHeader := kafka.Header{
+		Key:   "content-type",
+		Value: []byte("application/json"),
+	}
+	dataContentTypeHeader := kafka.Header{
+		Key:   "ce_datacontenttype",
+		Value: []byte("application/json"),
+	}
+
+	hearders := []kafka.Header{
+		sourceHeader,
+		specHeader,
+		contentTypeHeader,
+		dataContentTypeHeader,
+	}
+
+	var adapter Adapter
+	var filter string
+	switch cdcTyp := a.config.CdCType; cdcTyp {
+	case TABLES_CDC_TYPE:
+		filter = createCdCFilter(a.config.Account, a.config.Executed)
+		tableNames := make(StringSet)
+		for _, name := range a.config.TableNames {
+			tableNames[name] = empty
+		}
+		// tableKeyExpressions, err := createCdcKeyExpressions(a.config.ActionExpressions, TableDeclarations)
+		// if err != nil {
+		// 	return err
+		// }
+		generator := TableGenerator{
+			decodeDBOp: abiDecoder.DecodeDBOp,
+			// tableNames: tableKeyExpressions,
+			tableNames: tableNames,
+		}
+		adapter = &CdCAdapter{
+			topic:     a.config.KafkaTopic,
+			saveBlock: saveBlock,
+			headers:   hearders,
+			generator: generator,
+		}
+	case ACTIONS_CDC_TYPE:
+		filter = createCdCFilter(a.config.Account, a.config.Executed)
+		actionKeyExpressions, err := createCdcKeyExpressions(a.config.ActionExpressions, ActionDeclarations)
+		if err != nil {
+			return err
+		}
+		generator := ActionGenerator2{
+			keyExtractors: actionKeyExpressions,
+		}
+		adapter = &CdCAdapter{
+			topic:     a.config.KafkaTopic,
+			saveBlock: saveBlock,
+			headers:   hearders,
+			generator: generator,
+		}
+	default:
+		filter = a.config.IncludeFilterExpr
+		if a.config.ActionsExpr != "" {
+			adapter, err = newActionsAdapter(a.config.KafkaTopic,
+				saveBlock,
+				abiDecoder.DecodeDBOps,
+				a.config.FailOnUndecodableDBOP,
+				a.config.ActionsExpr,
+				hearders,
+			)
+			if err != nil {
+				return err
+			}
+		} else {
+			eventTypeProg, err := exprToCelProgram(a.config.EventTypeExpr)
+			if err != nil {
+				return fmt.Errorf("cannot parse event-type-expr: %w", err)
+			}
+			eventKeyProg, err := exprToCelProgram(a.config.EventKeysExpr)
+			if err != nil {
+				return fmt.Errorf("cannot parse event-keys-expr: %w", err)
+			}
+			adapter = newAdapter(
+				a.config.KafkaTopic,
+				saveBlock,
+				abiDecoder.DecodeDBOps,
+				a.config.FailOnUndecodableDBOP,
+				eventTypeProg,
+				eventKeyProg,
+				hearders,
+			)
+		}
+	}
+
+	req := &pbbstream.BlocksRequestV2{
+		IncludeFilterExpr: filter,
+		StartBlockNum:     a.config.StartBlockNum,
+		StopBlockNum:      a.config.StopBlockNum,
+	}
+
+	var producer *kafka.Producer
+	if !a.config.BatchMode || !a.config.DryRun {
+		producer, err = getKafkaProducer(createKafkaConfigForMessageProducer(a.config), a.config.KafkaTransactionID)
+		if err != nil {
+			return fmt.Errorf("getting kafka producer: %w", err)
+		}
 	}
 
 	var cp checkpointer
@@ -178,7 +282,8 @@ func (a *App) Run() error {
 			return fmt.Errorf("error loading cursor: %w", err)
 		}
 	}
-	if irreversibleOnly {
+	if a.config.Irreversible {
+		zlog.Debug("Request only irreversible blocks")
 		req.ForkSteps = []pbbstream.ForkStep{pbbstream.ForkStep_STEP_IRREVERSIBLE}
 	}
 
@@ -191,77 +296,26 @@ func (a *App) Run() error {
 			return err
 		}
 	}
+	zlog.Debug("Connect to dfuse grpc", zap.String("address", addr), zap.Any("options", dialOptions))
+	conn, err := grpc.Dial(addr,
+		dialOptions...,
+	)
+	if err != nil {
+		return fmt.Errorf("connecting to grpc address %s: %w", addr, err)
+	}
+
+	zlog.Debug("Create streaming client")
+	client := pbbstream.NewBlockStreamV2Client(conn)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	a.OnTerminating(func(_ error) {
 		cancel()
 	})
-
+	zlog.Info("Filter blocks", zap.Any("request", req))
 	executor, err := client.Blocks(ctx, req)
 	if err != nil {
 		return fmt.Errorf("requesting blocks from dfuse firehose: %w", err)
 	}
-
-	// setup the transformer, that will transform incoming blocks
-
-	sourceHeader := kafka.Header{
-		Key:   "ce_source",
-		Value: []byte(a.config.EventSource),
-	}
-	specHeader := kafka.Header{
-		Key:   "ce_specversion",
-		Value: []byte("1.0"),
-	}
-	contentTypeHeader := kafka.Header{
-		Key:   "content-type",
-		Value: []byte("application/json"),
-	}
-	dataContentTypeHeader := kafka.Header{
-		Key:   "ce_datacontenttype",
-		Value: []byte("application/json"),
-	}
-	var adapter adapter
-	if a.config.ActionsExpr != "" {
-		adapter, err = newActionsAdapter(a.config.KafkaTopic,
-			saveBlock,
-			abiDecoder.DecodeDBOps,
-			a.config.FailOnUndecodableDBOP,
-			a.config.ActionsExpr,
-			[]kafka.Header{
-				sourceHeader,
-				specHeader,
-				contentTypeHeader,
-				dataContentTypeHeader,
-			},
-		)
-		if err != nil {
-			return err
-		}
-	} else {
-		eventTypeProg, err := exprToCelProgram(a.config.EventTypeExpr)
-		if err != nil {
-			return fmt.Errorf("cannot parse event-type-expr: %w", err)
-		}
-		eventKeyProg, err := exprToCelProgram(a.config.EventKeysExpr)
-		if err != nil {
-			return fmt.Errorf("cannot parse event-keys-expr: %w", err)
-		}
-		adapter = newAdapter(
-			a.config.KafkaTopic,
-			saveBlock,
-			abiDecoder.DecodeDBOps,
-			a.config.FailOnUndecodableDBOP,
-			eventTypeProg,
-			eventKeyProg,
-			[]kafka.Header{
-				sourceHeader,
-				specHeader,
-				contentTypeHeader,
-				dataContentTypeHeader,
-			},
-		)
-	}
-
 	// loop: receive block,  transform block, send message...
 	zlog.Info("Start looping over blocks...")
 	for {
@@ -279,7 +333,7 @@ func (a *App) Run() error {
 		}
 
 		blocksReceived.Inc()
-		kafkaMsgs, err := adapter.adapt(blk, msg.Step.String())
+		kafkaMsgs, err := adapter.Adapt(blk, msg.Step.String())
 		if err != nil {
 			return fmt.Errorf("transform to kafka message: %s, %w", msg.Cursor, err)
 		}
@@ -298,6 +352,33 @@ func (a *App) Run() error {
 			return fmt.Errorf("committing message: %w", err)
 		}
 	}
+}
+
+func createCdcKeyExpressions(cdcExpression string, env cel.EnvOption) (cdcProgramByKeys map[string]cel.Program, err error) {
+	cdcExpressionMap := make(map[string]string)
+	var rawJSON = json.RawMessage(cdcExpression)
+	err = json.Unmarshal(rawJSON, &cdcExpressionMap)
+	if err != nil {
+		return
+	}
+	cdcProgramByKeys = make(map[string]cel.Program)
+	for k, v := range cdcExpressionMap {
+		var prog cel.Program
+		prog, err = exprToCelProgramWithEnv(v, env)
+		if err != nil {
+			return
+		}
+		cdcProgramByKeys[k] = prog
+	}
+	return
+}
+
+func createCdCFilter(account string, executed bool) string {
+	filter := fmt.Sprintf("account==\"%s\" && receiver==\"%s\"", account, account)
+	if executed {
+		filter = fmt.Sprintf("executed && %s", filter)
+	}
+	return filter
 }
 
 func createKafkaConfig(appConf *Config) kafka.ConfigMap {

@@ -126,13 +126,9 @@ will never be fetched or updated`)
 func publishRunE(cmd *cobra.Command, args []string) error {
 	SetupLogger()
 
-	localABIFiles := make(map[string]string)
-	for _, ext := range viper.GetStringSlice("publish-cmd-local-abi-files") {
-		account, abiPath, err := dkafka.ParseABIFileSpec(ext)
-		if err != nil {
-			return err
-		}
-		localABIFiles[account] = abiPath
+	localABIFiles, err := dkafka.ParseABIFileSpecs(viper.GetStringSlice("publish-cmd-local-abi-files"))
+	if err != nil {
+		return err
 	}
 
 	conf := &dkafka.Config{

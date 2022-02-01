@@ -93,7 +93,7 @@ func Test_adapter_adapt(t *testing.T) {
 			if err != nil {
 				t.Fatalf("exprToCelProgram() error: %v", err)
 			}
-			var adp adapter
+			var adp *adapter
 			if tt.actionBased {
 				adp, err = newActionsAdapter(
 					"test.topic",
@@ -119,7 +119,7 @@ func Test_adapter_adapt(t *testing.T) {
 				)
 			}
 
-			if msg, err := adp.adapt(block, "New"); (err != nil) != tt.wantErr {
+			if msg, err := adp.Adapt(block, "New"); (err != nil) != tt.wantErr {
 				t.Errorf("adapter.adapt() error = %v, wantErr %v", err, tt.wantErr)
 			} else {
 				if tt.expected != "" {
@@ -218,7 +218,7 @@ func Benchmark_adapter_adapt(b *testing.B) {
 		if err != nil {
 			b.Fatalf("exprToCelProgram() error: %v", err)
 		}
-		var adp adapter
+		var adp *adapter
 		if tt.actionBased {
 			adp, err = newActionsAdapter(
 				"test.topic",
@@ -245,7 +245,7 @@ func Benchmark_adapter_adapt(b *testing.B) {
 		}
 		b.Run(fmt.Sprintf("%s: %s", tt.name, path.Base(tt.file)), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				adp.adapt(block, "New")
+				adp.Adapt(block, "New")
 			}
 		})
 	}

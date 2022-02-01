@@ -7,13 +7,21 @@ BINARY_PATH := $(BUILD_DIR)/$(PROJECT_NAME)
 COVERAGE_DIR := $(BUILD_DIR)
 KUBECONFIG ?= ~/.kube/dfuse.staging.kube
 # INCLUDE_EXPRESSION ?= 'executed && action=="create" && account=="eosio.nft.ft" && receiver=="eosio.nft.ft"'
-INCLUDE_EXPRESSION ?= 'executed && (action=="create" || action=="issue") && account=="eosio.nft.ft" && receiver=="eosio.nft.ft"'
+# INCLUDE_EXPRESSION ?= 'executed && (action=="create" || action=="issue") && account=="eosio.nft.ft" && receiver=="eosio.nft.ft"'
 # KEY_EXPRESSION ?= '[string(db_ops[1].new_json.id)]'
 # ACTIONS_EXPRESSION ?= '{"create":[{"key":"transaction_id", "type":"TestType"}]}'
 # ACTIONS_EXPRESSION ?= '{"create":[{"filter": ["factory.a"], "key":"transaction_id", "type":"NftFtCreatedNotification"}]}'
 # ACTIONS_EXPRESSION ?= '{"create":[{"filter": ["factory.a"], "key":"string(db_ops[0].new_json.id)", "type":"TestType"}]}'
 # ACTIONS_EXPRESSION ?= '{"create":[{"filter": ["insert:factory.a"], "key":"string(db_ops[0].new_json.id)", "type":"NftFtCreatedNotification"}]}'
-ACTIONS_EXPRESSION ?= '{"create":[{"first": "insert:factory.a", "key":"string(db_ops[0].new_json.id)", "type":"NftFtCreatedNotification"}], "issue":[{"filter": "update:factory.a", "split": true, "key":"string(db_ops[0].new_json.id)", "type":"NftFtUpdatedNotification"}]}'
+# ACTIONS_EXPRESSION ?= '{"create":[{"first": "insert:factory.a", "key":"string(db_ops[0].new_json.id)", "type":"NftFtCreatedNotification"}], "issue":[{"filter": "update:factory.a", "split": true, "key":"string(db_ops[0].new_json.id)", "type":"NftFtUpdatedNotification"}]}'
+
+# CDC
+ACCOUNT ?= 'eosio.nft.ft'
+## CDC TABLES
+# TABLE_NAMES ?= 'factory.a,factory.b,resale.a,token.a'
+TABLE_NAMES ?= 'token.a'
+## CDC ACTIONS
+ACTIONS_EXPRESSION ?= '{"create":"transaction_id", "issue":"data.issue.to"}'
 
 # MESSAGE_TYPE ?= '"TestType"'
 COMPRESSION_TYPE ?= "snappy"
@@ -87,6 +95,30 @@ stream: build up ## stream expression based localy
 		--kafka-compression-level=$(COMPRESSION_LEVEL) \
 		--start-block-num=$(START_BLOCK) \
 		--kafka-message-max-bytes=$(MESSAGE_MAX_SIZE)
+
+cdc-tables: build up ## CDC stream on tables
+	$(BINARY_PATH) cdc tables \
+		--dfuse-firehose-grpc-addr=localhost:9000 \
+		--abicodec-grpc-addr=localhost:9001 \
+		--kafka-cursor-topic="cursor" \
+		--kafka-topic="io.dkafka.test" \
+		--kafka-compression-type=$(COMPRESSION_TYPE) \
+		--kafka-compression-level=$(COMPRESSION_LEVEL) \
+		--start-block-num=$(START_BLOCK) \
+		--kafka-message-max-bytes=$(MESSAGE_MAX_SIZE) \
+		-vvv \
+		--table-name=$(TABLE_NAMES) $(ACCOUNT)
+
+cdc-actions: build up ## CDC stream on tables
+	$(BINARY_PATH) cdc actions \
+		--kafka-cursor-topic="cursor" \
+		--kafka-topic="io.dkafka.test" \
+		--kafka-compression-type=$(COMPRESSION_TYPE) \
+		--kafka-compression-level=$(COMPRESSION_LEVEL) \
+		--start-block-num=$(START_BLOCK) \
+		--kafka-message-max-bytes=$(MESSAGE_MAX_SIZE) \
+		-vvv \
+		--actions-expr=$(ACTIONS_EXPRESSION) $(ACCOUNT)
 
 stream-act: build up ## stream actions based localy
 	$(BINARY_PATH) publish \

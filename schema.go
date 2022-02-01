@@ -52,10 +52,9 @@ func getNamespace(namespace string, abi AbiSpec) string {
 }
 
 func GenerateActionSchema(options NamedSchemaGenOptions) (Message, error) {
-	actionCamelCase := strcase.ToCamel(options.Name)
+	actionCamelCase, ceType := actionCeType(options.Name)
 
 	namespace := getNamespace(options.Namespace, options.AbiSpec)
-	ceType := fmt.Sprintf("%sActionNotification", actionCamelCase)
 	actionInfoRecordName := fmt.Sprintf("%sActionInfo", actionCamelCase)
 	actionParamsRecordName := fmt.Sprintf("%sActionParams", actionCamelCase)
 
@@ -72,14 +71,25 @@ func GenerateActionSchema(options NamedSchemaGenOptions) (Message, error) {
 		return Message{}, err
 	}
 	actionParamsSchema.Name = actionParamsRecordName
-	schema := newActionNotificationSchema(ceType, namespace, options.Version, newActionInfo2Schema(actionInfoRecordName, actionParamsSchema))
+	schema := newActionNotificationSchema(ceType, namespace, options.Version, newActionInfoSchema(actionInfoRecordName, actionParamsSchema))
 
 	return schema, nil
 }
 
+func actionCeType(name string) (actionCamelCase string, ceType string) {
+	actionCamelCase = strcase.ToCamel(name)
+	ceType = fmt.Sprintf("%sActionNotification", actionCamelCase)
+	return
+}
+
+func tableCeType(name string) (tableCamelCase string, ceType string) {
+	tableCamelCase = strcase.ToCamel(name)
+	ceType = fmt.Sprintf("%sTableNotification", tableCamelCase)
+	return
+}
+
 func GenerateTableSchema(options NamedSchemaGenOptions) (Message, error) {
-	tableCamelCase := strcase.ToCamel(options.Name)
-	ceType := fmt.Sprintf("%sTableNotification", tableCamelCase)
+	tableCamelCase, ceType := tableCeType(options.Name)
 	namespace := getNamespace(options.Namespace, options.AbiSpec)
 	dbOpInfoRecordName := fmt.Sprintf("%sTableOpInfo", tableCamelCase)
 	dbOpRecordName := fmt.Sprintf("%sTableOp", tableCamelCase)
@@ -141,7 +151,7 @@ func GenerateSchema(options AvroSchemaGenOptions) (Message, error) {
 	}
 	dbOpSchema.Name = dbOpRecordName
 	dbOpInfoSchema := newDBOpInfoRecord(dbOpInfoRecordName, dbOpSchema)
-	schema := newEventSchema(ceType, namespace, options.Version, newActionInfoSchema(actionDetailsRecordName, actionParamsSchema, dbOpInfoSchema))
+	schema := newEventSchema(ceType, namespace, options.Version, newActionInfoDetailsSchema(actionDetailsRecordName, actionParamsSchema, dbOpInfoSchema))
 
 	return schema, nil
 }
@@ -197,10 +207,14 @@ func abiFieldToRecordField(abi *eos.ABI, fieldDef eos.FieldDef) (Field, error) {
 	if err != nil {
 		return Field{}, fmt.Errorf("reslove Field type schema error: %v, on field: %s", err, fieldDef.Name)
 	}
-	return Field{
-		Name: fieldDef.Name,
-		Type: schema,
-	}, nil
+	if union, ok := schema.(Union); ok && union[0] == "null" {
+		return NewNullableField(fieldDef.Name, schema), nil
+	} else {
+		return Field{
+			Name: fieldDef.Name,
+			Type: schema,
+		}, nil
+	}
 }
 
 /*

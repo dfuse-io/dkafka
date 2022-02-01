@@ -52,17 +52,24 @@ func newActionsAdapter(
 	failOnUndecodableDBOP bool,
 	actionsConfJson string,
 	headers []kafka.Header,
-) (adapter, error) {
+) (*adapter, error) {
 	actionsConf := make(ActionsConf)
 	err := json.Unmarshal(json.RawMessage(actionsConfJson), &actionsConf)
 	if err != nil {
-		return adapter{}, err
+		return nil, err
 	}
 	generator, err := NewActionsGenerator(actionsConf)
 	if err != nil {
-		return adapter{}, err
+		return nil, err
 	}
-	return adapter{topic, saveBlock, decodeDBOps, failOnUndecodableDBOP, generator, headers}, nil
+	return &adapter{
+		topic,
+		saveBlock,
+		decodeDBOps,
+		failOnUndecodableDBOP,
+		generator,
+		headers,
+	}, nil
 }
 
 func newAdapter(
@@ -73,11 +80,11 @@ func newAdapter(
 	eventTypeProg cel.Program,
 	eventKeyProg cel.Program,
 	headers []kafka.Header,
-) adapter {
-	return adapter{topic, saveBlock, decodeDBOps, failOnUndecodableDBOP, NewExpressionsGenerator(eventKeyProg, eventTypeProg), headers}
+) *adapter {
+	return &adapter{topic, saveBlock, decodeDBOps, failOnUndecodableDBOP, NewExpressionsGenerator(eventKeyProg, eventTypeProg), headers}
 }
 
-func (m *adapter) adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message, error) {
+func (m *adapter) Adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message, error) {
 	m.saveBlock(blk)
 	step := sanitizeStep(rawStep)
 
@@ -151,7 +158,7 @@ func (m *adapter) adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message, e
 					Step:          step,
 					Correlation:   correlation,
 					TransactionID: trx.Id,
-					ActionInfo: ActionInfo{
+					ActionInfo: ActionInfoDetails{
 						Account:        act.Account(),
 						Receiver:       act.Receiver,
 						Action:         act.Name(),

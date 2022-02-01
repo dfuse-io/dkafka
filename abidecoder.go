@@ -154,6 +154,15 @@ func (a *ABIDecoder) decodeDBOp(op *decodedDBOp, blockNum uint32, forceRefresh b
 	return nil
 }
 
+func (a *ABIDecoder) DecodeDBOp(in *pbcodec.DBOp, blockNum uint32) (decoded *decodedDBOp, err error) {
+	decoded = &decodedDBOp{DBOp: in}
+	err = a.decodeDBOp(decoded, blockNum, false)
+	if err != nil {
+		err = a.decodeDBOp(decoded, blockNum, true) //force refreshing ABI from cache
+	}
+	return
+}
+
 func (a *ABIDecoder) DecodeDBOps(in []*pbcodec.DBOp, blockNum uint32) (decodedDBOps []*decodedDBOp, err error) {
 	for _, op := range in {
 		decoded := &decodedDBOp{DBOp: op}
