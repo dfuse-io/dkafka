@@ -140,6 +140,67 @@ func Test_resolveFieldTypeSchema(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "struct-inheritance",
+			args: args{"my_struct", &eos.ABI{
+				Types: []eos.ABIType{{
+					NewTypeName: "int64_alias",
+					Type:        "int64",
+				}},
+				Structs: []eos.StructDef{
+					{
+						Name: "parent",
+						Base: "",
+						Fields: []eos.FieldDef{
+							{
+								Name: "parentfieldA",
+								Type: "string",
+							},
+							{
+								Name: "parentFieldB",
+								Type: "int32",
+							},
+						},
+					},
+					{
+						Name: "my_struct",
+						Base: "parent",
+						Fields: []eos.FieldDef{
+							{
+								Name: "fieldA",
+								Type: "uint32",
+							},
+							{
+								Name: "fieldB",
+								Type: "int64_alias",
+							},
+						},
+					}},
+			}},
+			want: Record{
+				Type: "record",
+				Name: "MyStruct",
+				Fields: []Field{
+					{
+						Name: "parentfieldA",
+						Type: "string",
+					},
+					{
+						Name: "parentFieldB",
+						Type: "int",
+					},
+					{
+						Name: "fieldA",
+						Type: "long",
+					},
+					{
+						Name: "fieldB",
+						Type: "long",
+					},
+				},
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

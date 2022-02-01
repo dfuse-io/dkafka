@@ -117,7 +117,6 @@ cdc-actions: build up ## CDC stream on tables
 		--kafka-compression-level=$(COMPRESSION_LEVEL) \
 		--start-block-num=$(START_BLOCK) \
 		--kafka-message-max-bytes=$(MESSAGE_MAX_SIZE) \
-		-vvv \
 		--actions-expr=$(ACTIONS_EXPRESSION) $(ACCOUNT)
 
 stream-act: build up ## stream actions based localy

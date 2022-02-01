@@ -179,9 +179,19 @@ func structToRecord(abi *eos.ABI, structName string) (Record, error) {
 	if s == nil {
 		return Record{}, fmt.Errorf("struct not found: %s", structName)
 	}
+	//inheritance
+	parentRecord := Record{}
+	if s.Base != "" {
+		var err error
+		parentRecord, err = structToRecord(abi, s.Base)
+		if err != nil {
+			return Record{}, fmt.Errorf("cannot get parent structToRecord() for %s.%s error: %v", structName, s.Base, err)
+		}
+	}
 	fields, err := abiFieldsToRecordFields(abi, s.Fields)
+	fields = append(parentRecord.Fields, fields...)
 	if err != nil {
-		return Record{}, err
+		return Record{}, fmt.Errorf("%s abiFieldsToRecordFields() error: %v", structName, err)
 	}
 	return newRecordS(
 		s.Name,
