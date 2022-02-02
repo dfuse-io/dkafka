@@ -240,8 +240,9 @@ Examples:
 - [x] avro schema generation
 - [x] parametrize the record name with the ce_type
 - [x] add meta info in avro schema `meta: {compatibility: FORWARD, type: notification version: 1.2.1}
-- [ ] add support for cdc on tables
-- [ ] add support for cdc on actions
-- [ ] see if we need a defaulting on the key expression for cdc tables like:
+- [x] add support for cdc on tables
+- [x] add support for cdc on actions
+- [x] see if we need a defaulting on the key expression for cdc tables like:
       `key := fmt.Sprintf("%s:%s", decodedDBOp.Scope, decodedDBOp.PrimaryKey)`
-- [ ] see ...
+- [ ] see with blockchain team for the default type mapping
+- [ ] validate with blockchain team cdc table message key

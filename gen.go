@@ -42,7 +42,7 @@ var empty = void{}
 func (tg TableGenerator) Apply(gc GenContext) ([]Generation2, error) {
 	dbOps := gc.transaction.DBOpsForAction(gc.actionTrace.ExecutionIndex)
 	generations := []Generation2{}
-	for i, dbOp := range dbOps {
+	for _, dbOp := range dbOps {
 		if dbOp.Operation == pbcodec.DBOp_OPERATION_UNKNOWN {
 			continue
 		}
@@ -75,8 +75,8 @@ func (tg TableGenerator) Apply(gc GenContext) ([]Generation2, error) {
 			gc.block.Id,
 			gc.transaction.Id,
 			gc.actionTrace.ExecutionIndex,
-			i,
-			ceType,
+			dbOp.Operation,
+			dbOp.TableName,
 			gc.stepName,
 			key))
 		value := TableNotification{
