@@ -255,14 +255,14 @@ func (a *ABIDecoder) decodeDBOp(op *decodedDBOp, blockNum uint32, forceRefresh b
 	}
 
 	if len(op.NewData) > 0 {
-		asMap, err := abi.DecodeTableRowTyped2Map(tableDef.Type, op.NewData)
+		asMap, err := abi.DecodeTableRowTypedNative(tableDef.Type, op.NewData)
 		if err != nil {
 			return fmt.Errorf("decode row: %w", err)
 		}
 		op.NewJSON = asMap
 	}
 	if len(op.OldData) > 0 {
-		asMap, err := abi.DecodeTableRowTyped2Map(tableDef.Type, op.OldData)
+		asMap, err := abi.DecodeTableRowTypedNative(tableDef.Type, op.OldData)
 		if err != nil {
 			return fmt.Errorf("decode row: %w", err)
 		}

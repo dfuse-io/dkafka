@@ -43,8 +43,7 @@ func (a *ABI) DecodeTableRow(tableName TableName, data []byte) ([]byte, error) {
 }
 
 func (a *ABI) DecodeTableRowTyped(tableType string, data []byte) ([]byte, error) {
-	binaryDecoder := NewDecoder(data)
-	builtStruct, err := a.decode(binaryDecoder, tableType)
+	builtStruct, err := a.DecodeTableRowTypedNative(tableType, data)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +51,7 @@ func (a *ABI) DecodeTableRowTyped(tableType string, data []byte) ([]byte, error)
 
 }
 
-func (a *ABI) DecodeTableRowTyped2Map(tableType string, data []byte) (map[string]interface{}, error) {
+func (a *ABI) DecodeTableRowTypedNative(tableType string, data []byte) (map[string]interface{}, error) {
 	binaryDecoder := NewDecoder(data)
 	return a.decode(binaryDecoder, tableType)
 }
