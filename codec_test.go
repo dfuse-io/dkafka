@@ -233,7 +233,7 @@ func TestCodec_MarshalUnmarshal(t *testing.T) {
 		},
 		NewJSON: map[string]interface{}{
 			"id":               eos.Uint64(104),
-			"mint_date":        42,
+			"mint_date":        "2021-12-30T17:36:19",
 			"serial_number":    9,
 			"token_factory_id": 2,
 		},
@@ -297,11 +297,18 @@ func TestCodec_MarshalUnmarshal(t *testing.T) {
 			false,
 			false,
 			map[string]interface{}{
-				"firstName":  "Christophe",
-				"lastName":   "O",
-				"middleName": nil,
-				"age":        int32(24),
-				"id":         int64(42),
+				"operation":    map[string]interface{}{"int": int32(1)},
+				"action_index": map[string]interface{}{"long": int64(0)},
+				"code":         nil,
+				"scope":        nil,
+				"table_name":   map[string]interface{}{"string": "token.a"},
+				"primary_key":  nil,
+				"old_payer":    nil,
+				"new_payer":    nil,
+				"old_data":     nil,
+				"new_data":     map[string]interface{}{"bytes": []byte("aAAAAAAAAAACAAAAAAAAABPuzWEJAAAA")},
+				"old_json":     nil,
+				"new_json":     map[string]interface{}{"dkafka.test.TokenATableOp": map[string]interface{}{"id": int64(104), "mint_date": "2021-12-30T17:36:19", "serial_number": int64(9), "token_factory_id": int64(2)}},
 			},
 		},
 	}
@@ -323,7 +330,7 @@ func TestCodec_MarshalUnmarshal(t *testing.T) {
 				expect = tt.args.value
 			}
 			if !reflect.DeepEqual(gotValue, expect) {
-				t.Errorf("codec Marshal() then Unmarshal() = %v, want %v", gotValue, tt.args.value)
+				t.Errorf("codec Marshal() then Unmarshal() = %v, want %v", gotValue, expect)
 			}
 		})
 	}
