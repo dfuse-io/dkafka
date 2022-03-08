@@ -37,3 +37,5 @@ require (
 )
 
 replace github.com/eoscanada/eos-go v0.9.1-0.20210812015252-984fc96878b6 => ./fork/eos-go
+
+replace github.com/linkedin/goavro/v2 v2.11.0 => ./fork/goavro

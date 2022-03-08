@@ -88,11 +88,15 @@ func tableCeType(name string) (tableCamelCase string, ceType string) {
 	return
 }
 
+func dbOpRecordName(tableCamelCaseName string) string {
+	return fmt.Sprintf("%sTableOp", tableCamelCaseName)
+}
+
 func GenerateTableSchema(options NamedSchemaGenOptions) (MessageSchema, error) {
 	tableCamelCase, ceType := tableCeType(options.Name)
 	namespace := getNamespace(options.Namespace, options.AbiSpec)
 	dbOpInfoRecordName := fmt.Sprintf("%sTableOpInfo", tableCamelCase)
-	dbOpRecordName := fmt.Sprintf("%sTableOp", tableCamelCase)
+	dbOpRecordName := dbOpRecordName(tableCamelCase)
 
 	zlog.Debug(
 		"generate table avro schema with following names:",
@@ -278,20 +282,20 @@ var avroPrimitiveTypeByBuiltInTypes map[string]string = map[string]string{
 	"int32":                "int",
 	"uint32":               "long",
 	"int64":                "long",
-	"uint64":               "long", // FIXME maybe use Decimal here see goavro
+	"uint64":               "long", // FIXME maybe use Decimal here see goavro or FIXED
 	"varint32":             "int",
 	"varuint32":            "long",
 	"float32":              "float",
 	"float64":              "double",
-	"time_point":           "long", // FIXME check with blockchain team
-	"time_point_sec":       "long", // FIXME check with blockchain team
-	"block_timestamp_type": "long", // FIXME check with blockchain team
+	"time_point":           "string", // fork/eos-go/abidecoder.go TODO add ABI.nativeTime bool to skip time to string conversion in abidecoder read method
+	"time_point_sec":       "string", // fork/eos-go/abidecoder.go
+	"block_timestamp_type": "string", // fork/eos-go/abidecoder.go
 	"name":                 "string",
 	"bytes":                "bytes",
-	"string":               "string", // FIXME check with blockchain team
-	"checksum160":          "string", // FIXME check with blockchain team
-	"checksum256":          "string", // FIXME check with blockchain team
-	"checksum512":          "string", // FIXME check with blockchain team
+	"string":               "string",
+	"checksum160":          "bytes",
+	"checksum256":          "bytes",
+	"checksum512":          "bytes",
 	"public_key":           "string", // FIXME check with blockchain team
 	"signature":            "string", // FIXME check with blockchain team
 	"symbol":               "string", // FIXME check with blockchain team

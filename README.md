@@ -249,3 +249,5 @@ Examples:
 - [ ] patch (pool request) on goavro to support uint32 and unit64... overflow => negative value
 - [ ] implement KafkaAvroABICodec by method composition
 - [ ] pool request on eos-go for native decode functions
+- [ ] add ABI.nativeTime bool to skip time to string conversion in abidecoder `read` method as it is done for `ABI.fitNodeos` property
+- [ ] fix the issue with some types mapping in `schema.go`

@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"testing"
 
+	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
+	"github.com/eoscanada/eos-go"
 	"github.com/linkedin/goavro/v2"
 	"github.com/riferrei/srclient"
 )
@@ -76,6 +78,14 @@ const UserSchema = `
 			"type": "string"
 		},
 		{
+			"name": "middleName",
+			"type": [
+				"null",
+				"string"
+			],
+			"default": null
+		},
+		{
 			"name": "age",
 			"type": "int"
 		},
@@ -87,7 +97,147 @@ const UserSchema = `
 }
 `
 
+const TokenATableOpInfo = `
+{
+	"namespace": "dkafka.test",
+	"type": "record",
+	"name": "TokenATableOpInfo",
+	"fields": [
+		{
+			"name": "operation",
+			"type": [
+				"null",
+				"int"
+			],
+			"default": null
+		},
+		{
+			"name": "action_index",
+			"type": [
+				"null",
+				"long"
+			],
+			"default": null
+		},
+		{
+			"name": "code",
+			"type": [
+				"null",
+				"string"
+			],
+			"default": null
+		},
+		{
+			"name": "scope",
+			"type": [
+				"null",
+				"string"
+			],
+			"default": null
+		},
+		{
+			"name": "table_name",
+			"type": [
+				"null",
+				"string"
+			],
+			"default": null
+		},
+		{
+			"name": "primary_key",
+			"type": [
+				"null",
+				"string"
+			],
+			"default": null
+		},
+		{
+			"name": "old_payer",
+			"type": [
+				"null",
+				"string"
+			],
+			"default": null
+		},
+		{
+			"name": "new_payer",
+			"type": [
+				"null",
+				"string"
+			],
+			"default": null
+		},
+		{
+			"name": "old_data",
+			"type": [
+				"null",
+				"bytes"
+			],
+			"default": null
+		},
+		{
+			"name": "new_data",
+			"type": [
+				"null",
+				"bytes"
+			],
+			"default": null
+		},
+		{
+			"name": "old_json",
+			"type": [
+				"null",
+				{
+					"type": "record",
+					"name": "TokenATableOp",
+					"fields": [
+						{
+							"name": "id",
+							"type": "long"
+						},
+						{
+							"name": "token_factory_id",
+							"type": "long"
+						},
+						{
+							"name": "mint_date",
+							"type": "string"
+						},
+						{
+							"name": "serial_number",
+							"type": "long"
+						}
+					]
+				}
+			],
+			"default": null
+		},
+		{
+			"name": "new_json",
+			"type": [
+				"null",
+				"TokenATableOp"
+			],
+			"default": null
+		}
+	]
+}
+`
+
 func TestCodec_MarshalUnmarshal(t *testing.T) {
+	dbOp := &decodedDBOp{
+		DBOp: &pbcodec.DBOp{
+			Operation: pbcodec.DBOp_OPERATION_INSERT,
+			TableName: "token.a",
+			NewData:   []byte("aAAAAAAAAAACAAAAAAAAABPuzWEJAAAA"),
+		},
+		NewJSON: map[string]interface{}{
+			"id":               eos.Uint64(104),
+			"mint_date":        42,
+			"serial_number":    9,
+			"token_factory_id": 2,
+		},
+	}
 	type args struct {
 		buf   []byte
 		value interface{}
@@ -98,6 +248,7 @@ func TestCodec_MarshalUnmarshal(t *testing.T) {
 		args             args
 		wantMarshalErr   bool
 		wantUnmarshalErr bool
+		expect           interface{}
 	}{
 		{
 			"json",
@@ -112,6 +263,7 @@ func TestCodec_MarshalUnmarshal(t *testing.T) {
 			},
 			false,
 			false,
+			nil,
 		},
 		{
 			"kafka-avro",
@@ -127,6 +279,30 @@ func TestCodec_MarshalUnmarshal(t *testing.T) {
 			},
 			false,
 			false,
+			map[string]interface{}{
+				"firstName":  "Christophe",
+				"lastName":   "O",
+				"middleName": nil,
+				"age":        int32(24),
+				"id":         int64(42),
+			},
+		},
+		{
+			"repeated-avro",
+			NewKafkaAvroCodec(newSchema(t, 42, TokenATableOpInfo, nil)),
+			args{
+				nil,
+				dbOp.asMap("dkafka.test.TokenATableOp"),
+			},
+			false,
+			false,
+			map[string]interface{}{
+				"firstName":  "Christophe",
+				"lastName":   "O",
+				"middleName": nil,
+				"age":        int32(24),
+				"id":         int64(42),
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -142,7 +318,11 @@ func TestCodec_MarshalUnmarshal(t *testing.T) {
 				t.Errorf("JSONCodec.Unmarshal() error = %v, wantUnmarshalErr %v", err, tt.wantUnmarshalErr)
 				return
 			}
-			if !reflect.DeepEqual(gotValue, tt.args.value) {
+			expect := tt.expect
+			if expect == nil {
+				expect = tt.args.value
+			}
+			if !reflect.DeepEqual(gotValue, expect) {
 				t.Errorf("codec Marshal() then Unmarshal() = %v, want %v", gotValue, tt.args.value)
 			}
 		})
@@ -167,3 +347,16 @@ func newAvroCodec(t testing.TB, s string) *goavro.Codec {
 	}
 	return codec
 }
+
+// func TestDummy(t *testing.T) {
+// 	var value = eos.Uint64(42)
+// 	valueOf := reflect.ValueOf(value)
+// 	fmt.Println(valueOf.Kind())
+// 	valueOf.Int()
+
+// 	fmt.Println(reflect.TypeOf(value))
+// 	fmt.Println(reflect.TypeOf(value).ConvertibleTo(reflect.TypeOf(uint64(0))))
+
+// 	// valueType := reflect.TypeOf(value)
+// 	// valueType.ConvertibleTo(reflect.Uint64)
+// }

@@ -173,9 +173,9 @@ type decodedDBOp struct {
 	OldJSON map[string]interface{} `json:"old_json,omitempty"`
 }
 
-func (dbOp *decodedDBOp) asMap() map[string]interface{} {
+func (dbOp *decodedDBOp) asMap(dbOpRecordName string) map[string]interface{} {
 	asMap := map[string]interface{}{
-		"operation":    dbOp.Operation,
+		"operation":    int32(dbOp.Operation),
 		"action_index": dbOp.ActionIndex,
 	}
 	addOptionalString(&asMap, "code", dbOp.Code)
@@ -184,24 +184,38 @@ func (dbOp *decodedDBOp) asMap() map[string]interface{} {
 	addOptionalString(&asMap, "primary_key", dbOp.PrimaryKey)
 	addOptionalString(&asMap, "old_payer", dbOp.OldPayer)
 	addOptionalString(&asMap, "new_payer", dbOp.NewPayer)
-	addOptional(&asMap, "old_data", dbOp.OldData)
-	addOptional(&asMap, "new_data", dbOp.NewData)
+	addOptionalBytes(&asMap, "old_data", dbOp.OldData)
+	addOptionalBytes(&asMap, "new_data", dbOp.NewData)
 	addOptional(&asMap, "old_json", dbOp.OldJSON)
 	addOptional(&asMap, "new_json", dbOp.NewJSON)
+	// addOptionalRecord(&asMap, "old_json", dbOpRecordName, dbOp.OldJSON)
+	// addOptionalRecord(&asMap, "new_json", dbOpRecordName, dbOp.NewJSON)
 	return asMap
 }
 
-func addOptionalString(m *map[string]interface{}, key string, value interface{}) {
+func addOptionalBytes(m *map[string]interface{}, key string, value []byte) {
+	if len(value) > 0 {
+		(*m)[key] = value
+	}
+}
+
+func addOptionalString(m *map[string]interface{}, key string, value string) {
 	if value != "" {
 		(*m)[key] = value
 	}
 }
 
-func addOptional(m *map[string]interface{}, key string, value interface{}) {
-	if value != nil {
+func addOptional(m *map[string]interface{}, key string, value map[string]interface{}) {
+	if len(value) > 0 {
 		(*m)[key] = value
 	}
 }
+
+// func addOptionalRecord(m *map[string]interface{}, key string, rType string, value map[string]interface{}) {
+// 	if len(value) > 0 {
+// 		addOptional(m, key, map[string]interface{}{rType: value})
+// 	}
+// }
 
 func (a *ABIDecoder) abi(contract string, blockNum uint32, forceRefresh bool) (*eos.ABI, error) {
 	if a.overrides != nil {

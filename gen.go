@@ -6,6 +6,7 @@ import (
 
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 	"github.com/google/cel-go/cel"
+	"go.uber.org/zap"
 )
 
 type EntityType = string
@@ -97,7 +98,7 @@ func (tg TableGenerator) doApply(gc GenContext) ([]generation, error) {
 		}
 		// TODO manage key based on table name in tableNames => return a key generator function
 		key := fmt.Sprintf("%s:%s", decodedDBOp.Scope, decodedDBOp.PrimaryKey)
-		_, ceType := tableCeType(dbOp.TableName)
+		tableCamelCase, ceType := tableCeType(dbOp.TableName)
 		ceId := hashString(fmt.Sprintf(
 			"%s%s%d%d%s%s%s",
 			gc.block.Id,
@@ -110,16 +111,18 @@ func (tg TableGenerator) doApply(gc GenContext) ([]generation, error) {
 		value := newTableNotification(
 			notificationContextMap(gc),
 			actionInfoBasicMap(gc),
-			decodedDBOp.asMap(),
+			decodedDBOp.asMap(dbOpRecordName(tableCamelCase)),
 		)
-		generations = append(generations, generation{
+		generation := generation{
 			CeId:       ceId,
 			CeType:     ceType,
 			Key:        key,
 			Value:      value,
 			EntityType: Table,
 			EntityName: dbOp.TableName,
-		})
+		}
+		zlog.Debug("generated table message", zap.Any("generation", generation))
+		generations = append(generations, generation)
 	}
 	return generations, nil
 }
