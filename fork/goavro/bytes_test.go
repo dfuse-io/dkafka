@@ -19,12 +19,15 @@ func TestSchemaPrimitiveCodecBytes(t *testing.T) {
 	testSchemaPrimativeCodec(t, `"bytes"`)
 }
 
+type TBytes []byte
+
 func TestPrimitiveBytesBinary(t *testing.T) {
 	testBinaryEncodeFailBadDatumType(t, `"bytes"`, 13)
 	testBinaryDecodeFailShortBuffer(t, `"bytes"`, nil)
 	testBinaryDecodeFailShortBuffer(t, `"bytes"`, []byte{2})
 	testBinaryCodecPass(t, `"bytes"`, []byte(""), []byte("\x00"))
 	testBinaryCodecPass(t, `"bytes"`, []byte("some bytes"), []byte("\x14some bytes"))
+	testBinaryCodecPass(t, `"bytes"`, TBytes("some bytes"), []byte("\x14some bytes"))
 }
 
 func TestPrimitiveBytesText(t *testing.T) {
@@ -68,12 +71,15 @@ func TestSchemaPrimitiveStringCodec(t *testing.T) {
 	testSchemaPrimativeCodec(t, `"string"`)
 }
 
+type TString string
+
 func TestPrimitiveStringBinary(t *testing.T) {
 	testBinaryEncodeFailBadDatumType(t, `"string"`, 42)
 	testBinaryDecodeFailShortBuffer(t, `"string"`, nil)
 	testBinaryDecodeFailShortBuffer(t, `"string"`, []byte{2})
 	testBinaryCodecPass(t, `"string"`, "", []byte("\x00"))
 	testBinaryCodecPass(t, `"string"`, "some string", []byte("\x16some string"))
+	testBinaryCodecPass(t, `"string"`, TString("some string"), []byte("\x16some string"))
 }
 
 func TestPrimitiveStringText(t *testing.T) {

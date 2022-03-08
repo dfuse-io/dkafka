@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
 	"unicode"
 	"unicode/utf16"
 	"unicode/utf8"
@@ -63,7 +64,15 @@ func bytesBinaryFromNative(buf []byte, datum interface{}) ([]byte, error) {
 	case string:
 		someBytes = []byte(d)
 	default:
-		return nil, fmt.Errorf("cannot encode binary bytes: expected: []byte or string; received: %T", datum)
+		valueOf := reflect.ValueOf(d)
+		switch kind := valueOf.Kind(); {
+		case kind == reflect.Slice && valueOf.Type().Elem().Kind() == reflect.Uint8:
+			someBytes = valueOf.Bytes()
+		case kind == reflect.String:
+			someBytes = []byte(valueOf.String())
+		default:
+			return nil, fmt.Errorf("cannot encode binary bytes: expected: []byte or string; received: %T", datum)
+		}
 	}
 	buf, _ = longBinaryFromNative(buf, len(someBytes)) // only fails when given non integer
 	return append(buf, someBytes...), nil              // append datum bytes

@@ -234,9 +234,12 @@ Examples:
 
 
 ## TODO
+- [ ] implement a cache on a top of KafkaAvroABICodec
+- [ ] add ABI.nativeTime bool to skip time to string conversion in abidecoder `read` method as it is done for `ABI.fitNodeos` property
+- [ ] fix the issue with some types mapping in `schema.go`
 - [x] user ce_type instead of source for the `ce_id`
-- [ ] schema registry integration
-- [ ] avro codec
+- [x] schema registry integration
+- [x] avro codec
 - [x] avro schema generation
 - [x] parametrize the record name with the ce_type
 - [x] add meta info in avro schema `meta: {compatibility: FORWARD, type: notification version: 1.2.1}
@@ -244,10 +247,7 @@ Examples:
 - [x] add support for cdc on actions
 - [x] see if we need a defaulting on the key expression for cdc tables like:
       `key := fmt.Sprintf("%s:%s", decodedDBOp.Scope, decodedDBOp.PrimaryKey)`
-- [ ] see with blockchain team for the default type mapping
-- [ ] validate with blockchain team cdc table message key
+- [x] see with blockchain team for the default type mapping
+- [x] validate with blockchain team cdc table message key
 - [ ] patch (pool request) on goavro to support uint32 and unit64... overflow => negative value
-- [ ] implement KafkaAvroABICodec by method composition
 - [ ] pool request on eos-go for native decode functions
-- [ ] add ABI.nativeTime bool to skip time to string conversion in abidecoder `read` method as it is done for `ABI.fitNodeos` property
-- [ ] fix the issue with some types mapping in `schema.go`

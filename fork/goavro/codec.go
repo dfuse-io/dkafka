@@ -207,7 +207,7 @@ func newSymbolTable() map[string]*Codec {
 			typeName:          &name{"string", nullNamespace},
 			schemaOriginal:    "string",
 			schemaCanonical:   "string",
-			binaryFromNative:  stringBinaryFromNative,
+			binaryFromNative:  bytesBinaryFromNative,
 			nativeFromBinary:  stringNativeFromBinary,
 			nativeFromTextual: stringNativeFromTextual,
 			textualFromNative: stringTextualFromNative,
