@@ -94,6 +94,7 @@ func (m *adapter) Adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message, e
 	if blk.Number%10 == 0 {
 		zlog.Debug("incoming block 1/10", zap.Uint32("blk_number", blk.Number), zap.String("step", step), zap.Int("length_filtered_trx_traces", len(blk.FilteredTransactionTraces)))
 	}
+	msgs := make([]*kafka.Message, 0, 1)
 
 	for _, trx := range blk.TransactionTraces() {
 		transactionTracesReceived.Inc()
@@ -148,7 +149,6 @@ func (m *adapter) Adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message, e
 			if source == "" {
 				return nil, fmt.Errorf("ce_source is missing")
 			}
-			msgs := make([]*kafka.Message, 0, 1)
 			for _, generation := range generations {
 				eosioAction := event{
 					BlockNum:      blk.Number,
@@ -198,11 +198,9 @@ func (m *adapter) Adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message, e
 				}
 				msgs = append(msgs, msg)
 			}
-
-			return msgs, nil
 		}
 	}
-	return nil, nil
+	return msgs, nil
 }
 
 func hashString(data string) []byte {
