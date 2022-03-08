@@ -32,7 +32,21 @@ services:
             docker-kafka-server:
               properties:
                 bootstrap.servers: "kafka:9093"
+              schema-registry:
+                url: "kafka-schema-registry:8081"
     ports:
       - 8080:8080
+    depends_on:
+      - kafka
+  kafka-schema-registry:
+    image: quay.io/ultraio/confluent-schema-registry-ultra
+    container_name: kafka-schema-registry
+    restart: always
+    ports:
+      - "127.0.0.1:8081:8081"
+    environment:
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: "kafka:9093"
+      SCHEMA_REGISTRY_LISTENERS: "http://0.0.0.0:8081"
+      SCHEMA_REGISTRY_HOST_NAME: "localhost"
     depends_on:
       - kafka

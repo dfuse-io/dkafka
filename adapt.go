@@ -1,8 +1,6 @@
 package dkafka
 
 import (
-	"encoding/json"
-
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 	"go.uber.org/zap"
@@ -29,7 +27,7 @@ func (m *CdCAdapter) Adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message
 	if blk.Number%10 == 0 {
 		zlog.Debug("incoming block 1/10", zap.Uint32("blk_number", blk.Number), zap.String("step", step), zap.Int("length_filtered_trx_traces", len(blk.FilteredTransactionTraces)))
 	}
-
+	msgs := make([]*kafka.Message, 0)
 	for _, trx := range blk.TransactionTraces() {
 		transactionTracesReceived.Inc()
 		// manage correlation
@@ -54,7 +52,7 @@ func (m *CdCAdapter) Adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message
 			if err != nil {
 				return nil, err
 			}
-			msgs := make([]*kafka.Message, 0, 1)
+
 			for _, generation := range generations {
 				headers := append(m.headers,
 					kafka.Header{
@@ -74,15 +72,13 @@ func (m *CdCAdapter) Adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message
 						Value: []byte(step),
 					},
 				)
-				// TODO introduce codec
-				value, err := json.Marshal(generation.Value)
 				if err != nil {
 					return nil, err
 				}
 				msg := &kafka.Message{
 					Key:     []byte(generation.Key),
 					Headers: headers,
-					Value:   value,
+					Value:   generation.Value,
 					TopicPartition: kafka.TopicPartition{
 						Topic:     &m.topic,
 						Partition: kafka.PartitionAny,
@@ -90,8 +86,10 @@ func (m *CdCAdapter) Adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message
 				}
 				msgs = append(msgs, msg)
 			}
-			return msgs, nil
 		}
 	}
-	return nil, nil
+	if traceEnabled {
+		zlog.Debug("produced kafka messages", zap.Uint32("blk_number", blk.Number), zap.String("step", step), zap.Int("nb_messages", len(msgs)))
+	}
+	return msgs, nil
 }

@@ -254,8 +254,8 @@ func Benchmark_adapter_adapt(b *testing.B) {
 				topic:     "test.topic",
 				saveBlock: saveBlockNoop,
 				generator: TableGenerator{
-					decodeDBOp: abiDecoder.DecodeDBOp,
 					tableNames: map[string]void{"factory.a": empty},
+					abiCodec:   NewJsonABICodec(abiDecoder, "eosio.nft.ft"),
 				},
 				headers: default_headers,
 			}

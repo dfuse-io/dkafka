@@ -6,11 +6,11 @@ import (
 
 const dkafkaNamespace = "io.dkafka"
 
-func newCorrelationRecord() Record {
+func newCorrelationRecord() RecordSchema {
 	return newRecordFQN(
 		dkafkaNamespace,
 		"Correlation",
-		[]Field{
+		[]FieldSchema{
 			{
 				Name: "payer",
 				Type: "string",
@@ -23,15 +23,30 @@ func newCorrelationRecord() Record {
 	)
 }
 
+func newOptionalCorrelation(correlation *Correlation) map[string]interface{} {
+	if correlation != nil {
+		return newCorrelation(correlation.Payer, correlation.Id)
+	} else {
+		return nil
+	}
+}
+
+func newCorrelation(payer string, id string) map[string]interface{} {
+	return map[string]interface{}{
+		"payer": payer,
+		"id":    id,
+	}
+}
+
 type Correlation struct {
 	Payer string `json:"payer"`
 	Id    string `json:"id"`
 }
 
-func newActionInfoDetailsSchema(name string, jsonData Record, dbOpsRecord Record) Record {
+func newActionInfoDetailsSchema(name string, jsonData RecordSchema, dbOpsRecord RecordSchema) RecordSchema {
 	return newRecordS(
 		name,
-		[]Field{
+		[]FieldSchema{
 			{
 				Name: "payer",
 				Type: "string",
@@ -68,10 +83,10 @@ func newActionInfoDetailsSchema(name string, jsonData Record, dbOpsRecord Record
 	)
 }
 
-func newDBOpInfoRecord(tableName string, jsonData Record) Record {
+func newDBOpInfoRecord(tableName string, jsonData RecordSchema) RecordSchema {
 	return newRecordS(
 		tableName,
-		[]Field{
+		[]FieldSchema{
 			NewOptionalField("operation", "int"),
 			NewOptionalField("action_index", "long"),
 			NewOptionalField("code", "string"),
@@ -83,20 +98,28 @@ func newDBOpInfoRecord(tableName string, jsonData Record) Record {
 			NewOptionalField("old_data", "bytes"),
 			NewOptionalField("new_data", "bytes"),
 			NewOptionalField("old_json", jsonData),
-			NewOptionalField("new_json", jsonData),
+			NewOptionalField("new_json", jsonData.Name),
 		},
 	)
 }
 
-type ActionInfoBasic struct {
-	Account        string   `json:"account"`
-	Receiver       string   `json:"receiver"`
-	Name           string   `json:"name"`
-	GlobalSequence uint64   `json:"global_seq"`
-	Authorization  []string `json:"authorizations"`
+func newActionInfoBasic(
+	account string,
+	receiver string,
+	name string,
+	globalSequence uint64,
+	authorization []string,
+) map[string]interface{} {
+	return map[string]interface{}{
+		"account":        account,
+		"receiver":       receiver,
+		"name":           name,
+		"global_seq":     globalSequence,
+		"authorizations": authorization,
+	}
 }
 
-type ActionInfoBasicSchema = Record
+type ActionInfoBasicSchema = RecordSchema
 
 func newActionInfoBasicSchema() ActionInfoBasicSchema {
 	return newActionInfoBasicSchemaFQN("ActionInfoBasic", dkafkaNamespace)
@@ -108,7 +131,7 @@ func newActionInfoBasicSchemaFQN(name string, np string) ActionInfoBasicSchema {
 	return newRecordFQN(
 		np,
 		name,
-		[]Field{
+		[]FieldSchema{
 			{
 				Name: "account",
 				Type: "string",
@@ -144,11 +167,11 @@ type ActionInfoDetails struct {
 	JSONData       *json.RawMessage `json:"json_data"`
 }
 
-func newEventSchema(name string, namespace string, version string, actionInfoSchema Record) Message {
+func newEventSchema(name string, namespace string, version string, actionInfoSchema RecordSchema) MessageSchema {
 	record := newRecordFQN(
 		namespace,
 		name,
-		[]Field{
+		[]FieldSchema{
 			{
 				Name: "block_num",
 				Type: "long",
@@ -180,9 +203,9 @@ func newEventSchema(name string, namespace string, version string, actionInfoSch
 			},
 		},
 	)
-	return Message{
+	return MessageSchema{
 		record,
-		Meta{
+		MetaSchema{
 			Compatibility: "FORWARD",
 			Type:          "notification",
 			Version:       version,
@@ -207,22 +230,36 @@ func (e event) JSON() []byte {
 
 }
 
-type NotificationContext struct {
-	BlockNum      uint32       `json:"block_num"`
-	BlockID       string       `json:"block_id"`
-	Status        string       `json:"status"`
-	Executed      bool         `json:"executed"`
-	Step          string       `json:"block_step"`
-	Correlation   *Correlation `json:"correlation,omitempty"`
-	TransactionID string       `json:"trx_id"`
+func newNotificationContext(
+	blockID string,
+	blockNum uint32,
+	status string,
+	executed bool,
+	step string,
+	transactionID string,
+	correlation map[string]interface{},
+) map[string]interface{} {
+	nc := map[string]interface{}{
+		"block_id":   blockID,
+		"block_num":  blockNum,
+		"status":     status,
+		"executed":   executed,
+		"block_step": step,
+		"trx_id":     transactionID,
+	}
+	if len(correlation) > 0 {
+		nc["correlation"] = correlation
+	}
+	return nc
 }
-type NotificationContextSchema = Record
+
+type NotificationContextSchema = RecordSchema
 
 func newNotificationContextSchema() NotificationContextSchema {
 	return newRecordFQN(
 		dkafkaNamespace,
 		"NotificationContext",
-		[]Field{
+		[]FieldSchema{
 			{
 				Name: "block_num",
 				Type: "long",
@@ -252,17 +289,19 @@ func newNotificationContextSchema() NotificationContextSchema {
 	)
 }
 
-type TableNotification struct {
-	Context NotificationContext `json:"context"`
-	Action  ActionInfoBasic     `json:"action"`
-	DBOp    *decodedDBOp        `json:"db_op"`
+func newTableNotification(context map[string]interface{}, action map[string]interface{}, dbOp map[string]interface{}) map[string]interface{} {
+	return map[string]interface{}{
+		"context": context,
+		"action":  action,
+		"db_op":   dbOp,
+	}
 }
 
-func newTableNotificationSchema(name string, namespace string, version string, dbOpRecord Record) Message {
+func newTableNotificationSchema(name string, namespace string, version string, dbOpRecord RecordSchema) MessageSchema {
 	record := newRecordFQN(
 		namespace,
 		name,
-		[]Field{
+		[]FieldSchema{
 			{
 				Name: "context",
 				Type: newNotificationContextSchema(),
@@ -277,9 +316,9 @@ func newTableNotificationSchema(name string, namespace string, version string, d
 			},
 		},
 	)
-	return Message{
+	return MessageSchema{
 		record,
-		Meta{
+		MetaSchema{
 			Compatibility: "FORWARD",
 			Type:          "notification",
 			Version:       version,
@@ -287,16 +326,18 @@ func newTableNotificationSchema(name string, namespace string, version string, d
 	}
 }
 
-type ActionNotification struct {
-	Context    NotificationContext `json:"context"`
-	ActionInfo ActionInfo          `json:"act_info"`
+func newActionNotification(context map[string]interface{}, actionInfo map[string]interface{}) map[string]interface{} {
+	return map[string]interface{}{
+		"context":  context,
+		"act_info": actionInfo,
+	}
 }
 
-func newActionNotificationSchema(name string, namespace string, version string, actionInfoSchema ActionInfoSchema) Message {
+func newActionNotificationSchema(name string, namespace string, version string, actionInfoSchema ActionInfoSchema) MessageSchema {
 	record := newRecordFQN(
 		namespace,
 		name,
-		[]Field{
+		[]FieldSchema{
 			{
 				Name: "context",
 				Type: newNotificationContextSchema(),
@@ -307,9 +348,9 @@ func newActionNotificationSchema(name string, namespace string, version string, 
 			},
 		},
 	)
-	return Message{
+	return MessageSchema{
 		record,
-		Meta{
+		MetaSchema{
 			Compatibility: "FORWARD",
 			Type:          "notification",
 			Version:       version,
@@ -317,15 +358,19 @@ func newActionNotificationSchema(name string, namespace string, version string, 
 	}
 }
 
-type ActionInfo struct {
-	ActionInfoBasic
-	JSONData *json.RawMessage `json:"json_data"`
+func newActionInfo(
+	actionInfoBasic map[string]interface{},
+	jsonData map[string]interface{},
+) map[string]interface{} {
+	actionInfoBasic["json_data"] = jsonData
+	return actionInfoBasic
 }
-type ActionInfoSchema = Record
 
-func newActionInfoSchema(name string, jsonData Record) ActionInfoSchema {
+type ActionInfoSchema = RecordSchema
+
+func newActionInfoSchema(name string, jsonData RecordSchema) ActionInfoSchema {
 	result := newActionInfoBasicSchemaN(name)
-	result.Fields = append(result.Fields, Field{Name: "json_data",
+	result.Fields = append(result.Fields, FieldSchema{Name: "json_data",
 		Type: jsonData,
 	})
 	return result

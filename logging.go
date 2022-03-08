@@ -19,8 +19,10 @@ import (
 	"go.uber.org/zap"
 )
 
+var traceEnabled bool
 var zlog *zap.Logger
 
 func init() {
 	logging.Register("github.com/dfuse-io/dkafka", &zlog)
+	traceEnabled = logging.IsTraceEnabled("dkafka", "github.com/dfuse-io/dkafka")
 }

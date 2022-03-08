@@ -14,18 +14,18 @@ import (
 // A JSON array, representing a union of embedded types.
 type Schema = interface{}
 
-type Meta struct {
+type MetaSchema struct {
 	Compatibility string `json:"name"`
 	Type          string `json:"type"`
 	Version       string `json:"version,omitempty"`
 }
 
-type Message struct {
-	Record
-	Meta Meta `json:"meta"`
+type MessageSchema struct {
+	RecordSchema
+	Meta MetaSchema `json:"meta"`
 }
 
-type Field struct {
+type FieldSchema struct {
 	// Name a JSON string providing the name of the field (required)
 	Name string `json:"name"`
 	// Doc a JSON string describing this field for users (optional).
@@ -38,19 +38,19 @@ type Field struct {
 
 var _defaultNull = json.RawMessage("null")
 
-func NewNullableField(n string, t Schema) Field {
-	return Field{
+func NewNullableField(n string, t Schema) FieldSchema {
+	return FieldSchema{
 		Name:    n,
 		Type:    t,
 		Default: _defaultNull,
 	}
 }
 
-func NewOptionalField(n string, t Schema) Field {
+func NewOptionalField(n string, t Schema) FieldSchema {
 	return NewNullableField(n, NewOptional(t))
 }
 
-type Record struct {
+type RecordSchema struct {
 	// type always equal to "record"
 	Type string `json:"type"`
 	// Name a JSON string providing the name of the record (required)
@@ -60,15 +60,15 @@ type Record struct {
 	// Doc a JSON string providing documentation to the user of this schema (optional).
 	Doc string `json:"doc,omitempty"`
 	// Fields a JSON array, listing fields (required). Each field is a JSON object.
-	Fields []Field `json:"fields,omitempty"`
+	Fields []FieldSchema `json:"fields,omitempty"`
 }
 
-func newRecordS(name string, fields []Field) Record {
+func newRecordS(name string, fields []FieldSchema) RecordSchema {
 	return newRecordFQN("", name, fields)
 }
 
-func newRecordFQN(np string, name string, fields []Field) Record {
-	return Record{
+func newRecordFQN(np string, name string, fields []FieldSchema) RecordSchema {
+	return RecordSchema{
 		Type:      "record",
 		Name:      strcase.ToCamel(name),
 		Namespace: strcase.ToDelimited(np, '.'),
@@ -76,7 +76,7 @@ func newRecordFQN(np string, name string, fields []Field) Record {
 	}
 }
 
-type Array struct {
+type ArraySchema struct {
 	// type always equal to "array"
 	Type string `json:"type"`
 	// items the schema of the array's items.
@@ -84,8 +84,8 @@ type Array struct {
 	// todo manage default
 }
 
-func NewArray(itemType Schema) Array {
-	return Array{
+func NewArray(itemType Schema) ArraySchema {
+	return ArraySchema{
 		Type:  "array",
 		Items: itemType,
 	}

@@ -8,6 +8,13 @@ import (
 	"github.com/google/cel-go/cel"
 )
 
+type EntityType = string
+
+const (
+	Action EntityType = "action"
+	Table  EntityType = "table"
+)
+
 type GenContext struct {
 	block       *pbcodec.Block
 	stepName    string
@@ -21,17 +28,26 @@ type Generator2 interface {
 }
 
 type Generation2 struct {
-	CeType string      `json:"ce_type,omitempty"`
-	CeId   []byte      `json:"ce_id,omitempty"`
-	Key    string      `json:"key,omitempty"`
-	Value  interface{} `json:"value,omitempty"`
+	CeType string `json:"ce_type,omitempty"`
+	CeId   []byte `json:"ce_id,omitempty"`
+	Key    string `json:"key,omitempty"`
+	Value  []byte `json:"value,omitempty"`
+}
+
+type generation struct {
+	EntityType EntityType  `json:"entityType,omitempty"`
+	EntityName string      `json:"entityName,omitempty"`
+	CeType     string      `json:"ce_type,omitempty"`
+	CeId       []byte      `json:"ce_id,omitempty"`
+	Key        string      `json:"key,omitempty"`
+	Value      interface{} `json:"value,omitempty"`
 }
 
 type DecodeDBOp = func(in *pbcodec.DBOp, blockNum uint32) (decodedDBOps *decodedDBOp, err error)
 
 type TableGenerator struct {
-	decodeDBOp DecodeDBOp
 	tableNames StringSet
+	abiCodec   ABICodec
 }
 
 type void struct{}
@@ -39,9 +55,33 @@ type StringSet = map[string]void
 
 var empty = void{}
 
-func (tg TableGenerator) Apply(gc GenContext) ([]Generation2, error) {
+func (tg TableGenerator) Apply(gc GenContext) (generations []Generation2, err error) {
+	gens, err := tg.doApply(gc)
+	if err != nil {
+		return
+	}
+	for _, g := range gens {
+		codec, err := tg.abiCodec.GetCodec(g.EntityName, gc.block.Number)
+		if err != nil {
+			return nil, err
+		}
+		value, err := codec.Marshal(nil, g.Value)
+		if err != nil {
+			return nil, err
+		}
+		generations = append(generations, Generation2{
+			CeType: g.CeType,
+			CeId:   g.CeId,
+			Key:    g.Key,
+			Value:  value,
+		})
+	}
+	return generations, nil
+}
+
+func (tg TableGenerator) doApply(gc GenContext) ([]generation, error) {
 	dbOps := gc.transaction.DBOpsForAction(gc.actionTrace.ExecutionIndex)
-	generations := []Generation2{}
+	generations := []generation{}
 	for _, dbOp := range dbOps {
 		if dbOp.Operation == pbcodec.DBOp_OPERATION_UNKNOWN {
 			continue
@@ -51,23 +91,11 @@ func (tg TableGenerator) Apply(gc GenContext) ([]Generation2, error) {
 		if !found {
 			continue
 		}
-		decodedDBOp, err := tg.decodeDBOp(dbOp, gc.block.Number)
+		decodedDBOp, err := tg.abiCodec.DecodeDBOp(dbOp, gc.block.Number)
 		if err != nil {
 			return nil, err
 		}
-		// activation, err := NewTableActivation(
-		// 	gc.stepName,
-		// 	gc.transaction,
-		// 	gc.actionTrace,
-		// 	decodedDBOp,
-		// )
-		// if err != nil {
-		// 	return nil, err
-		// }
-		// key, err := evalString(extractor, activation)
-		// if err != nil {
-		// 	return nil, err
-		// }
+		// TODO manage key based on table name in tableNames => return a key generator function
 		key := fmt.Sprintf("%s:%s", decodedDBOp.Scope, decodedDBOp.PrimaryKey)
 		_, ceType := tableCeType(dbOp.TableName)
 		ceId := hashString(fmt.Sprintf(
@@ -79,16 +107,18 @@ func (tg TableGenerator) Apply(gc GenContext) ([]Generation2, error) {
 			dbOp.TableName,
 			gc.stepName,
 			key))
-		value := TableNotification{
-			Context: notificationContext(gc),
-			Action:  actionInfoBasic(gc),
-			DBOp:    decodedDBOp,
-		}
-		generations = append(generations, Generation2{
-			CeId:   ceId,
-			CeType: ceType,
-			Key:    key,
-			Value:  value,
+		value := newTableNotification(
+			notificationContextMap(gc),
+			actionInfoBasicMap(gc),
+			decodedDBOp.asMap(),
+		)
+		generations = append(generations, generation{
+			CeId:       ceId,
+			CeType:     ceType,
+			Key:        key,
+			Value:      value,
+			EntityType: Table,
+			EntityName: dbOp.TableName,
 		})
 	}
 	return generations, nil
@@ -96,13 +126,50 @@ func (tg TableGenerator) Apply(gc GenContext) ([]Generation2, error) {
 
 type ActionGenerator2 struct {
 	keyExtractors map[string]cel.Program
+	abiCodec      ABICodec
 }
 
 func (ag ActionGenerator2) Apply(gc GenContext) ([]Generation2, error) {
+	gens, err := ag.doApply(gc)
+	if err != nil {
+		return nil, err
+	}
+	if len(gens) > 0 {
+		g := gens[0]
+		codec, err := ag.abiCodec.GetCodec(g.EntityName, gc.block.Number)
+		if err != nil {
+			return nil, err
+		}
+		value, err := codec.Marshal(nil, g.Value)
+		if err != nil {
+			// this marshalling issue can comes from an out of date
+			// version of the ABI => refresh the ABI
+			err = ag.abiCodec.Refresh(gc.block.Number)
+			if err != nil {
+				return nil, err
+			}
+			value, err = codec.Marshal(nil, g.Value)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return []Generation2{{
+			CeType: g.CeType,
+			CeId:   g.CeId,
+			Key:    g.Key,
+			Value:  value,
+		}}, nil
+	} else {
+		return nil, nil
+	}
+
+}
+
+func (ag ActionGenerator2) doApply(gc GenContext) ([]generation, error) {
 	actionName := gc.actionTrace.Action.Name
 	extractor, found := ag.keyExtractors[actionName]
 	if !found {
-		return []Generation2{}, nil
+		return nil, nil
 	}
 	activation, err := NewActionActivation(
 		gc.stepName,
@@ -127,41 +194,42 @@ func (ag ActionGenerator2) Apply(gc GenContext) ([]Generation2, error) {
 		ceType,
 		gc.stepName,
 		key))
-	var jsonData json.RawMessage
+	jsonData := make(map[string]interface{})
 	if stringData := gc.actionTrace.Action.JsonData; stringData != "" {
-		jsonData = json.RawMessage(stringData)
+		err = json.Unmarshal(json.RawMessage(stringData), &jsonData)
+		if err != nil {
+			return nil, err
+		}
 	}
-	value := ActionNotification{
-		Context: notificationContext(gc),
-		ActionInfo: ActionInfo{
-			ActionInfoBasic: actionInfoBasic(gc),
-			JSONData:        &jsonData,
-		},
-	}
-
-	return []Generation2{{
-		CeId:   ceId,
-		CeType: ceType,
-		Key:    key,
-		Value:  value,
+	value := newActionNotification(
+		notificationContextMap(gc),
+		newActionInfo(actionInfoBasicMap(gc), jsonData),
+	)
+	return []generation{{
+		CeId:       ceId,
+		CeType:     ceType,
+		Key:        key,
+		Value:      value,
+		EntityType: Action,
+		EntityName: actionName,
 	}}, nil
 }
 
-func notificationContext(gc GenContext) NotificationContext {
+func notificationContextMap(gc GenContext) map[string]interface{} {
 	status := sanitizeStatus(gc.transaction.Receipt.Status.String())
 
-	return NotificationContext{
-		BlockNum:      gc.block.Number,
-		BlockID:       gc.block.Id,
-		Status:        status,
-		Executed:      !gc.transaction.HasBeenReverted(),
-		Step:          gc.stepName,
-		Correlation:   gc.correlation,
-		TransactionID: gc.transaction.Id,
-	}
+	return newNotificationContext(
+		gc.block.Id,
+		gc.block.Number,
+		status,
+		!gc.transaction.HasBeenReverted(),
+		gc.stepName,
+		gc.transaction.Id,
+		newOptionalCorrelation(gc.correlation),
+	)
 }
 
-func actionInfoBasic(gc GenContext) ActionInfoBasic {
+func actionInfoBasicMap(gc GenContext) map[string]interface{} {
 	var globalSeq uint64
 	if receipt := gc.actionTrace.Receipt; receipt != nil {
 		globalSeq = receipt.GlobalSequence
@@ -172,11 +240,11 @@ func actionInfoBasic(gc GenContext) ActionInfoBasic {
 		authorizations = append(authorizations, auth.Authorization())
 	}
 
-	return ActionInfoBasic{
-		Account:        gc.actionTrace.Account(),
-		Receiver:       gc.actionTrace.Receiver,
-		Name:           gc.actionTrace.Name(),
-		GlobalSequence: globalSeq,
-		Authorization:  authorizations,
-	}
+	return newActionInfoBasic(
+		gc.actionTrace.Account(),
+		gc.actionTrace.Receiver,
+		gc.actionTrace.Name(),
+		globalSeq,
+		authorizations,
+	)
 }

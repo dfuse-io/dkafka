@@ -16,6 +16,8 @@ import (
 	"go.uber.org/zap"
 )
 
+var codecTypes = NewEnumFlag(dkafka.JsonCodec, dkafka.AvroCodec)
+
 type GenOptions struct {
 	namespace string
 	version   string
@@ -93,6 +95,12 @@ start streaming from this block number (if negative, relative to HEAD)`)
 	CdCCmd.PersistentFlags().Bool("executed", false, "Specify publish messages based only on executed actions => modify the state of the blockchain. This remove the error messages")
 	CdCCmd.PersistentFlags().Bool("irreversible", false, "Specify publish messages based only on irreversible actions")
 
+	CdCCmd.PersistentFlags().Var(codecTypes, "codec", codecTypes.Help("Specify the codec to use to encode the messages."))
+	CdCCmd.PersistentFlags().String("schema-registry-url", "http://localhost:8081", "Schema registry url whose schemas are pushed to")
+
+	CdCCmd.PersistentFlags().StringP("namespace", "n", "", "namespace of the schema(s). Default: account name")
+	CdCCmd.PersistentFlags().StringP("version", "V", "", "Optional but strongly recommended version of the schema(s) in a semver form: 1.2.3.")
+
 	CdCCmd.AddCommand(CdCActionsCmd)
 	CdCActionsCmd.Flags().String("actions-expr", "", "A JSON Object that associate the a name of an action to CEL expression for the message key extration.")
 
@@ -105,8 +113,6 @@ will never be fetched or updated`)
 	CdCTablesCmd.Flags().StringSlice("table-name", []string{}, "the table name on which the message must be sent.")
 
 	CdCCmd.AddCommand(CdCSchemasCmd)
-	CdCSchemasCmd.Flags().StringP("namespace", "n", "", "namespace of the schema(s). Default: account name")
-	CdCSchemasCmd.Flags().StringP("version", "V", "", "Optional but strongly recommended version of the schema(s) in a semver form: 1.2.3.")
 	CdCSchemasCmd.Flags().StringP("output-dir", "o", "./", `Optional output directory for the avro schema. The file name pattern is
 	the <account>-<schema-type>.avsc in snake-case.`)
 
@@ -205,6 +211,11 @@ func executeCdC(cmd *cobra.Command, args []string,
 		Account:      account,
 		Irreversible: viper.GetBool("cdc-cmd-irreversible"),
 		Executed:     viper.GetBool("cdc-cmd-executed"),
+
+		Codec:             viper.GetString("cdc-cmd-codec"),
+		SchemaRegistryURL: viper.GetString("cdc-cmd-schema-registry-url"),
+		SchemaNamespace:   viper.GetString("cdc-cmd-namespace"),
+		SchemaVersion:     viper.GetString("cdc-cmd-version"),
 	}
 	conf = f(conf)
 	cmd.SilenceUsage = true
@@ -226,9 +237,9 @@ func executeCdC(cmd *cobra.Command, args []string,
 }
 
 func genOptions(cmd *cobra.Command, args []string) (opts GenOptions, err error) {
-	namespace := viper.GetString("cdc-schemas-cmd-namespace")
+	namespace := viper.GetString("cdc-cmd-namespace")
 	outputDir := viper.GetString("cdc-schemas-cmd-output-dir")
-	version := viper.GetString("cdc-schemas-cmd-version")
+	version := viper.GetString("cdc-cmd-version")
 	abiString := args[0]
 
 	account, abiFile, err := dkafka.ParseABIFileSpec(abiString)
@@ -276,7 +287,7 @@ func doGenTableAvroSchema(name string, opts GenOptions) error {
 	return doGenAvroSchema(name, opts, dkafka.GenerateTableSchema)
 }
 
-func doGenAvroSchema(name string, opts GenOptions, f func(dkafka.NamedSchemaGenOptions) (dkafka.Message, error)) error {
+func doGenAvroSchema(name string, opts GenOptions, f func(dkafka.NamedSchemaGenOptions) (dkafka.MessageSchema, error)) error {
 	schema, err := f(dkafka.NamedSchemaGenOptions{
 		Name:      name,
 		Namespace: opts.namespace,
@@ -294,7 +305,7 @@ func doGenAvroSchema(name string, opts GenOptions, f func(dkafka.NamedSchemaGenO
 	return nil
 }
 
-func saveSchema(schema dkafka.Message, prefix string, outputDir string) error {
+func saveSchema(schema dkafka.MessageSchema, prefix string, outputDir string) error {
 	fileName := strcase.ToSnake(fmt.Sprintf("%s%s.avsc", prefix, schema.Name))
 	fileName = fmt.Sprintf("%s.avsc", fileName)
 	filePath := filepath.Join(outputDir, fileName)

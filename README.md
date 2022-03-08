@@ -246,3 +246,6 @@ Examples:
       `key := fmt.Sprintf("%s:%s", decodedDBOp.Scope, decodedDBOp.PrimaryKey)`
 - [ ] see with blockchain team for the default type mapping
 - [ ] validate with blockchain team cdc table message key
+- [ ] patch (pool request) on goavro to support uint32 and unit64... overflow => negative value
+- [ ] implement KafkaAvroABICodec by method composition
+- [ ] pool request on eos-go for native decode functions

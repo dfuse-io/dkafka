@@ -109,6 +109,20 @@ cdc-tables: build up ## CDC stream on tables
 		-vvv \
 		--table-name=$(TABLE_NAMES) $(ACCOUNT)
 
+cdc-tables-avro: build up ## CDC stream on tables
+	$(BINARY_PATH) cdc tables \
+		--dfuse-firehose-grpc-addr=localhost:9000 \
+		--abicodec-grpc-addr=localhost:9001 \
+		--kafka-cursor-topic="cursor" \
+		--kafka-topic="io.dkafka.test" \
+		--kafka-compression-type=$(COMPRESSION_TYPE) \
+		--kafka-compression-level=$(COMPRESSION_LEVEL) \
+		--start-block-num=$(START_BLOCK) \
+		--kafka-message-max-bytes=$(MESSAGE_MAX_SIZE) \
+		--codec="avro" \
+		-vvv \
+		--table-name=$(TABLE_NAMES) $(ACCOUNT)
+
 cdc-actions: build up ## CDC stream on tables
 	$(BINARY_PATH) cdc actions \
 		--kafka-cursor-topic="cursor" \

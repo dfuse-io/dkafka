@@ -124,10 +124,10 @@ func Test_resolveFieldTypeSchema(t *testing.T) {
 					},
 				}},
 			}},
-			want: Record{
+			want: RecordSchema{
 				Type: "record",
 				Name: "MyStruct",
-				Fields: []Field{
+				Fields: []FieldSchema{
 					{
 						Name: "fieldA",
 						Type: "long",
@@ -177,10 +177,10 @@ func Test_resolveFieldTypeSchema(t *testing.T) {
 						},
 					}},
 			}},
-			want: Record{
+			want: RecordSchema{
 				Type: "record",
 				Name: "MyStruct",
-				Fields: []Field{
+				Fields: []FieldSchema{
 					{
 						Name: "parentfieldA",
 						Type: "string",
@@ -249,7 +249,7 @@ func TestActionToRecord(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    Record
+		want    RecordSchema
 		wantErr bool
 	}{
 		{
@@ -258,10 +258,10 @@ func TestActionToRecord(t *testing.T) {
 				&actionABI,
 				"my_action",
 			},
-			Record{
+			RecordSchema{
 				Type: "record",
 				Name: "MyAction",
-				Fields: []Field{
+				Fields: []FieldSchema{
 					{
 						Name: "fieldA",
 						Type: "long",
@@ -280,7 +280,7 @@ func TestActionToRecord(t *testing.T) {
 				&actionABI,
 				"unknown_action",
 			},
-			Record{},
+			RecordSchema{},
 			true,
 		},
 	}
@@ -332,7 +332,7 @@ func TestTableToRecord(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    Record
+		want    RecordSchema
 		wantErr bool
 	}{
 		{
@@ -341,10 +341,10 @@ func TestTableToRecord(t *testing.T) {
 				&tableABI,
 				"my.table",
 			},
-			Record{
+			RecordSchema{
 				Type: "record",
 				Name: "MyTableStruct",
-				Fields: []Field{
+				Fields: []FieldSchema{
 					{
 						Name: "fieldA",
 						Type: "long",
@@ -363,7 +363,7 @@ func TestTableToRecord(t *testing.T) {
 				&actionABI,
 				"unknown.table",
 			},
-			Record{},
+			RecordSchema{},
 			true,
 		},
 	}

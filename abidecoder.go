@@ -10,8 +10,97 @@ import (
 	pbabicodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/abicodec/v1"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 	"github.com/eoscanada/eos-go"
+	"github.com/riferrei/srclient"
+	"go.uber.org/zap"
 )
 
+type ABICodec interface {
+	IsNOOP() bool
+	DecodeDBOp(in *pbcodec.DBOp, blockNum uint32) (*decodedDBOp, error)
+	GetCodec(name string, blockNum uint32) (Codec, error)
+	Refresh(blockNum uint32) error
+}
+
+type JsonABICodec struct {
+	*ABIDecoder
+	codec   Codec
+	account string
+}
+
+func (c *JsonABICodec) GetCodec(name string, blockNum uint32) (Codec, error) {
+	return c.codec, nil
+}
+
+func (c *JsonABICodec) Refresh(blockNum uint32) error {
+	return nil
+}
+
+func NewJsonABICodec(
+	decoder *ABIDecoder,
+	account string,
+) ABICodec {
+	return &JsonABICodec{
+		decoder,
+		NewJSONCodec(),
+		account,
+	}
+}
+
+// MessageSchemaSupplier is a function that return the specific message schema
+// of a given entity (i.e. table or action)
+type MessageSchemaSupplier = func(string, *eos.ABI) (MessageSchema, error)
+
+type KafkaAvroABICodec struct {
+	*ABIDecoder
+	getSchema            MessageSchemaSupplier
+	schemaRegistryClient *srclient.SchemaRegistryClient
+	account              string
+}
+
+func (c *KafkaAvroABICodec) GetCodec(name string, blockNum uint32) (Codec, error) {
+	abi, err := c.abi(c.account, blockNum, false)
+	if err != nil {
+		return nil, err
+	}
+	messageSchema, err := c.getSchema(name, abi)
+	if err != nil {
+		return nil, err
+	}
+	subject := fmt.Sprintf("%s.%s", messageSchema.Namespace, messageSchema.Name)
+	jsonSchema, err := json.Marshal(messageSchema)
+	if err != nil {
+		return nil, err
+	}
+	if traceEnabled {
+		zlog.Debug("register schema", zap.String("subject", subject), zap.ByteString("schema", jsonSchema))
+	}
+	schema, err := c.schemaRegistryClient.CreateSchema(subject, string(jsonSchema), srclient.Avro)
+	if err != nil {
+		return nil, fmt.Errorf("CreateSchema on subject: '%s', schema:\n%s error: %w", subject, string(jsonSchema), err)
+	}
+	return NewKafkaAvroCodec(schema), nil
+}
+
+func (c *KafkaAvroABICodec) Refresh(blockNum uint32) error {
+	_, err := c.abi(c.account, blockNum, true)
+	return err
+}
+
+func NewKafkaAvroABICodec(
+	decoder *ABIDecoder,
+	getSchema MessageSchemaSupplier,
+	schemaRegistryClient *srclient.SchemaRegistryClient,
+	account string,
+) ABICodec {
+	return &KafkaAvroABICodec{
+		decoder,
+		getSchema,
+		schemaRegistryClient,
+		account,
+	}
+}
+
+// ABIDecoder legacy abi codec does not support schema registry
 type ABIDecoder struct {
 	overrides   map[string]*eos.ABI
 	abiCodecCli pbabicodec.DecoderClient
@@ -80,8 +169,38 @@ func NewABIDecoder(
 
 type decodedDBOp struct {
 	*pbcodec.DBOp
-	NewJSON *json.RawMessage `json:"new_json,omitempty"`
-	OldJSON *json.RawMessage `json:"old_json,omitempty"`
+	NewJSON map[string]interface{} `json:"new_json,omitempty"`
+	OldJSON map[string]interface{} `json:"old_json,omitempty"`
+}
+
+func (dbOp *decodedDBOp) asMap() map[string]interface{} {
+	asMap := map[string]interface{}{
+		"operation":    dbOp.Operation,
+		"action_index": dbOp.ActionIndex,
+	}
+	addOptionalString(&asMap, "code", dbOp.Code)
+	addOptionalString(&asMap, "scope", dbOp.Scope)
+	addOptionalString(&asMap, "table_name", dbOp.TableName)
+	addOptionalString(&asMap, "primary_key", dbOp.PrimaryKey)
+	addOptionalString(&asMap, "old_payer", dbOp.OldPayer)
+	addOptionalString(&asMap, "new_payer", dbOp.NewPayer)
+	addOptional(&asMap, "old_data", dbOp.OldData)
+	addOptional(&asMap, "new_data", dbOp.NewData)
+	addOptional(&asMap, "old_json", dbOp.OldJSON)
+	addOptional(&asMap, "new_json", dbOp.NewJSON)
+	return asMap
+}
+
+func addOptionalString(m *map[string]interface{}, key string, value interface{}) {
+	if value != "" {
+		(*m)[key] = value
+	}
+}
+
+func addOptional(m *map[string]interface{}, key string, value interface{}) {
+	if value != nil {
+		(*m)[key] = value
+	}
 }
 
 func (a *ABIDecoder) abi(contract string, blockNum uint32, forceRefresh bool) (*eos.ABI, error) {
@@ -136,20 +255,18 @@ func (a *ABIDecoder) decodeDBOp(op *decodedDBOp, blockNum uint32, forceRefresh b
 	}
 
 	if len(op.NewData) > 0 {
-		bytes, err := abi.DecodeTableRowTyped(tableDef.Type, op.NewData)
+		asMap, err := abi.DecodeTableRowTyped2Map(tableDef.Type, op.NewData)
 		if err != nil {
 			return fmt.Errorf("decode row: %w", err)
 		}
-		asJSON := json.RawMessage(bytes)
-		op.NewJSON = &asJSON
+		op.NewJSON = asMap
 	}
 	if len(op.OldData) > 0 {
-		bytes, err := abi.DecodeTableRowTyped(tableDef.Type, op.OldData)
+		asMap, err := abi.DecodeTableRowTyped2Map(tableDef.Type, op.OldData)
 		if err != nil {
 			return fmt.Errorf("decode row: %w", err)
 		}
-		asJSON := json.RawMessage(bytes)
-		op.OldJSON = &asJSON
+		op.OldJSON = asMap
 	}
 	return nil
 }

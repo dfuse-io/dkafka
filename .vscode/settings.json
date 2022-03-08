@@ -27,6 +27,8 @@
         "protobuf",
         "ptypes",
         "ricardian",
+        "riferrei",
+        "srclient",
         "SSLCA",
         "Structs",
         "Undecodable",

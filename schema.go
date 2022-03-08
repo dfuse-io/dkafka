@@ -51,7 +51,7 @@ func getNamespace(namespace string, abi AbiSpec) string {
 	return namespace
 }
 
-func GenerateActionSchema(options NamedSchemaGenOptions) (Message, error) {
+func GenerateActionSchema(options NamedSchemaGenOptions) (MessageSchema, error) {
 	actionCamelCase, ceType := actionCeType(options.Name)
 
 	namespace := getNamespace(options.Namespace, options.AbiSpec)
@@ -68,7 +68,7 @@ func GenerateActionSchema(options NamedSchemaGenOptions) (Message, error) {
 
 	actionParamsSchema, err := ActionToRecord(options.AbiSpec.Abi, eos.ActionName(options.Name))
 	if err != nil {
-		return Message{}, err
+		return MessageSchema{}, err
 	}
 	actionParamsSchema.Name = actionParamsRecordName
 	schema := newActionNotificationSchema(ceType, namespace, options.Version, newActionInfoSchema(actionInfoRecordName, actionParamsSchema))
@@ -88,7 +88,7 @@ func tableCeType(name string) (tableCamelCase string, ceType string) {
 	return
 }
 
-func GenerateTableSchema(options NamedSchemaGenOptions) (Message, error) {
+func GenerateTableSchema(options NamedSchemaGenOptions) (MessageSchema, error) {
 	tableCamelCase, ceType := tableCeType(options.Name)
 	namespace := getNamespace(options.Namespace, options.AbiSpec)
 	dbOpInfoRecordName := fmt.Sprintf("%sTableOpInfo", tableCamelCase)
@@ -104,7 +104,7 @@ func GenerateTableSchema(options NamedSchemaGenOptions) (Message, error) {
 
 	dbOpSchema, err := TableToRecord(options.AbiSpec.Abi, eos.TableName(options.Name))
 	if err != nil {
-		return Message{}, err
+		return MessageSchema{}, err
 	}
 	dbOpSchema.Name = dbOpRecordName
 	dbOpInfoSchema := newDBOpInfoRecord(dbOpInfoRecordName, dbOpSchema)
@@ -113,7 +113,7 @@ func GenerateTableSchema(options NamedSchemaGenOptions) (Message, error) {
 	return schema, nil
 }
 
-func GenerateSchema(options AvroSchemaGenOptions) (Message, error) {
+func GenerateSchema(options AvroSchemaGenOptions) (MessageSchema, error) {
 	actionCamelCase := strcase.ToCamel(options.Action)
 	tableCamelCase := strcase.ToCamel(options.Table)
 	accountCamelCase := strcase.ToCamel(options.AbiSpec.Account)
@@ -142,12 +142,12 @@ func GenerateSchema(options AvroSchemaGenOptions) (Message, error) {
 
 	actionParamsSchema, err := ActionToRecord(options.AbiSpec.Abi, eos.ActionName(options.Action))
 	if err != nil {
-		return Message{}, err
+		return MessageSchema{}, err
 	}
 	actionParamsSchema.Name = actionParamsRecordName
 	dbOpSchema, err := TableToRecord(options.AbiSpec.Abi, eos.TableName(options.Table))
 	if err != nil {
-		return Message{}, err
+		return MessageSchema{}, err
 	}
 	dbOpSchema.Name = dbOpRecordName
 	dbOpInfoSchema := newDBOpInfoRecord(dbOpInfoRecordName, dbOpSchema)
@@ -156,42 +156,42 @@ func GenerateSchema(options AvroSchemaGenOptions) (Message, error) {
 	return schema, nil
 }
 
-func ActionToRecord(abi *eos.ABI, name eos.ActionName) (Record, error) {
+func ActionToRecord(abi *eos.ABI, name eos.ActionName) (RecordSchema, error) {
 	actionDef := abi.ActionForName(name)
 	if actionDef == nil {
-		return Record{}, fmt.Errorf("action '%s' not found", name)
+		return RecordSchema{}, fmt.Errorf("action '%s' not found", name)
 	}
 
 	return structToRecord(abi, actionDef.Type)
 }
 
-func TableToRecord(abi *eos.ABI, name eos.TableName) (Record, error) {
+func TableToRecord(abi *eos.ABI, name eos.TableName) (RecordSchema, error) {
 	tableDef := abi.TableForName(name)
 	if tableDef == nil {
-		return Record{}, fmt.Errorf("table '%s' not found", name)
+		return RecordSchema{}, fmt.Errorf("table '%s' not found", name)
 	}
 
 	return structToRecord(abi, tableDef.Type)
 }
 
-func structToRecord(abi *eos.ABI, structName string) (Record, error) {
+func structToRecord(abi *eos.ABI, structName string) (RecordSchema, error) {
 	s := abi.StructForName(structName)
 	if s == nil {
-		return Record{}, fmt.Errorf("struct not found: %s", structName)
+		return RecordSchema{}, fmt.Errorf("struct not found: %s", structName)
 	}
 	//inheritance
-	parentRecord := Record{}
+	parentRecord := RecordSchema{}
 	if s.Base != "" {
 		var err error
 		parentRecord, err = structToRecord(abi, s.Base)
 		if err != nil {
-			return Record{}, fmt.Errorf("cannot get parent structToRecord() for %s.%s error: %v", structName, s.Base, err)
+			return RecordSchema{}, fmt.Errorf("cannot get parent structToRecord() for %s.%s error: %v", structName, s.Base, err)
 		}
 	}
 	fields, err := abiFieldsToRecordFields(abi, s.Fields)
 	fields = append(parentRecord.Fields, fields...)
 	if err != nil {
-		return Record{}, fmt.Errorf("%s abiFieldsToRecordFields() error: %v", structName, err)
+		return RecordSchema{}, fmt.Errorf("%s abiFieldsToRecordFields() error: %v", structName, err)
 	}
 	return newRecordS(
 		s.Name,
@@ -199,8 +199,8 @@ func structToRecord(abi *eos.ABI, structName string) (Record, error) {
 	), nil
 }
 
-func abiFieldsToRecordFields(abi *eos.ABI, fieldDefs []eos.FieldDef) ([]Field, error) {
-	fields := make([]Field, len(fieldDefs))
+func abiFieldsToRecordFields(abi *eos.ABI, fieldDefs []eos.FieldDef) ([]FieldSchema, error) {
+	fields := make([]FieldSchema, len(fieldDefs))
 	for i, fieldDef := range fieldDefs {
 		field, err := abiFieldToRecordField(abi, fieldDef)
 		if err != nil {
@@ -211,16 +211,16 @@ func abiFieldsToRecordFields(abi *eos.ABI, fieldDefs []eos.FieldDef) ([]Field, e
 	return fields, nil
 }
 
-func abiFieldToRecordField(abi *eos.ABI, fieldDef eos.FieldDef) (Field, error) {
+func abiFieldToRecordField(abi *eos.ABI, fieldDef eos.FieldDef) (FieldSchema, error) {
 	zlog.Debug("convert field", zap.String("name", fieldDef.Name), zap.String("type", fieldDef.Type))
 	schema, err := resolveFieldTypeSchema(abi, fieldDef.Type)
 	if err != nil {
-		return Field{}, fmt.Errorf("reslove Field type schema error: %v, on field: %s", err, fieldDef.Name)
+		return FieldSchema{}, fmt.Errorf("reslove Field type schema error: %v, on field: %s", err, fieldDef.Name)
 	}
 	if union, ok := schema.(Union); ok && union[0] == "null" {
 		return NewNullableField(fieldDef.Name, schema), nil
 	} else {
-		return Field{
+		return FieldSchema{
 			Name: fieldDef.Name,
 			Type: schema,
 		}, nil

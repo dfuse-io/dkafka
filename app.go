@@ -15,6 +15,7 @@ import (
 	"github.com/eoscanada/eos-go"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/google/cel-go/cel"
+	"github.com/riferrei/srclient"
 	"github.com/streamingfast/bstream/forkable"
 	"github.com/streamingfast/dgrpc"
 	pbbstream "github.com/streamingfast/pbgo/dfuse/bstream/v1"
@@ -76,6 +77,11 @@ type Config struct {
 	TableNames        []string
 	Executed          bool
 	Irreversible      bool
+
+	Codec             string
+	SchemaRegistryURL string
+	SchemaNamespace   string
+	SchemaVersion     string
 }
 
 type App struct {
@@ -170,6 +176,18 @@ func (a *App) Run() (err error) {
 	var filter string
 	switch cdcTyp := a.config.CdCType; cdcTyp {
 	case TABLES_CDC_TYPE:
+		msg := MessageSchemaGenerator{
+			Namespace: a.config.SchemaNamespace,
+			Version:   a.config.SchemaVersion,
+			Account:   a.config.Account,
+		}
+		abiCodec, err := newABICodec(
+			a.config.Codec, a.config.Account, a.config.SchemaRegistryURL, abiDecoder,
+			msg.getTableSchema,
+		)
+		if err != nil {
+			return err
+		}
 		filter = createCdCFilter(a.config.Account, a.config.Executed)
 		tableNames := make(StringSet)
 		for _, name := range a.config.TableNames {
@@ -180,9 +198,9 @@ func (a *App) Run() (err error) {
 		// 	return err
 		// }
 		generator := TableGenerator{
-			decodeDBOp: abiDecoder.DecodeDBOp,
 			// tableNames: tableKeyExpressions,
 			tableNames: tableNames,
+			abiCodec:   abiCodec,
 		}
 		adapter = &CdCAdapter{
 			topic:     a.config.KafkaTopic,
@@ -196,8 +214,21 @@ func (a *App) Run() (err error) {
 		if err != nil {
 			return err
 		}
+		msg := MessageSchemaGenerator{
+			Namespace: a.config.SchemaNamespace,
+			Version:   a.config.SchemaVersion,
+			Account:   a.config.Account,
+		}
+		abiCodec, err := newABICodec(
+			a.config.Codec, a.config.Account, a.config.SchemaRegistryURL, abiDecoder,
+			msg.getActionSchema,
+		)
+		if err != nil {
+			return err
+		}
 		generator := ActionGenerator2{
 			keyExtractors: actionKeyExpressions,
+			abiCodec:      abiCodec,
 		}
 		adapter = &CdCAdapter{
 			topic:     a.config.KafkaTopic,
@@ -442,4 +473,46 @@ func getCompressionLevel(compressionType string, config *Config) int {
 		return -1
 	}
 	return level.normalize(compressionLevel)
+}
+
+func newABICodec(codec string, account string, schemaRegistryURL string, abiDecoder *ABIDecoder, getSchema MessageSchemaSupplier) (ABICodec, error) {
+	switch codec {
+	case JsonCodec:
+		return NewJsonABICodec(abiDecoder, account), nil
+	case AvroCodec:
+		schemaRegistryClient := srclient.CreateSchemaRegistryClient(schemaRegistryURL)
+		return NewKafkaAvroABICodec(abiDecoder, getSchema, schemaRegistryClient, account), nil
+	default:
+		return nil, fmt.Errorf("unsupported codec type: %s", codec)
+	}
+}
+
+type MessageSchemaGenerator struct {
+	Namespace string
+	Version   string
+	Account   string
+}
+
+func (msg MessageSchemaGenerator) getTableSchema(tableName string, abi *eos.ABI) (MessageSchema, error) {
+	return GenerateTableSchema(NamedSchemaGenOptions{
+		Name:      tableName,
+		Namespace: msg.Namespace,
+		Version:   msg.Version,
+		AbiSpec: AbiSpec{
+			Account: msg.Account,
+			Abi:     abi,
+		},
+	})
+}
+
+func (msg MessageSchemaGenerator) getActionSchema(actionName string, abi *eos.ABI) (MessageSchema, error) {
+	return GenerateActionSchema(NamedSchemaGenOptions{
+		Name:      actionName,
+		Namespace: msg.Namespace,
+		Version:   msg.Version,
+		AbiSpec: AbiSpec{
+			Account: msg.Account,
+			Abi:     abi,
+		},
+	})
 }
