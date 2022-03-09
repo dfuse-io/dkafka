@@ -234,8 +234,10 @@ Examples:
 
 
 ## TODO
+- [ ] benchmark avro codec
 - [ ] implement a cache on a top of KafkaAvroABICodec
-- [ ] add ABI.nativeTime bool to skip time to string conversion in abidecoder `read` method as it is done for `ABI.fitNodeos` property
+- [ ] implement correlation id
+- [ ] add ABI.nativeTime bool to skip time to string conversion in abidecoder `read` method as it is done for `ABI.fitNodeos` property with logical type
 - [ ] fix the issue with some types mapping in `schema.go`
 - [x] user ce_type instead of source for the `ce_id`
 - [x] schema registry integration
