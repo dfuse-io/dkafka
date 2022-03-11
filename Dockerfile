@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY go.mod ./
 COPY go.sum ./
+COPY fork ./fork
 RUN go mod download
 
 COPY *.go ./
