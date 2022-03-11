@@ -10,6 +10,7 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
+	"github.com/riferrei/srclient"
 )
 
 var default_headers = []kafka.Header{{
@@ -156,6 +157,8 @@ const (
 	ACTION_ADAPTER
 	CDC_TABLE_ADAPTER
 	CDC_ACTION_ADAPTER
+	CDC_TABLE_ADAPTER_AVRO
+	CDC_ACTION_ADAPTER_AVRO
 )
 
 func Benchmark_adapter_adapt(b *testing.B) {
@@ -187,7 +190,17 @@ func Benchmark_adapter_adapt(b *testing.B) {
 		{
 			"cdc-actions",
 			"testdata/block-30080032.json",
+			CDC_ACTION_ADAPTER,
+		},
+		{
+			"cdc-tables-avro",
+			"testdata/block-30080032.json",
 			CDC_TABLE_ADAPTER,
+		},
+		{
+			"cdc-actions-avro",
+			"testdata/block-30080032.json",
+			CDC_ACTION_ADAPTER,
 		},
 	}
 
@@ -270,6 +283,44 @@ func Benchmark_adapter_adapt(b *testing.B) {
 				saveBlock: saveBlockNoop,
 				generator: ActionGenerator2{
 					keyExtractors: actionKeyExpressions,
+					abiCodec:      NewJsonABICodec(abiDecoder, "eosio.nft.ft"),
+				},
+				headers: default_headers,
+			}
+		case CDC_TABLE_ADAPTER_AVRO:
+			msg := MessageSchemaGenerator{
+				Namespace: "test.dkafka",
+				Version:   "1.2.3",
+				Account:   "eosio.nft.ft",
+			}
+			abiCodec := NewKafkaAvroABICodec(abiDecoder, msg.getTableSchema, srclient.CreateMockSchemaRegistryClient("mock://bench-adapter"), msg.Account)
+			adp = &CdCAdapter{
+				topic:     "test.topic",
+				saveBlock: saveBlockNoop,
+				generator: TableGenerator{
+					tableNames: map[string]void{"factory.a": empty},
+					abiCodec:   abiCodec,
+				},
+				headers: default_headers,
+			}
+		case CDC_ACTION_ADAPTER_AVRO:
+			actionKeyExpressions, err := createCdcKeyExpressions(`{"create":"transaction_id"}`, ActionDeclarations)
+			if err != nil {
+				b.Fatalf("createCdcKeyExpressions() error: %v", err)
+				return
+			}
+			msg := MessageSchemaGenerator{
+				Namespace: "test.dkafka",
+				Version:   "1.2.3",
+				Account:   "eosio.nft.ft",
+			}
+			abiCodec := NewKafkaAvroABICodec(abiDecoder, msg.getActionSchema, srclient.CreateMockSchemaRegistryClient("mock://bench-adapter"), msg.Account)
+			adp = &CdCAdapter{
+				topic:     "test.topic",
+				saveBlock: saveBlockNoop,
+				generator: ActionGenerator2{
+					keyExtractors: actionKeyExpressions,
+					abiCodec:      abiCodec,
 				},
 				headers: default_headers,
 			}

@@ -27,7 +27,11 @@ ACTIONS_EXPRESSION ?= '{"create":"transaction_id", "issue":"data.issue.to"}'
 COMPRESSION_TYPE ?= "snappy"
 COMPRESSION_LEVEL ?= -1
 MESSAGE_MAX_SIZE ?= 10000000
-START_BLOCK ?= 37562000
+# create
+# START_BLOCK ?= 37562000
+# issue
+START_BLOCK ?= 32316500
+
 # START_BLOCK ?= 30080000
 STOP_BLOCK ?= 3994800
 # Source:

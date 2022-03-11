@@ -118,7 +118,8 @@ func (a *App) Run() (err error) {
 	var saveBlock SaveBlock
 	saveBlock = saveBlockNoop
 	if a.config.Capture {
-		saveBlock = saveBlockJSON
+		saveBlock = saveBlockProto
+		// saveBlock = saveBlockJSON
 	}
 
 	var abiFiles map[string]*eos.ABI

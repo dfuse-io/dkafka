@@ -39,6 +39,7 @@ func NewJsonABICodec(
 	decoder *ABIDecoder,
 	account string,
 ) ABICodec {
+	decoder.onReload = func() {}
 	return &JsonABICodec{
 		decoder,
 		NewJSONCodec(),
@@ -52,9 +53,23 @@ type MessageSchemaSupplier = func(string, *eos.ABI) (MessageSchema, error)
 
 type KafkaAvroABICodec struct {
 	*ABIDecoder
-	getSchema            MessageSchemaSupplier
-	schemaRegistryClient *srclient.SchemaRegistryClient
+	getSchemaDelegate    MessageSchemaSupplier
+	schemaRegistryClient srclient.ISchemaRegistryClient
 	account              string
+	schemaCache          map[string]MessageSchema
+}
+
+func (c *KafkaAvroABICodec) getSchema(name string, abi *eos.ABI) (MessageSchema, error) {
+	if schema, found := c.schemaCache[name]; found {
+		return schema, nil
+	}
+	zlog.Info("schema cache miss get from schema registry", zap.String("name", name))
+	schema, err := c.getSchemaDelegate(name, abi)
+	if err != nil {
+		return schema, err
+	}
+	c.schemaCache[name] = schema
+	return schema, err
 }
 
 func (c *KafkaAvroABICodec) GetCodec(name string, blockNum uint32) (Codec, error) {
@@ -86,18 +101,26 @@ func (c *KafkaAvroABICodec) Refresh(blockNum uint32) error {
 	return err
 }
 
+func (c *KafkaAvroABICodec) onReload() {
+	zlog.Info("clear schema cache on reload")
+	c.schemaCache = make(map[string]MessageSchema)
+}
+
 func NewKafkaAvroABICodec(
 	decoder *ABIDecoder,
 	getSchema MessageSchemaSupplier,
-	schemaRegistryClient *srclient.SchemaRegistryClient,
+	schemaRegistryClient srclient.ISchemaRegistryClient,
 	account string,
 ) ABICodec {
-	return &KafkaAvroABICodec{
+	codec := &KafkaAvroABICodec{
 		decoder,
 		getSchema,
 		schemaRegistryClient,
 		account,
+		make(map[string]MessageSchema, 1),
 	}
+	decoder.onReload = codec.onReload
+	return codec
 }
 
 // ABIDecoder legacy abi codec does not support schema registry
@@ -105,6 +128,7 @@ type ABIDecoder struct {
 	overrides   map[string]*eos.ABI
 	abiCodecCli pbabicodec.DecoderClient
 	abisCache   map[string]*abiItem
+	onReload    func()
 }
 
 func (a *ABIDecoder) IsNOOP() bool {
@@ -235,7 +259,7 @@ func (a *ABIDecoder) abi(contract string, blockNum uint32, forceRefresh bool) (*
 			}
 		}
 	}
-
+	a.onReload()
 	resp, err := a.abiCodecCli.GetAbi(context.Background(), &pbabicodec.GetAbiRequest{
 		Account:    contract,
 		AtBlockNum: blockNum,

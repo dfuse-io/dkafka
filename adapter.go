@@ -10,6 +10,7 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
+	"github.com/golang/protobuf/proto"
 	"github.com/google/cel-go/cel"
 	"go.uber.org/zap"
 )
@@ -21,13 +22,27 @@ func saveBlockNoop(*pbcodec.Block) {
 	// does nothing
 }
 
-func saveBlockJSON(block *pbcodec.Block) {
-	byteArray, err := json.Marshal(block)
+// func marchalJSON(m proto.Message) ([]byte, error) {
+// 	return json.Marshal(m)
+// }
+
+// func saveBlockJSON(block *pbcodec.Block) {
+// 	saveBlock(block, marchalJSON, "json")
+// }
+
+func saveBlockProto(block *pbcodec.Block) {
+	saveBlock(block, proto.Marshal, "pb.bin")
+}
+
+type MarshalFunc func(proto.Message) ([]byte, error)
+
+func saveBlock(block *pbcodec.Block, marshal MarshalFunc, extension string) {
+	byteArray, err := marshal(block)
 	if err != nil {
 		zlog.Error("Fail to marshal to JSON incoming block", zap.Uint32("id", block.Number), zap.Error(err))
 	}
 	// the WriteFile method returns an error if unsuccessful
-	fileName := fmt.Sprintf("block-%d.json", block.Number)
+	fileName := fmt.Sprintf("block-%d.%s", block.Number, extension)
 	err = ioutil.WriteFile(fileName, byteArray, 0644)
 	// handle this error
 	if err != nil {

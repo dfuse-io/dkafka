@@ -1,7 +1,6 @@
 package dkafka
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -361,17 +360,17 @@ type TString string
 
 var Uint8Type reflect.Type = reflect.TypeOf(uint8(0))
 
-func TestDummy(t *testing.T) {
-	var value = TString("test")
-	valueOf := reflect.ValueOf(value)
-	switch kind := valueOf.Kind(); {
-	case kind == reflect.Slice:
-		fmt.Println(valueOf.Type().Elem())
-		fmt.Println(Uint8Type == valueOf.Type().Elem())
-	case kind == reflect.String:
-		fmt.Println(valueOf.String())
-	}
-	// fmt.Println(valueOf.Kind())
-	// fmt.Println(valueOf.Type())
-	// fmt.Println(valueOf.Type().Elem())
-}
+// func TestDummy(t *testing.T) {
+// 	var value = TString("test")
+// 	valueOf := reflect.ValueOf(value)
+// 	switch kind := valueOf.Kind(); {
+// 	case kind == reflect.Slice:
+// 		fmt.Println(valueOf.Type().Elem())
+// 		fmt.Println(Uint8Type == valueOf.Type().Elem())
+// 	case kind == reflect.String:
+// 		fmt.Println(valueOf.String())
+// 	}
+// 	// fmt.Println(valueOf.Kind())
+// 	// fmt.Println(valueOf.Type())
+// 	// fmt.Println(valueOf.Type().Elem())
+// }

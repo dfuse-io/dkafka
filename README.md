@@ -234,8 +234,8 @@ Examples:
 
 
 ## TODO
-- [ ] benchmark avro codec
-- [ ] implement a cache on a top of KafkaAvroABICodec
+- [x] benchmark avro codec
+- [x] implement a cache on a top of KafkaAvroABICodec
 - [ ] implement correlation id
 - [ ] add ABI.nativeTime bool to skip time to string conversion in abidecoder `read` method as it is done for `ABI.fitNodeos` property with logical type
 - [ ] fix the issue with some types mapping in `schema.go`
