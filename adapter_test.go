@@ -10,7 +10,10 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
+	"github.com/golang/protobuf/jsonpb"
+	"github.com/golang/protobuf/proto"
 	"github.com/riferrei/srclient"
+	"gotest.tools/assert"
 )
 
 var default_headers = []kafka.Header{{
@@ -195,12 +198,12 @@ func Benchmark_adapter_adapt(b *testing.B) {
 		{
 			"cdc-tables-avro",
 			"testdata/block-30080032.json",
-			CDC_TABLE_ADAPTER,
+			CDC_TABLE_ADAPTER_AVRO,
 		},
 		{
 			"cdc-actions-avro",
 			"testdata/block-30080032.json",
-			CDC_ACTION_ADAPTER,
+			CDC_ACTION_ADAPTER_AVRO,
 		},
 	}
 
@@ -331,4 +334,66 @@ func Benchmark_adapter_adapt(b *testing.B) {
 			}
 		})
 	}
+}
+
+func readFileFromTestdataProto(t testing.TB, file string, m proto.Message) {
+	t.Helper()
+	f, err := os.Open(file)
+	if err != nil {
+		t.Fatalf("Open() error: %v", err)
+	}
+	err = jsonpb.Unmarshal(f, m)
+	if err != nil {
+		t.Fatalf("jsonpb.Unmarshal() error: %v", err)
+	}
+}
+
+func Test_adapter_adapt_proto(t *testing.T) {
+	tests := struct {
+		name string
+		file string
+	}{
+		"correlaction-id",
+		"testdata/block-49608395.pb.json",
+	}
+
+	tt := tests
+	t.Run(path.Base(tt.name), func(t *testing.T) {
+		block := &pbcodec.Block{}
+		readFileFromTestdataProto(t, tt.file, block)
+		var localABIFiles = map[string]string{
+			"eosio.nft.ft": "testdata/eosio.nft.ft.abi",
+			"eosio.token":  "testdata/eosio.token.abi",
+		}
+		abiFiles, err := LoadABIFiles(localABIFiles)
+		if err != nil {
+			t.Fatalf("LoadABIFiles() error: %v", err)
+		}
+		abiDecoder := NewABIDecoder(abiFiles, nil)
+		adp := &CdCAdapter{
+			topic:     "test.topic",
+			saveBlock: saveBlockNoop,
+			generator: TableGenerator{
+				tableNames: map[string]void{"accounts": empty},
+				abiCodec:   NewJsonABICodec(abiDecoder, "eosio.token"),
+			},
+			headers: default_headers,
+		}
+
+		if msgs, err := adp.Adapt(block, "New"); err != nil {
+			t.Errorf("adapter.adapt() error = %v", err)
+		} else {
+			assert.Equal(t, len(msgs), 2, "should produce 2 messages")
+			for _, msg := range msgs {
+				value := make(map[string]interface{})
+				err := json.Unmarshal(msg.Value, &value)
+				if err != nil {
+					t.Errorf("json.Unmarshal() error: %v", err)
+				}
+				context := value["context"].(map[string]interface{})
+				correlation := context["correlation"].(map[string]interface{})
+				assert.Equal(t, correlation["id"], "ed19191b-3962-4c58-9dee-f41398866ee1", "should provide the correlation id")
+			}
+		}
+	})
 }
