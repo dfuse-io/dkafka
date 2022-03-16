@@ -253,3 +253,4 @@ Examples:
 - [x] validate with blockchain team cdc table message key
 - [ ] patch (pool request) on goavro to support uint32 and unit64... overflow => negative value
 - [ ] pool request on eos-go for native decode functions
+- [ ] add option to exclude certain actions when in cdc table mode

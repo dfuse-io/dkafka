@@ -406,7 +406,7 @@ func createCdcKeyExpressions(cdcExpression string, env cel.EnvOption) (cdcProgra
 }
 
 func createCdCFilter(account string, executed bool) string {
-	filter := fmt.Sprintf("account==\"%s\" && receiver==\"%s\"", account, account)
+	filter := fmt.Sprintf("account==\"%s\" && receiver==\"%s\" && action!=\"inject\" && action!=\"fixaccount\"", account, account)
 	if executed {
 		filter = fmt.Sprintf("executed && %s", filter)
 	}
