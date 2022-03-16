@@ -20,10 +20,11 @@ STREAM_ACT_INCLUDE_EXPRESSION := 'executed && action=="transfer" && account=="eo
 STREAM_ACT_ACTIONS_EXPRESSION ?= '{"create":[{"key":"transaction_id", "type":"NftFtCreatedNotification"}],"issue":[{"key":"transaction_id", "type":"NftFtIssuedNotification"}]}'
 STREAM_ACT_START_BLOCK ?= 49608000
 # CDC
-ACCOUNT ?= 'eosio.token'
+# ACCOUNT ?= 'eosio.token'
+ACCOUNT ?= 'eosio.nft.ft'
 ## CDC TABLES
-# TABLE_NAMES ?= 'factory.a,factory.b,resale.a,token.a'
-TABLE_NAMES ?= 'accounts'
+TABLE_NAMES ?= 'factory.a,factory.b,resale.a,token.a'
+# TABLE_NAMES ?= 'accounts'
 ## CDC ACTIONS
 ACTIONS_EXPRESSION ?= '{"create":"transaction_id", "issue":"data.issue.to"}'
 
@@ -34,7 +35,7 @@ MESSAGE_MAX_SIZE ?= 10000000
 # create
 # START_BLOCK ?= 37562000
 # issue
-START_BLOCK ?= 49608300
+START_BLOCK ?= 50705000
 
 # START_BLOCK ?= 30080000
 STOP_BLOCK ?= 3994800

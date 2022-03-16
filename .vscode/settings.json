@@ -32,6 +32,7 @@
         "srclient",
         "SSLCA",
         "Structs",
+        "trxs",
         "Undecodable",
         "zlog",
         "zstd"

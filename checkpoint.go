@@ -83,6 +83,10 @@ type cs struct {
 }
 
 func (c *kafkaCheckpointer) Save(cursor string) error {
+	if cursor == "" {
+		zlog.Warn("try to save empty checkpoint")
+		return nil
+	}
 	v, err := json.Marshal(cs{Cursor: cursor})
 	if err != nil {
 		return err

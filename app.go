@@ -278,7 +278,7 @@ func (a *App) Run() (err error) {
 	}
 
 	var producer *kafka.Producer
-	if !a.config.BatchMode || !a.config.DryRun {
+	if !a.config.BatchMode && !a.config.DryRun {
 		producer, err = getKafkaProducer(createKafkaConfigForMessageProducer(a.config), a.config.KafkaTransactionID)
 		if err != nil {
 			return fmt.Errorf("getting kafka producer: %w", err)
@@ -286,7 +286,7 @@ func (a *App) Run() (err error) {
 	}
 
 	var cp checkpointer
-	if a.config.BatchMode {
+	if a.config.BatchMode || a.config.DryRun {
 		zlog.Info("running in batch mode, ignoring cursors")
 		cp = &nilCheckpointer{}
 	} else {
@@ -318,12 +318,17 @@ func (a *App) Run() (err error) {
 		zlog.Debug("Request only irreversible blocks")
 		req.ForkSteps = []pbbstream.ForkStep{pbbstream.ForkStep_STEP_IRREVERSIBLE}
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	a.OnTerminating(func(_ error) {
+		cancel()
+	})
 
-	var s sender
+	var s Sender
 	if a.config.DryRun {
-		s = &dryRunSender{}
+		s = &DryRunSender{}
 	} else {
-		s, err = getKafkaSender(producer, cp, a.config.KafkaTransactionID != "")
+		// s, err = getKafkaSender(producer, cp, a.config.KafkaTransactionID != "")
+		s, err = NewSender(ctx, producer, cp, a.config.KafkaTransactionID != "")
 		if err != nil {
 			return err
 		}
@@ -339,49 +344,81 @@ func (a *App) Run() (err error) {
 	zlog.Debug("Create streaming client")
 	client := pbbstream.NewBlockStreamV2Client(conn)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	a.OnTerminating(func(_ error) {
-		cancel()
-	})
 	zlog.Info("Filter blocks", zap.Any("request", req))
 	executor, err := client.Blocks(ctx, req)
 	if err != nil {
 		return fmt.Errorf("requesting blocks from dfuse firehose: %w", err)
 	}
+	return iterate(ctx, cancel, adapter, s, a.config.CommitMinDelay, executor)
+}
+
+func iterate(ctx context.Context, cancel context.CancelFunc, adapter Adapter, s Sender, tickDuration time.Duration, stream pbbstream.BlockStreamV2_BlocksClient) error {
 	// loop: receive block,  transform block, send message...
 	zlog.Info("Start looping over blocks...")
+	in := make(chan BlockStep, 10)
+	out := make(chan error, 1)
+	ticker := time.NewTicker(tickDuration)
+	go blockHandler(ctx, adapter, s, in, ticker.C, out)
 	for {
-		msg, err := executor.Recv()
-		if err != nil {
-			if err == io.EOF {
-				return nil
+		select {
+		case err := <-out:
+			zlog.Error("exit block streaming on error", zap.Error(err))
+			ticker.Stop()
+			close(in)
+			return err
+		default:
+			msg, err := stream.Recv()
+			if err != nil {
+				if err == io.EOF {
+					return nil
+				}
+				return fmt.Errorf("error on receive: %w", err)
 			}
-			return fmt.Errorf("error on receive: %w", err)
-		}
-		zlog.Debug("Receive new block", zap.String("cursor", msg.Cursor))
-		blk := &pbcodec.Block{}
-		if err := ptypes.UnmarshalAny(msg.Block, blk); err != nil {
-			return fmt.Errorf("decoding any of type %q: %w", msg.Block.TypeUrl, err)
-		}
-
-		blocksReceived.Inc()
-		kafkaMsgs, err := adapter.Adapt(blk, msg.Step.String())
-		if err != nil {
-			return fmt.Errorf("transform to kafka message: %s, %w", msg.Cursor, err)
-		}
-		for _, kafkaMsg := range kafkaMsgs {
-			if err := s.Send(kafkaMsg); err != nil {
-				return fmt.Errorf("sending message: %w", err)
+			zlog.Debug("Receive new block", zap.String("cursor", msg.Cursor))
+			blk := &pbcodec.Block{}
+			if err := ptypes.UnmarshalAny(msg.Block, blk); err != nil {
+				return fmt.Errorf("decoding any of type %q: %w", msg.Block.TypeUrl, err)
 			}
-			messagesSent.Inc()
+			step := sanitizeStep(msg.Step.String())
+			blocksReceived.Inc()
+			blkStep := BlockStep{
+				blk:    blk,
+				step:   step,
+				cursor: msg.Cursor,
+			}
+			in <- blkStep
 		}
+	}
+}
 
-		if a.IsTerminating() {
-			return s.Commit(context.Background(), msg.Cursor)
-		}
+type BlockStep struct {
+	blk    *pbcodec.Block
+	step   string
+	cursor string
+}
 
-		if err := s.CommitIfAfter(context.Background(), msg.Cursor, a.config.CommitMinDelay); err != nil {
-			return fmt.Errorf("committing message: %w", err)
+func blockHandler(ctx context.Context, adapter Adapter, s Sender, in <-chan BlockStep, ticks <-chan time.Time, out chan<- error) {
+	var lastCursor string
+	for {
+		select {
+		case blkStep := <-in:
+			kafkaMsgs, err := adapter.Adapt(blkStep.blk, blkStep.step)
+			if err != nil {
+				out <- fmt.Errorf("transform to kafka message at: %s, %w", blkStep.cursor, err)
+				return
+			}
+			lastCursor = blkStep.cursor
+			if len(kafkaMsgs) == 0 {
+				continue
+			}
+			if err = s.Send(ctx, kafkaMsgs, blkStep.cursor); err != nil {
+				out <- fmt.Errorf("send to kafka message at: %s, %w", blkStep.cursor, err)
+				return
+			}
+			messagesSent.Add(float64(len(kafkaMsgs)))
+		case <-ticks:
+			zlog.Info("save checkpoint", zap.String("cursor", lastCursor))
+			s.SaveCP(ctx, lastCursor)
 		}
 	}
 }

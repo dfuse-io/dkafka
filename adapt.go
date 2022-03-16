@@ -14,13 +14,11 @@ type CdCAdapter struct {
 	topic     string
 	saveBlock SaveBlock
 	generator Generator2
-	// TODO merge all headers
-	headers []kafka.Header
+	headers   []kafka.Header
 }
 
-func (m *CdCAdapter) Adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message, error) {
+func (m *CdCAdapter) Adapt(blk *pbcodec.Block, step string) ([]*kafka.Message, error) {
 	m.saveBlock(blk)
-	step := sanitizeStep(rawStep)
 	if blk.Number%100 == 0 {
 		zlog.Info("incoming block 1/100", zap.Uint32("blk_number", blk.Number), zap.String("step", step), zap.Int("length_filtered_trx_traces", len(blk.FilteredTransactionTraces)))
 	}
@@ -28,14 +26,18 @@ func (m *CdCAdapter) Adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message
 		zlog.Debug("incoming block 1/10", zap.Uint32("blk_number", blk.Number), zap.String("step", step), zap.Int("length_filtered_trx_traces", len(blk.FilteredTransactionTraces)))
 	}
 	msgs := make([]*kafka.Message, 0)
-	for _, trx := range blk.TransactionTraces() {
+	trxs := blk.TransactionTraces()
+	zlog.Debug("adapt block", zap.Uint32("num", blk.Number), zap.Int("nb_trx", len(trxs)))
+	for _, trx := range trxs {
 		transactionTracesReceived.Inc()
 		// manage correlation
 		correlation, err := getCorrelation(trx.ActionTraces)
 		if err != nil {
 			return nil, err
 		}
-		for _, act := range trx.ActionTraces {
+		acts := trx.ActionTraces
+		zlog.Debug("adapt transaction", zap.Uint32("blk_num", blk.Number), zap.Int("trx_index", int(trx.Index)), zap.Int("nb_acts", len(acts)))
+		for _, act := range acts {
 			if !act.FilteringMatched {
 				continue
 			}
