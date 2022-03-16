@@ -72,8 +72,13 @@ func (m *CdCAdapter) Adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message
 						Value: []byte(step),
 					},
 				)
-				if err != nil {
-					return nil, err
+				if correlation != nil {
+					headers = append(headers,
+						kafka.Header{
+							Key:   "ce_parentid",
+							Value: []byte(correlation.Id),
+						},
+					)
 				}
 				msg := &kafka.Message{
 					Key:     []byte(generation.Key),

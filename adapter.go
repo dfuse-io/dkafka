@@ -10,6 +10,7 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
+	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
 	"github.com/google/cel-go/cel"
 	"go.uber.org/zap"
@@ -30,8 +31,16 @@ func saveBlockNoop(*pbcodec.Block) {
 // 	saveBlock(block, marchalJSON, "json")
 // }
 
+func saveBlockJSONPB(block proto.Message) ([]byte, error) {
+	s, err := (&jsonpb.Marshaler{}).MarshalToString(block)
+	if err != nil {
+		return nil, err
+	}
+	return []byte(s), nil
+}
+
 func saveBlockProto(block *pbcodec.Block) {
-	saveBlock(block, proto.Marshal, "pb.bin")
+	saveBlock(block, saveBlockJSONPB, "pb.json")
 }
 
 type MarshalFunc func(proto.Message) ([]byte, error)

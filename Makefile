@@ -15,11 +15,15 @@ KUBECONFIG ?= ~/.kube/dfuse.staging.kube
 # ACTIONS_EXPRESSION ?= '{"create":[{"filter": ["insert:factory.a"], "key":"string(db_ops[0].new_json.id)", "type":"NftFtCreatedNotification"}]}'
 # ACTIONS_EXPRESSION ?= '{"create":[{"first": "insert:factory.a", "key":"string(db_ops[0].new_json.id)", "type":"NftFtCreatedNotification"}], "issue":[{"filter": "update:factory.a", "split": true, "key":"string(db_ops[0].new_json.id)", "type":"NftFtUpdatedNotification"}]}'
 
+# stream-act 
+STREAM_ACT_INCLUDE_EXPRESSION := 'executed && action=="transfer" && account=="eosio.token" && receiver=="eosio.token"'
+STREAM_ACT_ACTIONS_EXPRESSION ?= '{"create":[{"key":"transaction_id", "type":"NftFtCreatedNotification"}],"issue":[{"key":"transaction_id", "type":"NftFtIssuedNotification"}]}'
+STREAM_ACT_START_BLOCK ?= 49608000
 # CDC
-ACCOUNT ?= 'eosio.nft.ft'
+ACCOUNT ?= 'eosio.token'
 ## CDC TABLES
 # TABLE_NAMES ?= 'factory.a,factory.b,resale.a,token.a'
-TABLE_NAMES ?= 'token.a'
+TABLE_NAMES ?= 'accounts'
 ## CDC ACTIONS
 ACTIONS_EXPRESSION ?= '{"create":"transaction_id", "issue":"data.issue.to"}'
 
@@ -30,7 +34,7 @@ MESSAGE_MAX_SIZE ?= 10000000
 # create
 # START_BLOCK ?= 37562000
 # issue
-START_BLOCK ?= 32316500
+START_BLOCK ?= 49608300
 
 # START_BLOCK ?= 30080000
 STOP_BLOCK ?= 3994800
@@ -110,7 +114,6 @@ cdc-tables: build up ## CDC stream on tables
 		--kafka-compression-level=$(COMPRESSION_LEVEL) \
 		--start-block-num=$(START_BLOCK) \
 		--kafka-message-max-bytes=$(MESSAGE_MAX_SIZE) \
-		-vvv \
 		--table-name=$(TABLE_NAMES) $(ACCOUNT)
 
 cdc-tables-avro: build up ## CDC stream on tables
@@ -124,7 +127,6 @@ cdc-tables-avro: build up ## CDC stream on tables
 		--start-block-num=$(START_BLOCK) \
 		--kafka-message-max-bytes=$(MESSAGE_MAX_SIZE) \
 		--codec="avro" \
-		-vvv \
 		--table-name=$(TABLE_NAMES) $(ACCOUNT)
 
 cdc-actions: build up ## CDC stream on tables
@@ -140,15 +142,16 @@ cdc-actions: build up ## CDC stream on tables
 stream-act: build up ## stream actions based localy
 	$(BINARY_PATH) publish \
 		--dfuse-firehose-grpc-addr=localhost:9000 \
+		--capture \
 		--abicodec-grpc-addr=localhost:9001 \
 		--fail-on-undecodable-db-op \
 		--kafka-cursor-topic="cursor" \
 		--kafka-topic="io.dkafka.test" \
-		--dfuse-firehose-include-expr=$(INCLUDE_EXPRESSION) \
-		--actions-expr=$(ACTIONS_EXPRESSION) \
+		--dfuse-firehose-include-expr=$(STREAM_ACT_INCLUDE_EXPRESSION) \
+		--actions-expr=$(STREAM_ACT_ACTIONS_EXPRESSION) \
 		--kafka-compression-type=$(COMPRESSION_TYPE) \
 		--kafka-compression-level=$(COMPRESSION_LEVEL) \
-		--start-block-num=$(START_BLOCK) \
+		--start-block-num=$(STREAM_ACT_START_BLOCK) \
 		--kafka-message-max-bytes=$(MESSAGE_MAX_SIZE)
 
 batch: build up ## run batch localy

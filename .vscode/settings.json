@@ -15,6 +15,7 @@
         "goavro",
         "gopkg",
         "GRPC",
+        "jsonpb",
         "memoizable",
         "mkdir",
         "msan",

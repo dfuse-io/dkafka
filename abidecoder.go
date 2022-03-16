@@ -39,7 +39,6 @@ func NewJsonABICodec(
 	decoder *ABIDecoder,
 	account string,
 ) ABICodec {
-	decoder.onReload = func() {}
 	return &JsonABICodec{
 		decoder,
 		NewJSONCodec(),
@@ -188,6 +187,7 @@ func NewABIDecoder(
 		overrides:   overrides,
 		abiCodecCli: abiCodecCli,
 		abisCache:   make(map[string]*abiItem),
+		onReload:    func() {},
 	}
 }
 
