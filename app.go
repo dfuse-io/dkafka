@@ -417,7 +417,18 @@ func blockHandler(ctx context.Context, adapter Adapter, s Sender, in <-chan Bloc
 			}
 			messagesSent.Add(float64(len(kafkaMsgs)))
 		case <-ticks:
-			zlog.Info("save checkpoint", zap.String("cursor", lastCursor))
+			c, err := forkable.CursorFromOpaque(lastCursor)
+			if err != nil {
+				zlog.Error("cannot decode cursor", zap.String("cursor", lastCursor), zap.Error(err))
+				continue
+			}
+			zlog.Info("save checkpoint",
+				zap.String("cursor", lastCursor),
+				zap.Stringer("plain_cursor", c),
+				zap.Stringer("cursor_block", c.Block),
+				zap.Stringer("cursor_head_block", c.HeadBlock),
+				zap.Stringer("cursor_LIB", c.LIB),
+			)
 			s.SaveCP(ctx, lastCursor)
 		}
 	}
