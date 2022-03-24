@@ -71,7 +71,7 @@ func newRecordFQN(np string, name string, fields []FieldSchema) RecordSchema {
 	return RecordSchema{
 		Type:      "record",
 		Name:      strcase.ToCamel(name),
-		Namespace: strcase.ToDelimited(np, '.'),
+		Namespace: np,
 		Fields:    fields,
 	}
 }

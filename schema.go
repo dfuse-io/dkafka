@@ -128,7 +128,7 @@ func GenerateSchema(options AvroSchemaGenOptions) (MessageSchema, error) {
 		ceType = fmt.Sprintf("%sNotification", baseName)
 	}
 	ceType = strcase.ToCamel(ceType) // to be sure if it's provided by the user
-	namespace := strcase.ToDelimited(options.Namespace, '.')
+	namespace := options.Namespace
 	actionDetailsRecordName := fmt.Sprintf("%sActionInfo", baseName)
 	actionParamsRecordName := fmt.Sprintf("%sActionParams", baseName)
 	dbOpRecordName := fmt.Sprintf("%sDBOp", baseName)
