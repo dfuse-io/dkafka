@@ -408,6 +408,14 @@ func analyzeFieldType(fieldType string) (typeName string, isOptional bool, isArr
 		return fieldType[0 : len(fieldType)-3], false, true, true
 	}
 
+	if strings.HasSuffix(fieldType, "?$") {
+		return fieldType[0 : len(fieldType)-2], true, false, false
+	}
+
+	if strings.HasSuffix(fieldType, "$") {
+		return fieldType[0 : len(fieldType)-1], false, false, true
+	}
+
 	if strings.HasSuffix(fieldType, "?") {
 		return fieldType[0 : len(fieldType)-1], true, false, false
 	}
