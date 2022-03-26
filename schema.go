@@ -310,6 +310,8 @@ var avroPrimitiveTypeByBuiltInTypes map[string]string = map[string]string{
 
 func resolveFieldTypeSchema(abi *eos.ABI, fieldType string) (Schema, error) {
 	zlog.Debug("resolve", zap.String("type", fieldType))
+	// remove binary extension marker if any
+	fieldType = strings.TrimSuffix(fieldType, "$")
 	if elementType := strings.TrimSuffix(fieldType, "[]"); elementType != fieldType {
 		// todo array
 		zlog.Debug("array of", zap.String("element", elementType))
