@@ -2,9 +2,35 @@ package dkafka
 
 import (
 	"encoding/json"
+	"fmt"
+	"regexp"
 
 	"github.com/iancoleman/strcase"
 )
+
+var namePattern *regexp.Regexp
+var namespacePattern *regexp.Regexp
+
+func init() {
+	namePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+	namespacePattern = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_]*)?(?:\.[A-Za-z_][A-Za-z0-9_]*)*$`)
+}
+
+func checkName(name string) (string, error) {
+	if namePattern.MatchString(name) {
+		return name, nil
+	} else {
+		return name, fmt.Errorf("invalid Avro name: %s", name)
+	}
+}
+
+func checkNamespace(np string) (string, error) {
+	if namespacePattern.MatchString(np) {
+		return np, nil
+	} else {
+		return np, fmt.Errorf("invalid Avro namespace: %s", np)
+	}
+}
 
 // Schema is represented in JSON by one of:
 // - A JSON string, naming a defined type.
@@ -71,7 +97,7 @@ func newRecordFQN(np string, name string, fields []FieldSchema) RecordSchema {
 	return RecordSchema{
 		Type:      "record",
 		Name:      strcase.ToCamel(name),
-		Namespace: strcase.ToDelimited(np, '.'),
+		Namespace: np,
 		Fields:    fields,
 	}
 }
