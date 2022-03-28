@@ -270,7 +270,7 @@ func Benchmark_adapter_adapt(b *testing.B) {
 				topic:     "test.topic",
 				saveBlock: saveBlockNoop,
 				generator: TableGenerator{
-					tableNames: map[string]void{"factory.a": empty},
+					tableNames: map[string]ExtractKey{"factory.a": extractPrimaryKey},
 					abiCodec:   NewJsonABICodec(abiDecoder, "eosio.nft.ft"),
 				},
 				headers: default_headers,
@@ -297,11 +297,12 @@ func Benchmark_adapter_adapt(b *testing.B) {
 				Account:   "eosio.nft.ft",
 			}
 			abiCodec := NewKafkaAvroABICodec(abiDecoder, msg.getTableSchema, srclient.CreateMockSchemaRegistryClient("mock://bench-adapter"), msg.Account)
+			abiCodec.GetCodec("factory.a", 0)
 			adp = &CdCAdapter{
 				topic:     "test.topic",
 				saveBlock: saveBlockNoop,
 				generator: TableGenerator{
-					tableNames: map[string]void{"factory.a": empty},
+					tableNames: map[string]ExtractKey{"factory.a": extractPrimaryKey},
 					abiCodec:   abiCodec,
 				},
 				headers: default_headers,
@@ -318,6 +319,7 @@ func Benchmark_adapter_adapt(b *testing.B) {
 				Account:   "eosio.nft.ft",
 			}
 			abiCodec := NewKafkaAvroABICodec(abiDecoder, msg.getActionSchema, srclient.CreateMockSchemaRegistryClient("mock://bench-adapter"), msg.Account)
+			abiCodec.GetCodec("create", 0)
 			adp = &CdCAdapter{
 				topic:     "test.topic",
 				saveBlock: saveBlockNoop,
@@ -364,7 +366,7 @@ func Test_adapter_correlation_id(t *testing.T) {
 		topic:     "test.topic",
 		saveBlock: saveBlockNoop,
 		generator: TableGenerator{
-			tableNames: map[string]void{"accounts": empty},
+			tableNames: map[string]ExtractKey{"accounts": extractFullKey},
 			abiCodec:   NewJsonABICodec(abiDecoder, "eosio.token"),
 		},
 		headers: default_headers,

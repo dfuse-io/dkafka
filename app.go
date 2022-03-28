@@ -119,7 +119,6 @@ func (a *App) Run() (err error) {
 	saveBlock = saveBlockNoop
 	if a.config.Capture {
 		saveBlock = saveBlockProto
-		// saveBlock = saveBlockJSON
 	}
 
 	var abiFiles map[string]*eos.ABI
@@ -173,166 +172,38 @@ func (a *App) Run() (err error) {
 		dataContentTypeHeader,
 	}
 
-	var adapter Adapter
-	var filter string
-	switch cdcTyp := a.config.CdCType; cdcTyp {
-	case TABLES_CDC_TYPE:
-		msg := MessageSchemaGenerator{
-			Namespace: a.config.SchemaNamespace,
-			Version:   a.config.SchemaVersion,
-			Account:   a.config.Account,
-		}
-		abiCodec, err := newABICodec(
-			a.config.Codec, a.config.Account, a.config.SchemaRegistryURL, abiDecoder,
-			msg.getTableSchema,
-		)
-		if err != nil {
-			return err
-		}
-		filter = createCdCFilter(a.config.Account, a.config.Executed)
-		tableNames := make(StringSet)
-		for _, name := range a.config.TableNames {
-			tableNames[name] = empty
-		}
-		// tableKeyExpressions, err := createCdcKeyExpressions(a.config.ActionExpressions, TableDeclarations)
-		// if err != nil {
-		// 	return err
-		// }
-		generator := TableGenerator{
-			// tableNames: tableKeyExpressions,
-			tableNames: tableNames,
-			abiCodec:   abiCodec,
-		}
-		adapter = &CdCAdapter{
-			topic:     a.config.KafkaTopic,
-			saveBlock: saveBlock,
-			headers:   hearders,
-			generator: generator,
-		}
-	case ACTIONS_CDC_TYPE:
-		filter = createCdCFilter(a.config.Account, a.config.Executed)
-		actionKeyExpressions, err := createCdcKeyExpressions(a.config.ActionExpressions, ActionDeclarations)
-		if err != nil {
-			return err
-		}
-		msg := MessageSchemaGenerator{
-			Namespace: a.config.SchemaNamespace,
-			Version:   a.config.SchemaVersion,
-			Account:   a.config.Account,
-		}
-		abiCodec, err := newABICodec(
-			a.config.Codec, a.config.Account, a.config.SchemaRegistryURL, abiDecoder,
-			msg.getActionSchema,
-		)
-		if err != nil {
-			return err
-		}
-		generator := ActionGenerator2{
-			keyExtractors: actionKeyExpressions,
-			abiCodec:      abiCodec,
-		}
-		adapter = &CdCAdapter{
-			topic:     a.config.KafkaTopic,
-			saveBlock: saveBlock,
-			headers:   hearders,
-			generator: generator,
-		}
-	default:
-		filter = a.config.IncludeFilterExpr
-		if a.config.ActionsExpr != "" {
-			adapter, err = newActionsAdapter(a.config.KafkaTopic,
-				saveBlock,
-				abiDecoder.DecodeDBOps,
-				a.config.FailOnUndecodableDBOP,
-				a.config.ActionsExpr,
-				hearders,
-			)
-			if err != nil {
-				return err
-			}
-		} else {
-			eventTypeProg, err := exprToCelProgram(a.config.EventTypeExpr)
-			if err != nil {
-				return fmt.Errorf("cannot parse event-type-expr: %w", err)
-			}
-			eventKeyProg, err := exprToCelProgram(a.config.EventKeysExpr)
-			if err != nil {
-				return fmt.Errorf("cannot parse event-keys-expr: %w", err)
-			}
-			adapter = newAdapter(
-				a.config.KafkaTopic,
-				saveBlock,
-				abiDecoder.DecodeDBOps,
-				a.config.FailOnUndecodableDBOP,
-				eventTypeProg,
-				eventKeyProg,
-				hearders,
-			)
-		}
-	}
-
-	req := &pbbstream.BlocksRequestV2{
-		IncludeFilterExpr: filter,
-		StartBlockNum:     a.config.StartBlockNum,
-		StopBlockNum:      a.config.StopBlockNum,
-	}
-
-	var producer *kafka.Producer
-	if !a.config.BatchMode && !a.config.DryRun {
-		producer, err = getKafkaProducer(createKafkaConfigForMessageProducer(a.config), a.config.KafkaTransactionID)
-		if err != nil {
-			return fmt.Errorf("getting kafka producer: %w", err)
-		}
-	}
-
-	var cp checkpointer
-	if a.config.BatchMode || a.config.DryRun {
-		zlog.Info("running in batch mode, ignoring cursors")
-		cp = &nilCheckpointer{}
-	} else {
-		cp = newKafkaCheckpointer(createKafkaConfig(a.config), a.config.KafkaCursorTopic, a.config.KafkaCursorPartition, a.config.KafkaTopic, a.config.KafkaCursorConsumerGroupID, producer)
-
-		cursor, err := cp.Load()
-		switch err {
-		case NoCursorErr:
-			zlog.Info("running in live mode, no cursor found: starting from beginning", zap.Int64("start_block_num", a.config.StartBlockNum))
-		case nil:
-			c, err := forkable.CursorFromOpaque(cursor)
-			if err != nil {
-				zlog.Error("cannot decode cursor", zap.Error(err))
-				return err
-			}
-			zlog.Info("running in live mode, found cursor",
-				zap.String("cursor", cursor),
-				zap.Stringer("plain_cursor", c),
-				zap.Stringer("cursor_block", c.Block),
-				zap.Stringer("cursor_head_block", c.HeadBlock),
-				zap.Stringer("cursor_LIB", c.LIB),
-			)
-			req.StartCursor = cursor
-		default:
-			return fmt.Errorf("error loading cursor: %w", err)
-		}
-	}
-	if a.config.Irreversible {
-		zlog.Debug("Request only irreversible blocks")
-		req.ForkSteps = []pbbstream.ForkStep{pbbstream.ForkStep_STEP_IRREVERSIBLE}
-	}
 	ctx, cancel := context.WithCancel(context.Background())
 	a.OnTerminating(func(_ error) {
 		cancel()
 	})
 
-	var s Sender
-	if a.config.DryRun {
-		s = &DryRunSender{}
-	} else {
-		// s, err = getKafkaSender(producer, cp, a.config.KafkaTransactionID != "")
-		s, err = NewSender(ctx, producer, cp, a.config.KafkaTransactionID != "")
+	var producer *kafka.Producer
+	if !a.config.DryRun {
+		trxID := a.config.KafkaTransactionID
+		if a.config.CdCType != "" {
+			trxID = ""
+		}
+		producer, err = getKafkaProducer(createKafkaConfigForMessageProducer(a.config), trxID)
 		if err != nil {
-			return err
+			return fmt.Errorf("getting kafka producer: %w", err)
 		}
 	}
+
+	var appCtx appCtx
+	if a.config.CdCType != "" {
+		appCtx, err = a.NewCDCCtx(ctx, producer, hearders, abiDecoder, saveBlock)
+	} else {
+		appCtx, err = a.NewLegacyCtx(ctx, producer, hearders, abiDecoder, saveBlock)
+	}
+	if err != nil {
+		return err
+	}
+
+	if a.config.DryRun {
+		appCtx.sender = &DryRunSender{}
+	}
+	req := NewRequest(appCtx.filter, a.config.StartBlockNum, a.config.StopBlockNum, appCtx.cursor, a.config.Irreversible)
+
 	zlog.Debug("Connect to dfuse grpc", zap.String("address", addr), zap.Any("options", dialOptions))
 	conn, err := grpc.Dial(addr,
 		dialOptions...,
@@ -349,7 +220,186 @@ func (a *App) Run() (err error) {
 	if err != nil {
 		return fmt.Errorf("requesting blocks from dfuse firehose: %w", err)
 	}
-	return iterate(ctx, cancel, adapter, s, a.config.CommitMinDelay, executor)
+	return iterate(ctx, cancel, appCtx.adapter, appCtx.sender, a.config.CommitMinDelay, executor)
+}
+
+type appCtx struct {
+	adapter Adapter
+	filter  string
+	sender  Sender
+	cursor  string
+}
+
+func (a *App) NewCDCCtx(ctx context.Context, producer *kafka.Producer, hearders []kafka.Header, abiDecoder *ABIDecoder, saveBlock SaveBlock) (appCtx, error) {
+	var adapter Adapter
+	var filter string
+	var sender Sender = NewFastSender(ctx, producer, a.config.KafkaTopic, hearders)
+	var cursor string
+
+	appCtx := appCtx{}
+	cursor, err := LoadCursor(createKafkaConfig(a.config), a.config.KafkaTopic)
+	if err != nil {
+		return appCtx, fmt.Errorf("fail to load cursor on topic: %s, due to: %w", a.config.KafkaTopic, err)
+	}
+	switch cdcType := a.config.CdCType; cdcType {
+	case TABLES_CDC_TYPE:
+		msg := MessageSchemaGenerator{
+			Namespace: a.config.SchemaNamespace,
+			Version:   a.config.SchemaVersion,
+			Account:   a.config.Account,
+		}
+		abiCodec, err := newABICodec(
+			a.config.Codec, a.config.Account, a.config.SchemaRegistryURL, abiDecoder,
+			msg.getTableSchema,
+		)
+		if err != nil {
+			return appCtx, err
+		}
+		filter = createCdCFilter(a.config.Account, a.config.Executed)
+		tableNames := make(map[string]ExtractKey)
+		for _, name := range a.config.TableNames {
+			kv := strings.SplitN(name, ":", 2)
+			var ek ExtractKey = extractPrimaryKey
+			if len(kv) == 2 {
+				switch kv[1] {
+				case "k":
+					ek = extractPrimaryKey
+				case "s+k":
+					ek = extractFullKey
+				case "s":
+					ek = extractScope
+				default:
+					return appCtx, fmt.Errorf("unsupported table key extractor pattern: %s, on support <name>[:{k|s|s+k}]", name)
+				}
+			}
+			tableNames[kv[0]] = ek
+		}
+		generator := TableGenerator{
+			tableNames: tableNames,
+			abiCodec:   abiCodec,
+		}
+		adapter = &CdCAdapter{
+			topic:     a.config.KafkaTopic,
+			saveBlock: saveBlock,
+			headers:   hearders,
+			generator: generator,
+		}
+	case ACTIONS_CDC_TYPE:
+		filter = createCdCFilter(a.config.Account, a.config.Executed)
+		actionKeyExpressions, err := createCdcKeyExpressions(a.config.ActionExpressions, ActionDeclarations)
+		if err != nil {
+			return appCtx, err
+		}
+		msg := MessageSchemaGenerator{
+			Namespace: a.config.SchemaNamespace,
+			Version:   a.config.SchemaVersion,
+			Account:   a.config.Account,
+		}
+		abiCodec, err := newABICodec(
+			a.config.Codec, a.config.Account, a.config.SchemaRegistryURL, abiDecoder,
+			msg.getActionSchema,
+		)
+		if err != nil {
+			return appCtx, err
+		}
+		generator := ActionGenerator2{
+			keyExtractors: actionKeyExpressions,
+			abiCodec:      abiCodec,
+		}
+		adapter = &CdCAdapter{
+			topic:     a.config.KafkaTopic,
+			saveBlock: saveBlock,
+			headers:   hearders,
+			generator: generator,
+		}
+	default:
+		return appCtx, fmt.Errorf("unsupported CDC type %s", cdcType)
+	}
+	appCtx.adapter = adapter
+	appCtx.cursor = cursor
+	appCtx.filter = filter
+	appCtx.sender = sender
+	return appCtx, nil
+}
+
+func (a *App) NewLegacyCtx(ctx context.Context, producer *kafka.Producer, hearders []kafka.Header, abiDecoder *ABIDecoder, saveBlock SaveBlock) (appCtx, error) {
+	var adapter Adapter
+	var filter string = a.config.IncludeFilterExpr
+	var sender Sender
+	var cursor string
+	var err error
+	appCtx := appCtx{}
+
+	if a.config.ActionsExpr != "" {
+		adapter, err = newActionsAdapter(a.config.KafkaTopic,
+			saveBlock,
+			abiDecoder.DecodeDBOps,
+			a.config.FailOnUndecodableDBOP,
+			a.config.ActionsExpr,
+			hearders,
+		)
+		if err != nil {
+			return appCtx, err
+		}
+	} else {
+		eventTypeProg, err := exprToCelProgram(a.config.EventTypeExpr)
+		if err != nil {
+			return appCtx, fmt.Errorf("cannot parse event-type-expr: %w", err)
+		}
+		eventKeyProg, err := exprToCelProgram(a.config.EventKeysExpr)
+		if err != nil {
+			return appCtx, fmt.Errorf("cannot parse event-keys-expr: %w", err)
+		}
+		adapter = newAdapter(
+			a.config.KafkaTopic,
+			saveBlock,
+			abiDecoder.DecodeDBOps,
+			a.config.FailOnUndecodableDBOP,
+			eventTypeProg,
+			eventKeyProg,
+			hearders,
+		)
+	}
+	var cp checkpointer
+	if a.config.BatchMode || a.config.DryRun {
+		zlog.Info("running in batch mode, ignoring cursors")
+		cp = &nilCheckpointer{}
+	} else {
+		cp = newKafkaCheckpointer(createKafkaConfig(a.config), a.config.KafkaCursorTopic, a.config.KafkaCursorPartition, a.config.KafkaTopic, a.config.KafkaCursorConsumerGroupID, producer)
+
+		cursor, err = cp.Load()
+		switch err {
+		case NoCursorErr:
+			zlog.Info("running in live mode, no cursor found: starting from beginning", zap.Int64("start_block_num", a.config.StartBlockNum))
+		case nil:
+			c, err := forkable.CursorFromOpaque(cursor)
+			if err != nil {
+				zlog.Error("cannot decode cursor", zap.Error(err))
+				return appCtx, err
+			}
+			zlog.Info("running in live mode, found cursor",
+				zap.String("cursor", cursor),
+				zap.Stringer("plain_cursor", c),
+				zap.Stringer("cursor_block", c.Block),
+				zap.Stringer("cursor_head_block", c.HeadBlock),
+				zap.Stringer("cursor_LIB", c.LIB),
+			)
+		default:
+			return appCtx, fmt.Errorf("error loading cursor: %w", err)
+		}
+	}
+
+	// s, err = getKafkaSender(producer, cp, a.config.KafkaTransactionID != "")
+	sender, err = NewSender(ctx, producer, cp, a.config.KafkaTransactionID != "")
+	if err != nil {
+		return appCtx, err
+	}
+
+	appCtx.adapter = adapter
+	appCtx.cursor = cursor
+	appCtx.filter = filter
+	appCtx.sender = sender
+	return appCtx, nil
 }
 
 func iterate(ctx context.Context, cancel context.CancelFunc, adapter Adapter, s Sender, tickDuration time.Duration, stream pbbstream.BlockStreamV2_BlocksClient) error {
@@ -429,7 +479,10 @@ func blockHandler(ctx context.Context, adapter Adapter, s Sender, in <-chan Bloc
 				zap.Stringer("cursor_head_block", c.HeadBlock),
 				zap.Stringer("cursor_LIB", c.LIB),
 			)
-			s.SaveCP(ctx, lastCursor)
+			if err := s.SaveCP(ctx, lastCursor); err != nil {
+				out <- fmt.Errorf("fail to save check point: %s, %w", lastCursor, err)
+				return
+			}
 		}
 	}
 }

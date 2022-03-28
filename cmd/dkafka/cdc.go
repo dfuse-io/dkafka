@@ -110,7 +110,11 @@ start streaming from this block number (if negative, relative to HEAD)`)
 ABIs are used to decode DB ops. Provided ABIs have highest priority and
 will never be fetched or updated`)
 	CdCTablesCmd.Flags().String("abicodec-grpc-addr", "", "if set, will connect to this endpoint to fetch contract ABIs")
-	CdCTablesCmd.Flags().StringSlice("table-name", []string{}, "the table name on which the message must be sent.")
+	CdCTablesCmd.Flags().StringSlice("table-name", []string{}, `table name(s) on which the message must be produced.
+The name can include the key extractor pattern as follow:
+<table-name>[:{k|s|s+k}]. Where k is for DBOp.PrimaryKey 
+and s is for DBOp.Scope.If not specified the ':k' extractor
+is used`)
 
 	CdCCmd.AddCommand(CdCSchemasCmd)
 	CdCSchemasCmd.Flags().StringP("output-dir", "o", "./", `Optional output directory for the avro schema. The file name pattern is
@@ -306,7 +310,7 @@ func doGenAvroSchema(name string, opts GenOptions, f func(dkafka.NamedSchemaGenO
 }
 
 func saveSchema(schema dkafka.MessageSchema, prefix string, outputDir string) error {
-	fileName := strcase.ToSnake(fmt.Sprintf("%s%s.avsc", prefix, schema.Name))
+	fileName := strcase.ToSnake(fmt.Sprintf("%s%s", prefix, schema.Name))
 	fileName = fmt.Sprintf("%s.avsc", fileName)
 	filePath := filepath.Join(outputDir, fileName)
 	zlog.Info("save schema", zap.String("path", filePath))

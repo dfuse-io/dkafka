@@ -52,26 +52,17 @@ type MessageSchemaSupplier = func(string, *eos.ABI) (MessageSchema, error)
 
 type KafkaAvroABICodec struct {
 	*ABIDecoder
-	getSchemaDelegate    MessageSchemaSupplier
+	getSchema            MessageSchemaSupplier
 	schemaRegistryClient srclient.ISchemaRegistryClient
 	account              string
-	schemaCache          map[string]MessageSchema
-}
-
-func (c *KafkaAvroABICodec) getSchema(name string, abi *eos.ABI) (MessageSchema, error) {
-	if schema, found := c.schemaCache[name]; found {
-		return schema, nil
-	}
-	zlog.Info("schema cache miss get from schema registry", zap.String("name", name))
-	schema, err := c.getSchemaDelegate(name, abi)
-	if err != nil {
-		return schema, err
-	}
-	c.schemaCache[name] = schema
-	return schema, err
+	codecCache           map[string]Codec
 }
 
 func (c *KafkaAvroABICodec) GetCodec(name string, blockNum uint32) (Codec, error) {
+	if codec, found := c.codecCache[name]; found {
+		return codec, nil
+	}
+
 	abi, err := c.abi(c.account, blockNum, false)
 	if err != nil {
 		return nil, err
@@ -92,7 +83,9 @@ func (c *KafkaAvroABICodec) GetCodec(name string, blockNum uint32) (Codec, error
 	if err != nil {
 		return nil, fmt.Errorf("CreateSchema on subject: '%s', schema:\n%s error: %w", subject, string(jsonSchema), err)
 	}
-	return NewKafkaAvroCodec(schema), nil
+	codec := NewKafkaAvroCodec(schema)
+	c.codecCache[name] = codec
+	return codec, nil
 }
 
 func (c *KafkaAvroABICodec) Refresh(blockNum uint32) error {
@@ -102,7 +95,7 @@ func (c *KafkaAvroABICodec) Refresh(blockNum uint32) error {
 
 func (c *KafkaAvroABICodec) onReload() {
 	zlog.Info("clear schema cache on reload")
-	c.schemaCache = make(map[string]MessageSchema)
+	c.codecCache = make(map[string]Codec)
 }
 
 func NewKafkaAvroABICodec(
@@ -116,7 +109,7 @@ func NewKafkaAvroABICodec(
 		getSchema,
 		schemaRegistryClient,
 		account,
-		make(map[string]MessageSchema, 1),
+		make(map[string]Codec, 5),
 	}
 	decoder.onReload = codec.onReload
 	return codec

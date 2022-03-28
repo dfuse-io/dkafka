@@ -44,10 +44,24 @@ type generation struct {
 	Value      interface{} `json:"value,omitempty"`
 }
 
-type DecodeDBOp = func(in *pbcodec.DBOp, blockNum uint32) (decodedDBOps *decodedDBOp, err error)
+type DecodeDBOp func(in *pbcodec.DBOp, blockNum uint32) (decodedDBOps *decodedDBOp, err error)
+
+type ExtractKey func(*pbcodec.DBOp) string
+
+func extractFullKey(dbOp *pbcodec.DBOp) string {
+	return fmt.Sprintf("%s:%s", dbOp.Scope, dbOp.PrimaryKey)
+}
+
+func extractScope(dbOp *pbcodec.DBOp) string {
+	return dbOp.Scope
+}
+
+func extractPrimaryKey(dbOp *pbcodec.DBOp) string {
+	return dbOp.PrimaryKey
+}
 
 type TableGenerator struct {
-	tableNames StringSet
+	tableNames map[string]ExtractKey
 	abiCodec   ABICodec
 }
 
@@ -77,6 +91,7 @@ func (tg TableGenerator) Apply(gc GenContext) (generations []Generation2, err er
 			Value:  value,
 		})
 	}
+	zlog.Debug("return messages after marshal operation", zap.Any("nb_messages", len(generations)))
 	return generations, nil
 }
 
@@ -88,7 +103,7 @@ func (tg TableGenerator) doApply(gc GenContext) ([]generation, error) {
 			continue
 		}
 		// extractor, found := tg.tableNames[dbOp.TableName]
-		_, found := tg.tableNames[dbOp.TableName]
+		extractKey, found := tg.tableNames[dbOp.TableName]
 		if !found {
 			continue
 		}
@@ -97,7 +112,8 @@ func (tg TableGenerator) doApply(gc GenContext) ([]generation, error) {
 			return nil, err
 		}
 		// TODO manage key based on table name in tableNames => return a key generator function
-		key := fmt.Sprintf("%s:%s", decodedDBOp.Scope, decodedDBOp.PrimaryKey)
+		// key := fmt.Sprintf("%s:%s", decodedDBOp.Scope, decodedDBOp.PrimaryKey)
+		key := extractKey(dbOp)
 		tableCamelCase, ceType := tableCeType(dbOp.TableName)
 		ceId := hashString(fmt.Sprintf(
 			"%s%s%d%d%s%s%s",
@@ -124,6 +140,7 @@ func (tg TableGenerator) doApply(gc GenContext) ([]generation, error) {
 		zlog.Debug("generated table message", zap.Any("generation", generation))
 		generations = append(generations, generation)
 	}
+	zlog.Debug("return generated table messages", zap.Int("nb_generations", len(generations)))
 	return generations, nil
 }
 

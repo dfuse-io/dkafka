@@ -374,3 +374,37 @@ var Uint8Type reflect.Type = reflect.TypeOf(uint8(0))
 // 	// fmt.Println(valueOf.Type())
 // 	// fmt.Println(valueOf.Type().Elem())
 // }
+
+func BenchmarkCodecMarshal(b *testing.B) {
+	user := map[string]interface{}{
+		"firstName":  "Chris",
+		"lastName":   "Otto",
+		"middleName": "Tutu",
+		"age":        int32(24),
+		"id":         int64(42),
+	}
+
+	tests := []struct {
+		name  string
+		codec Codec
+		value interface{}
+	}{
+		{
+			"json",
+			JSONCodec{},
+			user,
+		},
+		{
+			"avro",
+			NewKafkaAvroCodec(newSchema(b, 42, UserSchema, nil)),
+			user,
+		},
+	}
+	for _, tt := range tests {
+		b.Run(tt.name, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				tt.codec.Marshal(nil, tt.value)
+			}
+		})
+	}
+}

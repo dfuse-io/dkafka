@@ -97,7 +97,7 @@ func newTableGen4Test(t testing.TB, tableName string) TableGenerator {
 	abiDecoder := NewABIDecoder(abiFiles, nil)
 
 	return TableGenerator{
-		tableNames: map[string]void{tableName: empty},
+		tableNames: map[string]ExtractKey{tableName: extractFullKey},
 		abiCodec:   NewJsonABICodec(abiDecoder, "eosio.nft.ft"),
 	}
 }
