@@ -236,12 +236,22 @@ Examples:
 
 - https://developers.eos.io/manuals/eosio.cdt/latest/best-practices/abi/understanding-abi-files
 
+### goavro
+	// Supported logical types and their native go types:
+	// * timestamp-millis - time.Time
+	// * timestamp-micros - time.Time
+	// * time-millis      - time.Duration
+	// * time-micros      - time.Duration
+	// * date             - int
+	// * decimal          - big.Rat
+
 ## TODO
 - [x] benchmark avro codec
 - [x] implement a cache on a top of KafkaAvroABICodec
 - [x] implement correlation id
+- [x] provide a selector for table key => --table-name factory.a:s+k | factory.a:s | factory.a:k |factory.a
 - [ ] add ABI.nativeTime bool to skip time to string conversion in abidecoder `read` method as it is done for `ABI.fitNodeos` property with logical type
-- [ ] fix the issue with some types mapping in `schema.go`
+- [ ] fix the issue with some types mapping in `schema.go` like `asset`
 - [ ] add support of variants https://developers.eos.io/manuals/eosio.cdt/latest/tutorials/abi-variants
 - [ ] add `ce_dataschema` header
 - [ ] set `ce_datacontenttype` header at codec level or as a return type

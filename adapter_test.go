@@ -270,7 +270,7 @@ func Benchmark_adapter_adapt(b *testing.B) {
 				topic:     "test.topic",
 				saveBlock: saveBlockNoop,
 				generator: TableGenerator{
-					tableNames: map[string]void{"factory.a": empty},
+					tableNames: map[string]ExtractKey{"factory.a": extractPrimaryKey},
 					abiCodec:   NewJsonABICodec(abiDecoder, "eosio.nft.ft"),
 				},
 				headers: default_headers,
@@ -302,7 +302,7 @@ func Benchmark_adapter_adapt(b *testing.B) {
 				topic:     "test.topic",
 				saveBlock: saveBlockNoop,
 				generator: TableGenerator{
-					tableNames: map[string]void{"factory.a": empty},
+					tableNames: map[string]ExtractKey{"factory.a": extractPrimaryKey},
 					abiCodec:   abiCodec,
 				},
 				headers: default_headers,
@@ -366,7 +366,7 @@ func Test_adapter_correlation_id(t *testing.T) {
 		topic:     "test.topic",
 		saveBlock: saveBlockNoop,
 		generator: TableGenerator{
-			tableNames: map[string]void{"accounts": empty},
+			tableNames: map[string]ExtractKey{"accounts": extractFullKey},
 			abiCodec:   NewJsonABICodec(abiDecoder, "eosio.token"),
 		},
 		headers: default_headers,

@@ -256,16 +256,25 @@ func (a *App) NewCDCCtx(ctx context.Context, producer *kafka.Producer, hearders 
 			return appCtx, err
 		}
 		filter = createCdCFilter(a.config.Account, a.config.Executed)
-		tableNames := make(StringSet)
+		tableNames := make(map[string]ExtractKey)
 		for _, name := range a.config.TableNames {
-			tableNames[name] = empty
+			kv := strings.SplitN(name, ":", 2)
+			var ek ExtractKey = extractPrimaryKey
+			if len(kv) == 2 {
+				switch kv[1] {
+				case "k":
+					ek = extractPrimaryKey
+				case "s+k":
+					ek = extractFullKey
+				case "s":
+					ek = extractScope
+				default:
+					return appCtx, fmt.Errorf("unsupported table key extractor pattern: %s, on support <name>[:{k|s|s+k}]", name)
+				}
+			}
+			tableNames[kv[0]] = ek
 		}
-		// tableKeyExpressions, err := createCdcKeyExpressions(a.config.ActionExpressions, TableDeclarations)
-		// if err != nil {
-		// 	return err
-		// }
 		generator := TableGenerator{
-			// tableNames: tableKeyExpressions,
 			tableNames: tableNames,
 			abiCodec:   abiCodec,
 		}
