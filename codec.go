@@ -66,7 +66,7 @@ func (c JSONCodec) GetHeaders() []kafka.Header {
 	return jsonKafkaHearder
 }
 
-func NewKafkaAvroCodec(schemaRegistryURL string, schema *srclient.Schema) Codec {
+func NewKafkaAvroCodec(schemaRegistryURL string, schema *srclient.Schema, codec *goavro.Codec) Codec {
 	u, _ := url.Parse(schemaRegistryURL)
 	u, _ = u.Parse(schemaByIDs)
 	t := fmt.Sprint(u, "%d")
@@ -76,7 +76,7 @@ func NewKafkaAvroCodec(schemaRegistryURL string, schema *srclient.Schema) Codec 
 			id:      uint32(schema.ID()),
 			schema:  schema.Schema(),
 			version: schema.Version(),
-			codec:   schema.Codec(),
+			codec:   codec,
 		},
 	}
 }

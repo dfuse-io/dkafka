@@ -122,6 +122,15 @@ func NewCodecForStandardJSON(schemaSpecification string) (*Codec, error) {
 	)
 }
 
+func NewCodecForStandardJSONWithConverters(schemaSpecification string, converters map[string]ConvertBuild) (*Codec, error) {
+	return NewCodecFrom(schemaSpecification, &codecBuilder{
+		buildCodecForTypeDescribedByMap,
+		buildCodecForTypeDescribedByString,
+		buildCodecForTypeDescribedBySliceJSON,
+	}, converters,
+	)
+}
+
 func NewCodecFrom(schemaSpecification string, cb *codecBuilder, converters map[string]ConvertBuild) (*Codec, error) {
 	var schema interface{}
 

@@ -9,12 +9,11 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 	"github.com/golang/protobuf/jsonpb"
-	"github.com/linkedin/goavro/v2"
 	"github.com/riferrei/srclient"
 	"gotest.tools/assert"
 )
 
-func TestCdCAdapter_Adapt(t *testing.T) {
+func TestCdCAdapter_AdaptJSON(t *testing.T) {
 	type fields struct {
 		generator Generator2
 	}
@@ -53,12 +52,6 @@ func TestCdCAdapter_Adapt(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unmarshal() error: %v", err)
 			}
-			codec, err := goavro.NewCodec(tt.schema)
-			if err != nil {
-				t.Fatalf("goavro.NewCodec(schema) error = %v", err)
-				return
-			}
-
 			m := &CdCAdapter{
 				topic:     "test.topic",
 				saveBlock: saveBlockNoop,
@@ -71,24 +64,21 @@ func TestCdCAdapter_Adapt(t *testing.T) {
 				return
 			}
 			kafkaMessage := got[0]
-			value := make(map[string]interface{})
-			err = json.Unmarshal(kafkaMessage.Value, &value)
-			if err != nil {
-				t.Fatalf("json.Unmarshal(value) error = %v", err)
-				return
-			}
-			// https://github.com/mitchellh/mapstructure/blob/master/mapstructure.go
-			_, err = codec.BinaryFromNative(nil, value)
-			if err != nil {
-				// t.Errorf("codec.BinaryFromNative(value) error = %v", err)
-				// TODO fix the goavro codec issue
-				println("improve goavro")
-			}
-			// if !reflect.DeepEqual(got, tt.want) {
-			// 	t.Errorf("CdCAdapter.Adapt() = %v, want %v", got, tt.want)
-			// }
+
+			assert.Equal(t, findHeader("content-type", kafkaMessage.Headers), "application/json")
+			assert.Equal(t, findHeader("ce_datacontenttype", kafkaMessage.Headers), "application/json")
 		})
 	}
+}
+
+func findHeader(name string, headers []kafka.Header) string {
+
+	for _, header := range headers {
+		if header.Key == name {
+			return string(header.Value)
+		}
+	}
+	return ""
 }
 
 func newTableGen4Test(t testing.TB, tableName string) TableGenerator {

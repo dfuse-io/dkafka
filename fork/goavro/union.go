@@ -141,8 +141,9 @@ func binaryFromNative(cr *codecInfo) func(buf []byte, datum interface{}) ([]byte
 					index, ok := cr.indexFromName[key]
 					if !ok {
 						err = fmt.Errorf("cannot encode binary union: no member schema types support datum: allowed types: %v; received: %T", cr.allowedTypes, datum)
+					} else {
+						return doBinaryFromNative(cr, index, buf, value)
 					}
-					return doBinaryFromNative(cr, index, buf, value)
 				}
 			}
 		}

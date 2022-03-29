@@ -85,6 +85,11 @@ type RecordSchema struct {
 	Namespace string `json:"namespace,omitempty"`
 	// Doc a JSON string providing documentation to the user of this schema (optional).
 	Doc string `json:"doc,omitempty"`
+	// Convert a native type to a goavro
+	// map[string]interface{} that follow this specification/format.
+	// It's the name of the function that do the convertion and is
+	// available in the goavro schema builder context.
+	Convert string `json:"convert,omitempty"`
 	// Fields a JSON array, listing fields (required). Each field is a JSON object.
 	Fields []FieldSchema `json:"fields,omitempty"`
 }

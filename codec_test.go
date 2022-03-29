@@ -3,8 +3,6 @@ package dkafka
 import (
 	"encoding/json"
 	"fmt"
-	"math"
-	"math/big"
 	"reflect"
 	"testing"
 
@@ -61,7 +59,7 @@ func TestNewKafkaAvroCodec(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewKafkaAvroCodec("mock://test", tt.args.schema); !reflect.DeepEqual(got, tt.want) {
+			if got := NewKafkaAvroCodec("mock://test", tt.args.schema, tt.args.schema.Codec()); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("NewKafkaAvroCodec() = %v, want %v", got, tt.want)
 			}
 		})
@@ -243,6 +241,8 @@ func TestCodec_MarshalUnmarshal(t *testing.T) {
 			"token_factory_id": 2,
 		},
 	}
+	uSchema := newSchema(t, 42, UserSchema, nil)
+	tSchema := newSchema(t, 42, TokenATableOpInfo, nil)
 	type args struct {
 		buf   []byte
 		value interface{}
@@ -272,7 +272,7 @@ func TestCodec_MarshalUnmarshal(t *testing.T) {
 		},
 		{
 			"kafka-avro",
-			NewKafkaAvroCodec("mock://test", newSchema(t, 42, UserSchema, nil)),
+			NewKafkaAvroCodec("mock://test", uSchema, uSchema.Codec()),
 			args{
 				nil,
 				map[string]interface{}{
@@ -294,7 +294,7 @@ func TestCodec_MarshalUnmarshal(t *testing.T) {
 		},
 		{
 			"repeated-avro",
-			NewKafkaAvroCodec("mock://test", newSchema(t, 42, TokenATableOpInfo, nil)),
+			NewKafkaAvroCodec("mock://test", tSchema, tSchema.Codec()),
 			args{
 				nil,
 				dbOp.asMap("dkafka.test.TokenATableOp"),
@@ -352,19 +352,8 @@ func newSchema(t testing.TB, id uint32, s string, c *goavro.Codec) *srclient.Sch
 	return schema
 }
 
-func assetConverter(f func([]byte, interface{}) ([]byte, error)) func([]byte, interface{}) ([]byte, error) {
-	return func(bytes []byte, value interface{}) ([]byte, error) {
-		switch valueType := value.(type) {
-		case eos.Asset:
-			amount := big.NewRat(int64(valueType.Amount), int64(math.Pow10(int(valueType.Symbol.Precision))))
-			return f(bytes, map[string]interface{}{"amount": amount, "symbol": valueType.Symbol.Symbol})
-		default:
-			return bytes, fmt.Errorf("unsupported asset type: %T", value)
-		}
-	}
-}
-
 func newAvroCodec(t testing.TB, s string) *goavro.Codec {
+	// codec, err := goavro.NewCodec(s)
 	codec, err := goavro.NewCodecWithConverters(s, map[string]goavro.ConvertBuild{"eosio.Asset": assetConverter})
 	if err != nil {
 		t.Fatalf("goavro.NewCodec() on schema: %s, error: %v", s, err)
@@ -400,7 +389,7 @@ func BenchmarkCodecMarshal(b *testing.B) {
 		"age":        int32(24),
 		"id":         int64(42),
 	}
-
+	uSchema := newSchema(b, 42, UserSchema, nil)
 	tests := []struct {
 		name  string
 		codec Codec
@@ -413,7 +402,7 @@ func BenchmarkCodecMarshal(b *testing.B) {
 		},
 		{
 			"avro",
-			NewKafkaAvroCodec("mock://test", newSchema(b, 42, UserSchema, nil)),
+			NewKafkaAvroCodec("mock://test", uSchema, uSchema.Codec()),
 			user,
 		},
 	}
@@ -580,6 +569,102 @@ func TestAvroCodecNullAsset(t *testing.T) {
 	}
 	bytes, err := codec.Marshal(nil, map[string]interface{}{
 		"balance": nil,
+	})
+	if err != nil {
+		t.Fatalf("codec.Marshal() error: %v", err)
+	}
+	value, err := codec.Unmarshal(bytes)
+	t.Log(fmt.Sprintf("%v", value))
+	if err != nil {
+		t.Fatalf("codec.Unmarshal() error: %v", err)
+	}
+}
+
+var AccountsTableNotificationSchema = `
+{
+    "type": "record",
+    "name": "AccountsTableNotification",
+    "namespace": "test.dkafka",
+    "fields": [
+        {
+            "name": "db_op",
+            "type": {
+                "type": "record",
+                "name": "AccountsTableOpInfo",
+                "fields": [
+                    {
+                        "name": "old_json",
+                        "type": [
+                            "null",
+                            {
+                                "type": "record",
+                                "name": "AccountsTableOp",
+                                "fields": [
+                                    {
+                                        "name": "balance",
+                                        "type": {
+                                            "namespace": "eosio",
+                                            "name": "Asset",
+                                            "type": "record",
+                                            "convert": "eosio.Asset",
+                                            "fields": [
+                                                {
+                                                    "name": "amount",
+                                                    "type": {
+                                                        "type": "bytes",
+                                                        "logicalType": "decimal",
+                                                        "precision": 32,
+                                                        "scale": 8
+                                                    }
+                                                },
+                                                {
+                                                    "name": "symbol",
+                                                    "type": "string"
+                                                }
+                                            ]
+                                        }
+                                    }
+                                ]
+                            }
+                        ],
+                        "default": null
+                    }
+                ]
+            }
+        }
+    ]
+}
+`
+
+func TestAccountsTableNotification(t *testing.T) {
+
+	schema := newSchema(t, 42, AccountsTableNotificationSchema, nil)
+
+	codec := KafkaAvroCodec{
+		"mock://test/schemas/ids/%d",
+		RegisteredSchema{
+			id:      uint32(schema.ID()),
+			schema:  schema.Schema(),
+			version: schema.Version(),
+			codec:   schema.Codec(),
+		},
+	}
+	asset := eos.Asset{
+		Amount: eos.Int64(100_000_000),
+		Symbol: eos.Symbol{
+			Precision: uint8(8),
+			Symbol:    "UOS",
+		},
+	}
+	// asset := map[string]interface{}{
+	// 	"balance": "1.0",
+	// }
+	bytes, err := codec.Marshal(nil, map[string]interface{}{
+		"db_op": map[string]interface{}{
+			"old_json": map[string]interface{}{
+				"balance": asset,
+			},
+		},
 	})
 	if err != nil {
 		t.Fatalf("codec.Marshal() error: %v", err)

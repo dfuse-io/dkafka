@@ -1,11 +1,15 @@
 package dkafka
 
 import (
+	"encoding/json"
 	"fmt"
+	"math"
+	"math/big"
 	"strings"
 
 	"github.com/eoscanada/eos-go"
 	"github.com/iancoleman/strcase"
+	"github.com/linkedin/goavro/v2"
 	"go.uber.org/zap"
 )
 
@@ -281,7 +285,70 @@ func abiFieldToRecordField(abi *eos.ABI, fieldDef eos.FieldDef) (FieldSchema, er
    built_in_types.emplace("extended_asset",            pack_unpack<extended_asset>());
 */
 
-var avroPrimitiveTypeByBuiltInTypes map[string]string = map[string]string{
+// var assetSchema RecordSchema = RecordSchema{
+// 	Namespace: "eosio",
+// 	Name: "Asset",
+// 	Type: "record",
+// 	Doc: "Stores information for owner of asset",
+// 	Convert: "eosio.Asset",
+// 	Fields: []FieldSchema {
+// 		{
+// 			"name": "amount",
+// 			"type": {
+// 				"type": "bytes",
+// 				"logicalType": "decimal",
+// 				"precision": 28,
+// 				"scale": 8,
+// 			}
+// 		},
+// 		{
+// 			"name": "symbol",
+// 			"type": "string"
+// 		},
+// 	},
+
+// }
+
+func assetConverter(f func([]byte, interface{}) ([]byte, error)) func([]byte, interface{}) ([]byte, error) {
+	return func(bytes []byte, value interface{}) ([]byte, error) {
+		switch valueType := value.(type) {
+		case eos.Asset:
+			amount := big.NewRat(int64(valueType.Amount), int64(math.Pow10(int(valueType.Symbol.Precision))))
+			return f(bytes, map[string]interface{}{"amount": amount, "currency": valueType.Symbol.Symbol})
+		default:
+			return bytes, fmt.Errorf("unsupported asset type: %T", value)
+		}
+	}
+}
+
+var schemaTypeConverters = map[string]goavro.ConvertBuild{
+	"eosio.Asset": assetConverter,
+}
+
+var assetSchema json.RawMessage = json.RawMessage(`
+{
+	"namespace": "eosio",
+	"name": "Asset",
+	"type": "record",
+	"convert": "eosio.Asset",
+	"fields": [
+		{
+			"name": "amount",
+			"type": {
+				"type": "bytes",
+				"logicalType": "decimal",
+				"precision": 32,
+				"scale": 8
+			}
+		},
+		{
+			"name": "currency",
+			"type": "string"
+		}
+	]
+}`)
+
+var avroPrimitiveTypeByBuiltInTypes map[string]interface{} = map[string]interface{}{
 	"bool":                 "boolean",
 	"int8":                 "int",
 	"uint8":                "int",
@@ -308,7 +375,7 @@ var avroPrimitiveTypeByBuiltInTypes map[string]string = map[string]string{
 	"signature":            "string", // FIXME check with blockchain team
 	"symbol":               "string", // FIXME check with blockchain team
 	"symbol_code":          "string", // FIXME check with blockchain team
-	"asset":                "string", // FIXME check with blockchain team
+	"asset":                assetSchema,
 }
 
 // "int128":    "",

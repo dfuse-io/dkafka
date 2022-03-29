@@ -116,8 +116,6 @@ func (tg TableGenerator) doApply(gc GenContext) ([]generation, error) {
 		if err != nil {
 			return nil, err
 		}
-		// TODO manage key based on table name in tableNames => return a key generator function
-		// key := fmt.Sprintf("%s:%s", decodedDBOp.Scope, decodedDBOp.PrimaryKey)
 		key := extractKey(dbOp)
 		tableCamelCase, ceType := tableCeType(dbOp.TableName)
 		ceId := hashString(fmt.Sprintf(

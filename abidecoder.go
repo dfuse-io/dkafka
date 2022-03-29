@@ -10,6 +10,7 @@ import (
 	pbabicodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/abicodec/v1"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 	"github.com/eoscanada/eos-go"
+	"github.com/linkedin/goavro/v2"
 	"github.com/riferrei/srclient"
 	"go.uber.org/zap"
 )
@@ -87,7 +88,11 @@ func (c *KafkaAvroABICodec) GetCodec(name string, blockNum uint32) (Codec, error
 		return nil, fmt.Errorf("CreateSchema on subject: '%s', schema:\n%s error: %w", subject, string(jsonSchema), err)
 	}
 	zlog.Debug("create kafka avro codec", zap.Int("ID", schema.ID()))
-	codec := NewKafkaAvroCodec(c.schemaRegistryURL, schema)
+	ac, err := goavro.NewCodecWithConverters(schema.Schema(), schemaTypeConverters)
+	if err != nil {
+		return nil, fmt.Errorf("goavro.NewCodecWithConverters error: %w, with schema %s", err, string(jsonSchema))
+	}
+	codec := NewKafkaAvroCodec(c.schemaRegistryURL, schema, ac)
 	zlog.Debug("register codec into cache")
 	c.codecCache[name] = codec
 	return codec, nil
