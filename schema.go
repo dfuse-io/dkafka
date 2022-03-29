@@ -314,7 +314,7 @@ func assetConverter(f func([]byte, interface{}) ([]byte, error)) func([]byte, in
 		switch valueType := value.(type) {
 		case eos.Asset:
 			amount := big.NewRat(int64(valueType.Amount), int64(math.Pow10(int(valueType.Symbol.Precision))))
-			return f(bytes, map[string]interface{}{"amount": amount, "currency": valueType.Symbol.Symbol})
+			return f(bytes, map[string]interface{}{"amount": amount, "symbol": valueType.Symbol.Symbol})
 		default:
 			return bytes, fmt.Errorf("unsupported asset type: %T", value)
 		}
@@ -342,7 +342,7 @@ var assetSchema json.RawMessage = json.RawMessage(`
 			}
 		},
 		{
-			"name": "currency",
+			"name": "symbol",
 			"type": "string"
 		}
 	]
