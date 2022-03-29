@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 	"github.com/google/cel-go/cel"
 	"go.uber.org/zap"
@@ -29,10 +30,11 @@ type Generator2 interface {
 }
 
 type Generation2 struct {
-	CeType string `json:"ce_type,omitempty"`
-	CeId   []byte `json:"ce_id,omitempty"`
-	Key    string `json:"key,omitempty"`
-	Value  []byte `json:"value,omitempty"`
+	CeType  string         `json:"ce_type,omitempty"`
+	CeId    []byte         `json:"ce_id,omitempty"`
+	Key     string         `json:"key,omitempty"`
+	Value   []byte         `json:"value,omitempty"`
+	Headers []kafka.Header `json:"headers,omitempty"`
 }
 
 type generation struct {
@@ -80,15 +82,18 @@ func (tg TableGenerator) Apply(gc GenContext) (generations []Generation2, err er
 		if err != nil {
 			return nil, err
 		}
+		zlog.Debug("marshal table", zap.String("name", g.EntityName))
 		value, err := codec.Marshal(nil, g.Value)
 		if err != nil {
+			zlog.Debug("fail fast on codec.Marshal()", zap.Error(err))
 			return nil, err
 		}
 		generations = append(generations, Generation2{
-			CeType: g.CeType,
-			CeId:   g.CeId,
-			Key:    g.Key,
-			Value:  value,
+			CeType:  g.CeType,
+			CeId:    g.CeId,
+			Key:     g.Key,
+			Value:   value,
+			Headers: codec.GetHeaders(),
 		})
 	}
 	zlog.Debug("return messages after marshal operation", zap.Any("nb_messages", len(generations)))
@@ -174,10 +179,11 @@ func (ag ActionGenerator2) Apply(gc GenContext) ([]Generation2, error) {
 			}
 		}
 		return []Generation2{{
-			CeType: g.CeType,
-			CeId:   g.CeId,
-			Key:    g.Key,
-			Value:  value,
+			CeType:  g.CeType,
+			CeId:    g.CeId,
+			Key:     g.Key,
+			Value:   value,
+			Headers: codec.GetHeaders(),
 		}}, nil
 	} else {
 		return nil, nil

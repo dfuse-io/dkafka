@@ -317,7 +317,7 @@ func Test_buildCodecForTypeDescribedByString_CacheRespectsPrecisionScale(t *test
 	}
 
 	// cached bytes.decimal codec with matching precision.scale is returned
-	cacheHit, err := buildCodecForTypeDescribedByString(cache, "", "bytes", schemaMap, nil)
+	cacheHit, err := buildCodecForTypeDescribedByString(nil, cache, "", "bytes", schemaMap, nil)
 	ensureError(t, err) // ensure NO error
 	if cacheHit.schemaOriginal != cachedCodecIdentifier {
 		t.Errorf("GOT: %v; WANT: %v", cacheHit.schemaOriginal, cachedCodecIdentifier)
@@ -325,7 +325,7 @@ func Test_buildCodecForTypeDescribedByString_CacheRespectsPrecisionScale(t *test
 
 	// cached codec with unmatching precision.scale is not returned
 	schemaMap["scale"] = float64(1)
-	cacheMiss, err := buildCodecForTypeDescribedByString(cache, "", "bytes", schemaMap, nil)
+	cacheMiss, err := buildCodecForTypeDescribedByString(nil, cache, "", "bytes", schemaMap, nil)
 	ensureError(t, err) // ensure NO error
 	if cacheMiss.schemaOriginal == cachedCodecIdentifier {
 		t.Errorf("GOT: %v; WANT: %v", cacheMiss.schemaOriginal, "!= "+cachedCodecIdentifier)

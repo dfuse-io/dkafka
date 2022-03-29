@@ -56,6 +56,7 @@ type KafkaAvroABICodec struct {
 	schemaRegistryClient srclient.ISchemaRegistryClient
 	account              string
 	codecCache           map[string]Codec
+	schemaRegistryURL    string
 }
 
 func (c *KafkaAvroABICodec) GetCodec(name string, blockNum uint32) (Codec, error) {
@@ -67,6 +68,7 @@ func (c *KafkaAvroABICodec) GetCodec(name string, blockNum uint32) (Codec, error
 	if err != nil {
 		return nil, err
 	}
+	zlog.Debug("create schema from abi", zap.String("entry", name))
 	messageSchema, err := c.getSchema(name, abi)
 	if err != nil {
 		return nil, err
@@ -79,11 +81,14 @@ func (c *KafkaAvroABICodec) GetCodec(name string, blockNum uint32) (Codec, error
 	if traceEnabled {
 		zlog.Debug("register schema", zap.String("subject", subject), zap.ByteString("schema", jsonSchema))
 	}
+	zlog.Debug("register schema", zap.String("subject", subject))
 	schema, err := c.schemaRegistryClient.CreateSchema(subject, string(jsonSchema), srclient.Avro)
 	if err != nil {
 		return nil, fmt.Errorf("CreateSchema on subject: '%s', schema:\n%s error: %w", subject, string(jsonSchema), err)
 	}
-	codec := NewKafkaAvroCodec(schema)
+	zlog.Debug("create kafka avro codec", zap.Int("ID", schema.ID()))
+	codec := NewKafkaAvroCodec(c.schemaRegistryURL, schema)
+	zlog.Debug("register codec into cache")
 	c.codecCache[name] = codec
 	return codec, nil
 }
@@ -103,6 +108,7 @@ func NewKafkaAvroABICodec(
 	getSchema MessageSchemaSupplier,
 	schemaRegistryClient srclient.ISchemaRegistryClient,
 	account string,
+	schemaRegistryURL string,
 ) ABICodec {
 	codec := &KafkaAvroABICodec{
 		decoder,
@@ -110,6 +116,7 @@ func NewKafkaAvroABICodec(
 		schemaRegistryClient,
 		account,
 		make(map[string]Codec, 5),
+		schemaRegistryURL,
 	}
 	decoder.onReload = codec.onReload
 	return codec

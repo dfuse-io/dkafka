@@ -52,6 +52,7 @@ func (m *CdCAdapter) Adapt(blk *pbcodec.Block, step string) ([]*kafka.Message, e
 			})
 
 			if err != nil {
+				zlog.Debug("fail fast on generator.Apply()", zap.Error(err))
 				return nil, err
 			}
 
@@ -74,6 +75,7 @@ func (m *CdCAdapter) Adapt(blk *pbcodec.Block, step string) ([]*kafka.Message, e
 						Value: []byte(step),
 					},
 				)
+				headers = append(headers, generation.Headers...)
 				if correlation != nil {
 					headers = append(headers,
 						kafka.Header{

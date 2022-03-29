@@ -2,11 +2,16 @@ package dkafka
 
 import (
 	"encoding/json"
+	"path"
+	"strings"
 	"testing"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
+	"github.com/golang/protobuf/jsonpb"
 	"github.com/linkedin/goavro/v2"
+	"github.com/riferrei/srclient"
+	"gotest.tools/assert"
 )
 
 func TestCdCAdapter_Adapt(t *testing.T) {
@@ -124,4 +129,64 @@ func tableSchema(t testing.TB, abiFile string, tableName string) string {
 		t.Fatalf("json.Marshal() error: %v", err)
 	}
 	return string(bytes)
+}
+
+func TestCdCAdapter_Adapt_pb(t *testing.T) {
+	tests := []struct {
+		name  string
+		file  string
+		abi   string
+		table string
+	}{
+		{
+			"accounts",
+			"testdata/block-49608395.pb.json",
+			"testdata/eosio.token.abi",
+			"accounts",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			block := &pbcodec.Block{}
+			err := jsonpb.UnmarshalString(string(readFileFromTestdata(t, tt.file)), block)
+			if err != nil {
+				t.Fatalf("jsonpb.UnmarshalString(): %v", err)
+			}
+
+			abiAccount := strings.TrimRight(path.Base(tt.abi), ".abi")
+			var localABIFiles = map[string]string{
+				abiAccount: tt.abi,
+			}
+			abiFiles, err := LoadABIFiles(localABIFiles)
+			if err != nil {
+				t.Fatalf("LoadABIFiles() error: %v", err)
+			}
+			abiDecoder := NewABIDecoder(abiFiles, nil)
+			msg := MessageSchemaGenerator{
+				Namespace: "test.dkafka",
+				Version:   "1.2.3",
+				Account:   abiAccount,
+			}
+			// abi, _ := abiDecoder.abi(abiAccount, 0, false)
+			// schema, _ := msg.getTableSchema("accounts", abi)
+			// jsonSchema, err := json.Marshal(schema)
+			// fmt.Println(string(jsonSchema))
+			g := TableGenerator{
+				tableNames: map[string]ExtractKey{tt.table: extractFullKey},
+				abiCodec:   NewKafkaAvroABICodec(abiDecoder, msg.getTableSchema, srclient.CreateMockSchemaRegistryClient("mock://bench-adapter"), abiAccount, "mock://bench-adapter"),
+			}
+			a := &CdCAdapter{
+				topic:     "test.topic",
+				saveBlock: saveBlockNoop,
+				generator: g,
+				headers:   default_headers,
+			}
+			messages, err := a.Adapt(block, "New")
+			if err != nil {
+				t.Fatalf("Adapt() error: %v", err)
+			}
+			assert.Equal(t, len(messages), 2)
+		})
+	}
 }

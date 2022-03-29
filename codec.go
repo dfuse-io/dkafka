@@ -4,21 +4,26 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"net/url"
 
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/linkedin/goavro/v2"
 	"github.com/riferrei/srclient"
+	"go.uber.org/zap"
 )
 
 type CodecType = string
 
 const (
-	AvroCodec CodecType = "avro"
-	JsonCodec CodecType = "json"
+	AvroCodec   CodecType = "avro"
+	JsonCodec   CodecType = "json"
+	schemaByIDs           = "/schemas/ids/"
 )
 
 type Codec interface {
 	Marshal(buf []byte, value interface{}) ([]byte, error)
 	Unmarshal(buf []byte) (interface{}, error)
+	GetHeaders() []kafka.Header
 }
 
 func NewJSONCodec() Codec {
@@ -26,6 +31,17 @@ func NewJSONCodec() Codec {
 }
 
 type JSONCodec struct{}
+
+var jsonKafkaHearder []kafka.Header = []kafka.Header{
+	{
+		Key:   "content-type",
+		Value: []byte("application/json"),
+	},
+	{
+		Key:   "ce_datacontenttype",
+		Value: []byte("application/json"),
+	},
+}
 
 func (c JSONCodec) Marshal(buf []byte, value interface{}) (bytes []byte, err error) {
 	bytes, err = json.Marshal(value)
@@ -46,8 +62,16 @@ func (c JSONCodec) Unmarshal(buf []byte) (interface{}, error) {
 	return value, nil
 }
 
-func NewKafkaAvroCodec(schema *srclient.Schema) Codec {
+func (c JSONCodec) GetHeaders() []kafka.Header {
+	return jsonKafkaHearder
+}
+
+func NewKafkaAvroCodec(schemaRegistryURL string, schema *srclient.Schema) Codec {
+	u, _ := url.Parse(schemaRegistryURL)
+	u, _ = u.Parse(schemaByIDs)
+	t := fmt.Sprint(u, "%d")
 	return KafkaAvroCodec{
+		schemaURLTemplate: t,
 		schema: RegisteredSchema{
 			id:      uint32(schema.ID()),
 			schema:  schema.Schema(),
@@ -65,7 +89,8 @@ type RegisteredSchema struct {
 }
 
 type KafkaAvroCodec struct {
-	schema RegisteredSchema
+	schemaURLTemplate string
+	schema            RegisteredSchema
 }
 
 func (c KafkaAvroCodec) Marshal(buf []byte, value interface{}) (bytes []byte, err error) {
@@ -77,6 +102,7 @@ func (c KafkaAvroCodec) Marshal(buf []byte, value interface{}) (bytes []byte, er
 	// append append value
 	bytes, err = c.schema.codec.BinaryFromNative(bytes, value)
 	if err != nil {
+		zlog.Debug("on error codec.BinaryFromNative()", zap.Error(err))
 		bytes = buf
 	} else {
 		bytes = append(buf, bytes...)
@@ -98,4 +124,23 @@ func (c KafkaAvroCodec) Unmarshal(buf []byte) (interface{}, error) {
 	}
 	value, _, err := c.schema.codec.NativeFromBinary(buf[5:])
 	return value, err
+}
+
+var avroKafkaHearder []kafka.Header = []kafka.Header{
+	{
+		Key:   "content-type",
+		Value: []byte("application/avro"),
+	},
+	{
+		Key:   "ce_datacontenttype",
+		Value: []byte("application/avro"),
+	},
+}
+
+func (c KafkaAvroCodec) GetHeaders() []kafka.Header {
+	u := fmt.Sprintf(c.schemaURLTemplate, c.schema.id)
+	return append(avroKafkaHearder, kafka.Header{
+		Key:   "ce_dataschema",
+		Value: []byte(u),
+	})
 }

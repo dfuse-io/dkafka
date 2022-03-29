@@ -156,20 +156,10 @@ func (a *App) Run() (err error) {
 		Key:   "ce_specversion",
 		Value: []byte("1.0"),
 	}
-	contentTypeHeader := kafka.Header{
-		Key:   "content-type",
-		Value: []byte("application/json"),
-	}
-	dataContentTypeHeader := kafka.Header{
-		Key:   "ce_datacontenttype",
-		Value: []byte("application/json"),
-	}
 
 	hearders := []kafka.Header{
 		sourceHeader,
 		specHeader,
-		contentTypeHeader,
-		dataContentTypeHeader,
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -329,7 +319,16 @@ func (a *App) NewLegacyCtx(ctx context.Context, producer *kafka.Producer, hearde
 	var cursor string
 	var err error
 	appCtx := appCtx{}
-
+	hearders = append(hearders,
+		kafka.Header{
+			Key:   "content-type",
+			Value: []byte("application/json"),
+		},
+		kafka.Header{
+			Key:   "ce_datacontenttype",
+			Value: []byte("application/json"),
+		},
+	)
 	if a.config.ActionsExpr != "" {
 		adapter, err = newActionsAdapter(a.config.KafkaTopic,
 			saveBlock,
@@ -449,24 +448,35 @@ type BlockStep struct {
 
 func blockHandler(ctx context.Context, adapter Adapter, s Sender, in <-chan BlockStep, ticks <-chan time.Time, out chan<- error) {
 	var lastCursor string
+	hasFail := false
 	for {
 		select {
 		case blkStep := <-in:
+			if hasFail {
+				zlog.Debug("skip incoming block message after failure")
+				continue
+			}
 			kafkaMsgs, err := adapter.Adapt(blkStep.blk, blkStep.step)
 			if err != nil {
+				hasFail = true
+				zlog.Debug("fail fast on adapter.Adapt() send message to -> out chan", zap.Error(err))
 				out <- fmt.Errorf("transform to kafka message at: %s, %w", blkStep.cursor, err)
-				return
 			}
 			lastCursor = blkStep.cursor
 			if len(kafkaMsgs) == 0 {
 				continue
 			}
 			if err = s.Send(ctx, kafkaMsgs, blkStep.cursor); err != nil {
+				hasFail = true
+				zlog.Debug("fail fast on sender.Send() send message to -> out chan", zap.Error(err))
 				out <- fmt.Errorf("send to kafka message at: %s, %w", blkStep.cursor, err)
-				return
 			}
 			messagesSent.Add(float64(len(kafkaMsgs)))
 		case <-ticks:
+			if hasFail {
+				zlog.Debug("skip incoming tick message after failure")
+				continue
+			}
 			c, err := forkable.CursorFromOpaque(lastCursor)
 			if err != nil {
 				zlog.Error("cannot decode cursor", zap.String("cursor", lastCursor), zap.Error(err))
@@ -480,8 +490,9 @@ func blockHandler(ctx context.Context, adapter Adapter, s Sender, in <-chan Bloc
 				zap.Stringer("cursor_LIB", c.LIB),
 			)
 			if err := s.SaveCP(ctx, lastCursor); err != nil {
+				hasFail = true
+				zlog.Debug("fail fast on sender.SaveCP() send message to -> out chan", zap.Error(err))
 				out <- fmt.Errorf("fail to save check point: %s, %w", lastCursor, err)
-				return
 			}
 		}
 	}
@@ -583,7 +594,7 @@ func newABICodec(codec string, account string, schemaRegistryURL string, abiDeco
 		return NewJsonABICodec(abiDecoder, account), nil
 	case AvroCodec:
 		schemaRegistryClient := srclient.CreateSchemaRegistryClient(schemaRegistryURL)
-		return NewKafkaAvroABICodec(abiDecoder, getSchema, schemaRegistryClient, account), nil
+		return NewKafkaAvroABICodec(abiDecoder, getSchema, schemaRegistryClient, account, schemaRegistryURL), nil
 	default:
 		return nil, fmt.Errorf("unsupported codec type: %s", codec)
 	}

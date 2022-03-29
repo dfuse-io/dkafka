@@ -65,14 +65,14 @@ func Union(name string, datum interface{}) interface{} {
 // makeCodecInfo takes the schema array
 // and builds some lookup indices
 // returning a codecInfo
-func makeCodecInfo(st map[string]*Codec, enclosingNamespace string, schemaArray []interface{}, cb *codecBuilder) (codecInfo, error) {
+func makeCodecInfo(converters map[string]ConvertBuild, st map[string]*Codec, enclosingNamespace string, schemaArray []interface{}, cb *codecBuilder) (codecInfo, error) {
 	allowedTypes := make([]string, len(schemaArray)) // used for error reporting when encoder receives invalid datum type
 	codecFromIndex := make([]*Codec, len(schemaArray))
 	codecFromName := make(map[string]*Codec, len(schemaArray))
 	indexFromName := make(map[string]int, len(schemaArray))
 
 	for i, unionMemberSchema := range schemaArray {
-		unionMemberCodec, err := buildCodec(st, enclosingNamespace, unionMemberSchema, cb)
+		unionMemberCodec, err := buildCodec(converters, st, enclosingNamespace, unionMemberSchema, cb)
 		if err != nil {
 			return codecInfo{}, fmt.Errorf("Union item %d ought to be valid Avro type: %s", i+1, err)
 		}
@@ -223,12 +223,12 @@ func textualFromNative(cr *codecInfo) func(buf []byte, datum interface{}) ([]byt
 		return nil, fmt.Errorf("cannot encode textual union: non-nil values ought to be specified with Go map[string]interface{}, with single key equal to type name, and value equal to datum value: %v; received: %T", cr.allowedTypes, datum)
 	}
 }
-func buildCodecForTypeDescribedBySlice(st map[string]*Codec, enclosingNamespace string, schemaArray []interface{}, cb *codecBuilder) (*Codec, error) {
+func buildCodecForTypeDescribedBySlice(converters map[string]ConvertBuild, st map[string]*Codec, enclosingNamespace string, schemaArray []interface{}, cb *codecBuilder) (*Codec, error) {
 	if len(schemaArray) == 0 {
 		return nil, errors.New("Union ought to have one or more members")
 	}
 
-	cr, err := makeCodecInfo(st, enclosingNamespace, schemaArray, cb)
+	cr, err := makeCodecInfo(converters, st, enclosingNamespace, schemaArray, cb)
 	if err != nil {
 		return nil, err
 	}
@@ -273,12 +273,12 @@ func buildCodecForTypeDescribedBySlice(st map[string]*Codec, enclosingNamespace 
 // and then it will remain avro-json object
 // avro data is not serialized back into standard json
 // the data goes to avro-json and stays that way
-func buildCodecForTypeDescribedBySliceJSON(st map[string]*Codec, enclosingNamespace string, schemaArray []interface{}, cb *codecBuilder) (*Codec, error) {
+func buildCodecForTypeDescribedBySliceJSON(converters map[string]ConvertBuild, st map[string]*Codec, enclosingNamespace string, schemaArray []interface{}, cb *codecBuilder) (*Codec, error) {
 	if len(schemaArray) == 0 {
 		return nil, errors.New("Union ought to have one or more members")
 	}
 
-	cr, err := makeCodecInfo(st, enclosingNamespace, schemaArray, cb)
+	cr, err := makeCodecInfo(converters, st, enclosingNamespace, schemaArray, cb)
 	if err != nil {
 		return nil, err
 	}

@@ -296,7 +296,7 @@ func Benchmark_adapter_adapt(b *testing.B) {
 				Version:   "1.2.3",
 				Account:   "eosio.nft.ft",
 			}
-			abiCodec := NewKafkaAvroABICodec(abiDecoder, msg.getTableSchema, srclient.CreateMockSchemaRegistryClient("mock://bench-adapter"), msg.Account)
+			abiCodec := NewKafkaAvroABICodec(abiDecoder, msg.getTableSchema, srclient.CreateMockSchemaRegistryClient("mock://bench-adapter"), msg.Account, "mock://bench-adapter")
 			abiCodec.GetCodec("factory.a", 0)
 			adp = &CdCAdapter{
 				topic:     "test.topic",
@@ -318,7 +318,7 @@ func Benchmark_adapter_adapt(b *testing.B) {
 				Version:   "1.2.3",
 				Account:   "eosio.nft.ft",
 			}
-			abiCodec := NewKafkaAvroABICodec(abiDecoder, msg.getActionSchema, srclient.CreateMockSchemaRegistryClient("mock://bench-adapter"), msg.Account)
+			abiCodec := NewKafkaAvroABICodec(abiDecoder, msg.getActionSchema, srclient.CreateMockSchemaRegistryClient("mock://bench-adapter"), msg.Account, "mock://bench-adapter")
 			abiCodec.GetCodec("create", 0)
 			adp = &CdCAdapter{
 				topic:     "test.topic",
