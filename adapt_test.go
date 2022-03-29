@@ -123,16 +123,25 @@ func tableSchema(t testing.TB, abiFile string, tableName string) string {
 
 func TestCdCAdapter_Adapt_pb(t *testing.T) {
 	tests := []struct {
-		name  string
-		file  string
-		abi   string
-		table string
+		name       string
+		file       string
+		abi        string
+		table      string
+		nbMessages int
 	}{
 		{
 			"accounts",
 			"testdata/block-49608395.pb.json",
 			"testdata/eosio.token.abi",
 			"accounts",
+			2,
+		},
+		{
+			"nft-factory",
+			"testdata/block-50705256.pb.json",
+			"testdata/eosio.nft.ft.abi",
+			"factory.a",
+			1,
 		},
 	}
 
@@ -176,7 +185,7 @@ func TestCdCAdapter_Adapt_pb(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Adapt() error: %v", err)
 			}
-			assert.Equal(t, len(messages), 2)
+			assert.Equal(t, len(messages), tt.nbMessages)
 		})
 	}
 }

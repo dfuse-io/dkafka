@@ -222,7 +222,7 @@ func Test_resolveFieldTypeSchema(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolveFieldTypeSchema(tt.args.abi, tt.args.fieldType)
+			got, err := resolveFieldTypeSchema(tt.args.abi, tt.args.fieldType, make(map[string]string))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("resolveFieldTypeSchema() error = %v, wantErr %v", err, tt.wantErr)
 				return

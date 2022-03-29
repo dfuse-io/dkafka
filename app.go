@@ -460,7 +460,7 @@ func blockHandler(ctx context.Context, adapter Adapter, s Sender, in <-chan Bloc
 			if err != nil {
 				hasFail = true
 				zlog.Debug("fail fast on adapter.Adapt() send message to -> out chan", zap.Error(err))
-				out <- fmt.Errorf("transform to kafka message at: %s, %w", blkStep.cursor, err)
+				out <- fmt.Errorf("transform to kafka message at block_num: %d, cursor: %s, , %w", blkStep.blk.Number, blkStep.cursor, err)
 			}
 			lastCursor = blkStep.cursor
 			if len(kafkaMsgs) == 0 {

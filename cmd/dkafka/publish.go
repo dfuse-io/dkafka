@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/dfuse-io/dkafka"
@@ -20,17 +19,6 @@ var PublishCmd = &cobra.Command{
 }
 
 var compressionTypes = NewEnumFlag("none", "gzip", "snappy", "lz4", "zstd")
-
-var GenPublishSchemaCmd = &cobra.Command{
-	Use:   "gen-publish-schema [-n namespace] [-T ce_type] --table table  --action act abi-file-def",
-	Short: "Generate filtered avro schema from ABI file definition",
-	Long: `Generate avro schema from ABI file definition. The ABI file argument (abi-file-def)
-must be in this format:
-'{account}:{path/to/filename}' (ex: 'eosio.token:/tmp/eosio_token.abi').`,
-	Args:      cobra.ExactArgs(1),
-	ValidArgs: []string{"abi-file-path"},
-	RunE:      generateAvroSchema,
-}
 
 func init() {
 	RootCmd.AddCommand(PublishCmd)
@@ -130,16 +118,6 @@ will never be fetched or updated`)
 	PublishCmd.Flags().String("abicodec-grpc-addr", "", "if set, will connect to this endpoint to fetch contract ABIs")
 	PublishCmd.Flags().Bool("fail-on-undecodable-db-op", false, `If true, program will fail and exit when a db OP cannot be decoded
 (ex: missing or incompatible ABI file or invalid ABI fetched from abicodec`)
-
-	RootCmd.AddCommand(GenPublishSchemaCmd)
-
-	GenPublishSchemaCmd.Flags().StringP("action", "a", "", "action name on which generates the schema")
-	GenPublishSchemaCmd.Flags().StringP("table", "t", "", "exclusive table added to the db_ops")
-	GenPublishSchemaCmd.Flags().StringP("namespace", "n", "", "namespace of the message")
-	GenPublishSchemaCmd.Flags().StringP("version", "V", "", "version of the schema in a semver form: 1.2.3")
-	GenPublishSchemaCmd.Flags().StringP("type", "T", "", "Optional type of the message otherwise <Account><ActionName>On<TableName>Notification")
-	GenPublishSchemaCmd.Flags().StringP("output-dir", "o", "./", `Optional output directory for the avro schema. The file name pattern is
-	the schema type in snake-case with '.avsc' extension`)
 }
 
 func publishRunE(cmd *cobra.Command, args []string) error {
@@ -204,61 +182,4 @@ func publishRunE(cmd *cobra.Command, args []string) error {
 
 	<-app.Terminated()
 	return app.Err()
-}
-
-func generateAvroSchema(cmd *cobra.Command, args []string) error {
-	SetupLogger()
-	action := viper.GetString("gen-publish-schema-cmd-action")
-	table := viper.GetString("gen-publish-schema-cmd-table")
-	namespace := viper.GetString("gen-publish-schema-cmd-namespace")
-	ceType := viper.GetString("gen-publish-schema-cmd-type")
-	outputDir := viper.GetString("gen-publish-schema-cmd-output-dir")
-	version := viper.GetString("gen-publish-schema-cmd-version")
-	abiString := args[0]
-
-	account, abiFile, err := dkafka.ParseABIFileSpec(abiString)
-	if err != nil {
-		return err
-	}
-
-	if _, err := os.Stat(outputDir); err != nil {
-		zlog.Fatal("cannot reach", zap.String("output-dir", outputDir), zap.Error(err))
-	}
-
-	zlog.Info(
-		"generate avro schema with params",
-		zap.String("account", account),
-		zap.String("table", table),
-		zap.String("namespace", namespace),
-		zap.String("type", ceType),
-		zap.String("version", version),
-		zap.String("abi", abiString),
-	)
-	abi, err := dkafka.LoadABIFile(abiFile)
-	if err != nil {
-		return err
-	}
-	abiSpec := dkafka.AbiSpec{
-		Account: account,
-		Abi:     abi,
-	}
-	opts := dkafka.AvroSchemaGenOptions{
-		Action:    action,
-		Table:     table,
-		Namespace: namespace,
-		Type:      ceType,
-		Version:   version,
-		AbiSpec:   abiSpec,
-	}
-
-	schema, err := dkafka.GenerateSchema(opts)
-	if err != nil {
-		zlog.Fatal("generation error", zap.Error(err))
-	}
-	zlog.Debug("dkafka.GenerateSchema()", zap.Any("schema", schema), zap.Error(err))
-	err = saveSchema(schema, "", outputDir)
-	if err != nil {
-		zlog.Fatal("saveSchema()", zap.Error(err))
-	}
-	return nil
 }

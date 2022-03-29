@@ -72,7 +72,7 @@
                         "meta_uris": [
                             "https://s3.us-east-1.wasabisys.com/ultraio-uniq-staging/d6c999bbbd5f3c122d2261e2b787acb3e03aac6a1852024b9656c85d7a99fabd.zip"
                         ],
-                        "minimum_resell_price": "0.00000000 USD",
+                        "minimum_resell_price": {"amount":0,"precision":8,"symbol":"USD"},
                         "minted_tokens_no": 0,
                         "recall_window_start": 0,
                         "resale_shares": [

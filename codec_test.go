@@ -1,7 +1,6 @@
 package dkafka
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"testing"
@@ -504,8 +503,6 @@ func TestAvroCodecAsset(t *testing.T) {
 			Symbol:    "UOS",
 		},
 	}
-	b, _ := json.Marshal(asset)
-	fmt.Println(string(b))
 	bytes, err := codec.Marshal(nil, map[string]interface{}{
 		"balance": asset,
 	})
@@ -539,8 +536,6 @@ func TestAvroCodecNullableAsset(t *testing.T) {
 			Symbol:    "UOS",
 		},
 	}
-	b, _ := json.Marshal(asset)
-	fmt.Println(string(b))
 	bytes, err := codec.Marshal(nil, map[string]interface{}{
 		"balance": asset,
 	})
@@ -631,7 +626,11 @@ var AccountsTableNotificationSchema = `
                     }
                 ]
             }
-        }
+        },
+		{
+			"name": "minimum_resell_price",
+			"type": "eosio.Asset"
+		}
     ]
 }
 `
@@ -665,6 +664,7 @@ func TestAccountsTableNotification(t *testing.T) {
 				"balance": asset,
 			},
 		},
+		"minimum_resell_price": asset,
 	})
 	if err != nil {
 		t.Fatalf("codec.Marshal() error: %v", err)

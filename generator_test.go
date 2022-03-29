@@ -241,7 +241,7 @@ func Test_ActionGenerator_Apply(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(path.Base(tt.file), func(t *testing.T) {
+		t.Run(path.Base(tt.name), func(t *testing.T) {
 
 			byteValue := readFileFromTestdata(t, tt.file)
 
@@ -324,7 +324,7 @@ var DB_OPS_2 string = `
 			"meta_uris": [
 				"https://s3.us-east-1.wasabisys.com/ultraio-uniq-staging/d6c999bbbd5f3c122d2261e2b787acb3e03aac6a1852024b9656c85d7a99fabd.zip"
 			],
-			"minimum_resell_price": "0.00000000 USD",
+			"minimum_resell_price": {"amount":0,"precision":8,"symbol":"USD"},
 			"minted_tokens_no": 0,
 			"recall_window_start": 0,
 			"resale_shares": [
@@ -390,7 +390,7 @@ var DB_OPS_FACTORY_A string = `
 			"meta_uris": [
 				"https://s3.us-east-1.wasabisys.com/ultraio-uniq-staging/d6c999bbbd5f3c122d2261e2b787acb3e03aac6a1852024b9656c85d7a99fabd.zip"
 			],
-			"minimum_resell_price": "0.00000000 USD",
+			"minimum_resell_price": {"amount":0,"precision":8,"symbol":"USD"},
 			"minted_tokens_no": 0,
 			"recall_window_start": 0,
 			"resale_shares": [
@@ -451,7 +451,7 @@ var DB_OPS_4 string = `
 			"meta_uris": [
 				"https://s3.us-east-1.wasabisys.com/ultraio-uniq-staging/d6c999bbbd5f3c122d2261e2b787acb3e03aac6a1852024b9656c85d7a99fabd.zip"
 			],
-			"minimum_resell_price": "0.00000000 USD",
+			"minimum_resell_price": {"amount":0,"precision":8,"symbol":"USD"},
 			"minted_tokens_no": 0,
 			"recall_window_start": 0,
 			"resale_shares": [
@@ -507,7 +507,7 @@ var DB_OPS_4 string = `
 			"meta_uris": [
 				"https://s3.us-east-1.wasabisys.com/ultraio-uniq-staging/d6c999bbbd5f3c122d2261e2b787acb3e03aac6a1852024b9656c85d7a99fabd.zip"
 			],
-			"minimum_resell_price": "0.00000000 USD",
+			"minimum_resell_price": {"amount":0,"precision":8,"symbol":"USD"},
 			"minted_tokens_no": 0,
 			"recall_window_start": 0,
 			"resale_shares": [
@@ -625,8 +625,8 @@ func Test_operation_on(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			want := jsonToDBOps(tt.want)
-			if got := tt.op().on(jsonToDBOps(tt.args.decodedDBOps)); !reflect.DeepEqual(got, want) {
-				t.Errorf("projection.on() = %+v\nwant = %+v", got, want)
+			if got := tt.op().on(jsonToDBOps(tt.args.decodedDBOps)); !reflect.DeepEqual(toJSON(got), toJSON(want)) {
+				t.Errorf("projection.on() = %+v\nwant = %+v", string(toJSON(got)), string(toJSON(want)))
 			}
 		})
 	}

@@ -581,7 +581,13 @@ func (a *Asset) UnmarshalJSON(data []byte) error {
 }
 
 func (a Asset) MarshalJSON() (data []byte, err error) {
-	return json.Marshal(a.String())
+	ratAmount := big.NewRat(int64(a.Amount), int64(math.Pow10(int(a.Symbol.Precision))))
+	amount, _ := ratAmount.Float64()
+	return json.Marshal(map[string]interface{}{
+		"amount":    amount,
+		"symbol":    a.Symbol.Symbol,
+		"precision": a.Symbol.Precision,
+	})
 }
 
 type Permission struct {

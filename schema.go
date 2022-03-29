@@ -126,71 +126,29 @@ func GenerateTableSchema(options NamedSchemaGenOptions) (MessageSchema, error) {
 	return schema, nil
 }
 
-func GenerateSchema(options AvroSchemaGenOptions) (MessageSchema, error) {
-	actionCamelCase := strcase.ToCamel(options.Action)
-	tableCamelCase := strcase.ToCamel(options.Table)
-	accountCamelCase := strcase.ToCamel(options.AbiSpec.Account)
-	baseName := fmt.Sprintf("%s%sOn%s", accountCamelCase, actionCamelCase, tableCamelCase)
-	zlog.Debug("ToCamel()", zap.String("baseName", baseName))
-	ceType := options.Type
-	if ceType == "" {
-		ceType = fmt.Sprintf("%sNotification", baseName)
-	}
-	ceType = strcase.ToCamel(ceType) // to be sure if it's provided by the user
-	namespace, err := getNamespace(options.Namespace, options.AbiSpec)
-	if err != nil {
-		return MessageSchema{}, err
-	}
-	actionDetailsRecordName := fmt.Sprintf("%sActionInfo", baseName)
-	actionParamsRecordName := fmt.Sprintf("%sActionParams", baseName)
-	dbOpRecordName := fmt.Sprintf("%sDBOp", baseName)
-	dbOpInfoRecordName := fmt.Sprintf("%sDBOpInfo", baseName)
-
-	zlog.Debug(
-		"generate avro schema with following names for the records",
-		zap.String("namespace", namespace),
-		zap.String("ce_type", ceType),
-		zap.String("actionInfo", actionDetailsRecordName),
-		zap.String("actionParams", actionParamsRecordName),
-		zap.String("dbOp", dbOpRecordName),
-		zap.String("dbOpInfo", dbOpInfoRecordName),
-	)
-
-	actionParamsSchema, err := ActionToRecord(options.AbiSpec.Abi, eos.ActionName(options.Action))
-	if err != nil {
-		return MessageSchema{}, err
-	}
-	actionParamsSchema.Name = actionParamsRecordName
-	dbOpSchema, err := TableToRecord(options.AbiSpec.Abi, eos.TableName(options.Table))
-	if err != nil {
-		return MessageSchema{}, err
-	}
-	dbOpSchema.Name = dbOpRecordName
-	dbOpInfoSchema := newDBOpInfoRecord(dbOpInfoRecordName, dbOpSchema)
-	schema := newEventSchema(ceType, namespace, options.Version, newActionInfoDetailsSchema(actionDetailsRecordName, actionParamsSchema, dbOpInfoSchema))
-
-	return schema, nil
-}
-
 func ActionToRecord(abi *eos.ABI, name eos.ActionName) (RecordSchema, error) {
+	visited := make(map[string]string)
+	initBuiltInTypesForActions()
 	actionDef := abi.ActionForName(name)
 	if actionDef == nil {
 		return RecordSchema{}, fmt.Errorf("action '%s' not found", name)
 	}
 
-	return structToRecord(abi, actionDef.Type)
+	return structToRecord(abi, actionDef.Type, visited)
 }
 
 func TableToRecord(abi *eos.ABI, name eos.TableName) (RecordSchema, error) {
+	visited := make(map[string]string)
+	initBuiltInTypesForTables()
 	tableDef := abi.TableForName(name)
 	if tableDef == nil {
 		return RecordSchema{}, fmt.Errorf("table '%s' not found", name)
 	}
 
-	return structToRecord(abi, tableDef.Type)
+	return structToRecord(abi, tableDef.Type, visited)
 }
 
-func structToRecord(abi *eos.ABI, structName string) (RecordSchema, error) {
+func structToRecord(abi *eos.ABI, structName string, visited map[string]string) (RecordSchema, error) {
 	s := abi.StructForName(structName)
 	if s == nil {
 		return RecordSchema{}, fmt.Errorf("struct not found: %s", structName)
@@ -199,12 +157,12 @@ func structToRecord(abi *eos.ABI, structName string) (RecordSchema, error) {
 	parentRecord := RecordSchema{}
 	if s.Base != "" {
 		var err error
-		parentRecord, err = structToRecord(abi, s.Base)
+		parentRecord, err = structToRecord(abi, s.Base, visited)
 		if err != nil {
 			return RecordSchema{}, fmt.Errorf("cannot get parent structToRecord() for %s.%s error: %v", structName, s.Base, err)
 		}
 	}
-	fields, err := abiFieldsToRecordFields(abi, s.Fields)
+	fields, err := abiFieldsToRecordFields(abi, s.Fields, visited)
 	fields = append(parentRecord.Fields, fields...)
 	if err != nil {
 		return RecordSchema{}, fmt.Errorf("%s abiFieldsToRecordFields() error: %v", structName, err)
@@ -215,10 +173,10 @@ func structToRecord(abi *eos.ABI, structName string) (RecordSchema, error) {
 	), nil
 }
 
-func abiFieldsToRecordFields(abi *eos.ABI, fieldDefs []eos.FieldDef) ([]FieldSchema, error) {
+func abiFieldsToRecordFields(abi *eos.ABI, fieldDefs []eos.FieldDef, visited map[string]string) ([]FieldSchema, error) {
 	fields := make([]FieldSchema, len(fieldDefs))
 	for i, fieldDef := range fieldDefs {
-		field, err := abiFieldToRecordField(abi, fieldDef)
+		field, err := abiFieldToRecordField(abi, fieldDef, visited)
 		if err != nil {
 			return fields, err
 		}
@@ -227,9 +185,9 @@ func abiFieldsToRecordFields(abi *eos.ABI, fieldDefs []eos.FieldDef) ([]FieldSch
 	return fields, nil
 }
 
-func abiFieldToRecordField(abi *eos.ABI, fieldDef eos.FieldDef) (FieldSchema, error) {
+func abiFieldToRecordField(abi *eos.ABI, fieldDef eos.FieldDef, visited map[string]string) (FieldSchema, error) {
 	zlog.Debug("convert field", zap.String("name", fieldDef.Name), zap.String("type", fieldDef.Type))
-	schema, err := resolveFieldTypeSchema(abi, fieldDef.Type)
+	schema, err := resolveFieldTypeSchema(abi, fieldDef.Type, visited)
 	if err != nil {
 		return FieldSchema{}, fmt.Errorf("reslove Field type schema error: %v, on field: %s", err, fieldDef.Name)
 	}
@@ -314,7 +272,7 @@ func assetConverter(f func([]byte, interface{}) ([]byte, error)) func([]byte, in
 		switch valueType := value.(type) {
 		case eos.Asset:
 			amount := big.NewRat(int64(valueType.Amount), int64(math.Pow10(int(valueType.Symbol.Precision))))
-			return f(bytes, map[string]interface{}{"amount": amount, "symbol": valueType.Symbol.Symbol})
+			return f(bytes, map[string]interface{}{"amount": amount, "symbol": valueType.Symbol.Symbol, "precision": valueType.Symbol.Precision})
 		default:
 			return bytes, fmt.Errorf("unsupported asset type: %T", value)
 		}
@@ -325,72 +283,89 @@ var schemaTypeConverters = map[string]goavro.ConvertBuild{
 	"eosio.Asset": assetConverter,
 }
 
-var assetSchema json.RawMessage = json.RawMessage(`
-{
-	"namespace": "eosio",
-	"name": "Asset",
-	"type": "record",
-	"convert": "eosio.Asset",
-	"fields": [
+var avroPrimitiveTypeByBuiltInTypes map[string]interface{}
+
+var assetSchema RecordSchema = RecordSchema{
+	Type:      "record",
+	Name:      "Asset",
+	Namespace: "eosio",
+	Convert:   "eosio.Asset",
+	Fields: []FieldSchema{
 		{
-			"name": "amount",
-			"type": {
+			Name: "amount",
+			Type: json.RawMessage(`{
 				"type": "bytes",
 				"logicalType": "decimal",
 				"precision": 32,
 				"scale": 8
-			}
+			}`),
 		},
 		{
-			"name": "symbol",
-			"type": "string"
-		}
-	]
-}`)
-
-var avroPrimitiveTypeByBuiltInTypes map[string]interface{} = map[string]interface{}{
-	"bool":                 "boolean",
-	"int8":                 "int",
-	"uint8":                "int",
-	"int16":                "int",
-	"uint16":               "int",
-	"int32":                "int",
-	"uint32":               "long",
-	"int64":                "long",
-	"uint64":               "long", // FIXME maybe use Decimal here see goavro or FIXED
-	"varint32":             "int",
-	"varuint32":            "long",
-	"float32":              "float",
-	"float64":              "double",
-	"time_point":           "string", // fork/eos-go/abidecoder.go TODO add ABI.nativeTime bool to skip time to string conversion in abidecoder read method
-	"time_point_sec":       "string", // fork/eos-go/abidecoder.go
-	"block_timestamp_type": "string", // fork/eos-go/abidecoder.go
-	"name":                 "string",
-	"bytes":                "bytes",
-	"string":               "string",
-	"checksum160":          "bytes",
-	"checksum256":          "bytes",
-	"checksum512":          "bytes",
-	"public_key":           "string", // FIXME check with blockchain team
-	"signature":            "string", // FIXME check with blockchain team
-	"symbol":               "string", // FIXME check with blockchain team
-	"symbol_code":          "string", // FIXME check with blockchain team
-	"asset":                assetSchema,
+			Name: "symbol",
+			Type: "string",
+		},
+		{
+			Name: "precision",
+			Type: "int",
+		},
+	},
 }
+
+var avroRecordTypeByBuiltInTypes map[string]RecordSchema
 
 // "int128":    "",
 // "uint128":   "",
 // "float128",
 // "extended_asset",
 
-func resolveFieldTypeSchema(abi *eos.ABI, fieldType string) (Schema, error) {
+func initBuiltInTypesForTables() {
+	avroPrimitiveTypeByBuiltInTypes = map[string]interface{}{
+		"bool":                 "boolean",
+		"int8":                 "int",
+		"uint8":                "int",
+		"int16":                "int",
+		"uint16":               "int",
+		"int32":                "int",
+		"uint32":               "long",
+		"int64":                "long",
+		"uint64":               "long", // FIXME maybe use Decimal here see goavro or FIXED
+		"varint32":             "int",
+		"varuint32":            "long",
+		"float32":              "float",
+		"float64":              "double",
+		"time_point":           "string", // fork/eos-go/abidecoder.go TODO add ABI.nativeTime bool to skip time to string conversion in abidecoder read method
+		"time_point_sec":       "string", // fork/eos-go/abidecoder.go
+		"block_timestamp_type": "string", // fork/eos-go/abidecoder.go
+		"name":                 "string",
+		"bytes":                "bytes",
+		"string":               "string",
+		"checksum160":          "bytes",
+		"checksum256":          "bytes",
+		"checksum512":          "bytes",
+		"public_key":           "string", // FIXME check with blockchain team
+		"signature":            "string", // FIXME check with blockchain team
+		"symbol":               "string", // FIXME check with blockchain team
+		"symbol_code":          "string", // FIXME check with blockchain team
+	}
+	avroRecordTypeByBuiltInTypes = map[string]RecordSchema{
+		"asset": assetSchema,
+	}
+}
+
+func initBuiltInTypesForActions() {
+	initBuiltInTypesForTables()
+	avroPrimitiveTypeByBuiltInTypes["asset"] = "string"
+	avroRecordTypeByBuiltInTypes = map[string]RecordSchema{}
+}
+
+func resolveFieldTypeSchema(abi *eos.ABI, fieldType string, visited map[string]string) (Schema, error) {
 	zlog.Debug("resolve", zap.String("type", fieldType))
 	// remove binary extension marker if any
 	fieldType = strings.TrimSuffix(fieldType, "$")
 	if elementType := strings.TrimSuffix(fieldType, "[]"); elementType != fieldType {
 		// todo array
 		zlog.Debug("array of", zap.String("element", elementType))
-		itemType, err := resolveFieldTypeSchema(abi, elementType)
+		itemType, err := resolveFieldTypeSchema(abi, elementType, visited)
 		if err != nil {
 			return nil, fmt.Errorf("type %s not found, error: %w", elementType, err)
 		}
@@ -398,32 +373,49 @@ func resolveFieldTypeSchema(abi *eos.ABI, fieldType string) (Schema, error) {
 	}
 	if optionalType := strings.TrimSuffix(fieldType, "?"); optionalType != fieldType {
 		zlog.Debug("optional of", zap.String("type", optionalType))
-		oType, err := resolveFieldTypeSchema(abi, optionalType)
+		oType, err := resolveFieldTypeSchema(abi, optionalType, visited)
 		if err != nil {
 			return nil, fmt.Errorf("type %s not found, error: %w", optionalType, err)
 		}
 		return NewOptional(oType), nil
 	}
-	s, err := resolveType(abi, fieldType)
+	s, err := resolveType(abi, fieldType, visited)
 	if err != nil {
 		return nil, fmt.Errorf("unknown type: %s, error: %v", fieldType, err)
 	}
 	return s, nil
 }
 
-func resolveType(abi *eos.ABI, name string) (Schema, error) {
+func resolveType(abi *eos.ABI, name string, visited map[string]string) (Schema, error) {
 	zlog.Debug("find type", zap.String("name", name))
 	if primitive, found := avroPrimitiveTypeByBuiltInTypes[name]; found {
 		return primitive, nil
 	}
 	// resolve from types
 	if alias, found := abi.TypeNameForNewTypeName(name); found {
-		return resolveFieldTypeSchema(abi, alias)
+		return resolveFieldTypeSchema(abi, alias, visited)
 	}
 	// resolve from structs
-	if record, err := structToRecord(abi, name); err != nil {
+	if referenceName, found := visited[name]; found {
+		return referenceName, nil
+	}
+
+	if record, found := avroRecordTypeByBuiltInTypes[name]; found {
+		visited[name] = reference(record)
+		return record, nil
+	}
+	if record, err := structToRecord(abi, name, visited); err != nil {
 		return nil, err
 	} else {
+		visited[name] = reference(record)
 		return record, nil
+	}
+}
+
+func reference(record RecordSchema) string {
+	if record.Namespace != "" {
+		return fmt.Sprintf("%s.%s", record.Namespace, record.Name)
+	} else {
+		return record.Name
 	}
 }

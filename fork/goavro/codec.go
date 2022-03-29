@@ -584,19 +584,8 @@ func buildCodecForTypeDescribedByMap(converters map[string]ConvertBuild, st map[
 				codec = nil
 				err = fmt.Errorf("convert builder not found with name: %s", c)
 			} else {
-				codec = &Codec{
-					soeHeader:       codec.soeHeader,
-					schemaOriginal:  codec.schemaOriginal,
-					schemaCanonical: codec.schemaCanonical,
-					typeName:        codec.typeName,
-
-					nativeFromTextual: codec.nativeFromTextual,
-					binaryFromNative:  cb(codec.binaryFromNative),
-					nativeFromBinary:  codec.nativeFromBinary,
-					textualFromNative: codec.textualFromNative,
-
-					Rabin: codec.Rabin,
-				}
+				binaryFromNative := codec.binaryFromNative
+				codec.binaryFromNative = cb(binaryFromNative)
 			}
 		}
 	}
