@@ -186,6 +186,11 @@ func TestCdCAdapter_Adapt_pb(t *testing.T) {
 				t.Fatalf("Adapt() error: %v", err)
 			}
 			assert.Equal(t, len(messages), tt.nbMessages)
+			for _, m := range messages {
+				assert.Equal(t, findHeader("content-type", m.Headers), "application/avro")
+				assert.Equal(t, findHeader("ce_datacontenttype", m.Headers), "application/avro")
+				assert.Equal(t, findHeader("ce_dataschema", m.Headers), "mock://bench-adapter/schemas/ids/1")
+			}
 		})
 	}
 }

@@ -251,10 +251,10 @@ Examples:
 - [x] implement correlation id
 - [x] provide a selector for table key => --table-name factory.a:s+k | factory.a:s | factory.a:k |factory.a
 - [ ] add ABI.nativeTime bool to skip time to string conversion in abidecoder `read` method as it is done for `ABI.fitNodeos` property with logical type
-- [ ] fix the issue with some types mapping in `schema.go` like `asset`
+- [x] fix the issue with some types mapping in `schema.go` like `asset`
 - [ ] add support of variants https://developers.eos.io/manuals/eosio.cdt/latest/tutorials/abi-variants
-- [ ] add `ce_dataschema` header
-- [ ] set `ce_datacontenttype` header at codec level or as a return type
+- [x] add `ce_dataschema` header
+- [x] set `ce_datacontenttype` header at codec level or as a return type
 - [x] user ce_type instead of source for the `ce_id`
 - [x] schema registry integration
 - [x] avro codec
