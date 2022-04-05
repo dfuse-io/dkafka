@@ -109,7 +109,6 @@ cdc-tables: build up ## CDC stream on tables
 	$(BINARY_PATH) cdc tables \
 		--dfuse-firehose-grpc-addr=localhost:9000 \
 		--abicodec-grpc-addr=localhost:9001 \
-		--kafka-cursor-topic="cursor" \
 		--kafka-topic="io.dkafka.test" \
 		--kafka-compression-type=$(COMPRESSION_TYPE) \
 		--kafka-compression-level=$(COMPRESSION_LEVEL) \
@@ -121,7 +120,6 @@ cdc-tables-avro: build up ## CDC stream on tables
 	$(BINARY_PATH) cdc tables \
 		--dfuse-firehose-grpc-addr=localhost:9000 \
 		--abicodec-grpc-addr=localhost:9001 \
-		--kafka-cursor-topic="cursor" \
 		--kafka-topic="io.dkafka.test" \
 		--kafka-compression-type=$(COMPRESSION_TYPE) \
 		--kafka-compression-level=$(COMPRESSION_LEVEL) \
@@ -132,7 +130,6 @@ cdc-tables-avro: build up ## CDC stream on tables
 
 cdc-actions: build up ## CDC stream on tables
 	$(BINARY_PATH) cdc actions \
-		--kafka-cursor-topic="cursor" \
 		--kafka-topic="io.dkafka.test" \
 		--kafka-compression-type=$(COMPRESSION_TYPE) \
 		--kafka-compression-level=$(COMPRESSION_LEVEL) \
