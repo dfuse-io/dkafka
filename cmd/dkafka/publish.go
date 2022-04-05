@@ -23,6 +23,11 @@ var compressionTypes = NewEnumFlag("none", "gzip", "snappy", "lz4", "zstd")
 func init() {
 	RootCmd.AddCommand(PublishCmd)
 
+	PublishCmd.Flags().String("kafka-cursor-topic", "_dkafka_cursors", "kafka topic where cursor will be loaded and saved")
+	PublishCmd.Flags().Uint32("kafka-cursor-partition", 0, "kafka partition where cursor will be loaded and saved")
+	PublishCmd.Flags().String("kafka-cursor-consumer-group-id", "dkafkaconsumer", "Consumer group ID for reading cursor")
+	PublishCmd.Flags().String("kafka-transaction-id", "dkafkatransaction", "Unique ID for transactions")
+
 	PublishCmd.Flags().Var(compressionTypes, "kafka-compression-type", compressionTypes.Help("Specify the compression type to use for compressing message sets."))
 	PublishCmd.Flags().Int8("kafka-compression-level", int8(-1), `Compression level parameter for algorithm selected by configuration property
 kafka-compression-type. Higher values will result in better compression at the
@@ -141,10 +146,10 @@ func publishRunE(cmd *cobra.Command, args []string) error {
 		KafkaSSLClientCertFile:     viper.GetString("global-kafka-ssl-client-cert-file"),
 		KafkaSSLClientKeyFile:      viper.GetString("global-kafka-ssl-client-key-file"),
 		KafkaTopic:                 viper.GetString("global-kafka-topic"),
-		KafkaCursorTopic:           viper.GetString("global-kafka-cursor-topic"),
-		KafkaCursorPartition:       int32(viper.GetUint32("global-kafka-cursor-partition")),
-		KafkaCursorConsumerGroupID: viper.GetString("global-kafka-cursor-consumer-group-id"),
-		KafkaTransactionID:         viper.GetString("global-kafka-transaction-id"),
+		KafkaCursorTopic:           viper.GetString("publish-cmd-kafka-cursor-topic"),
+		KafkaCursorPartition:       int32(viper.GetUint32("publish-cmd-kafka-cursor-partition")),
+		KafkaCursorConsumerGroupID: viper.GetString("publish-cmd-kafka-cursor-consumer-group-id"),
+		KafkaTransactionID:         viper.GetString("publish-cmd-kafka-transaction-id"),
 		KafkaCompressionType:       viper.GetString("publish-cmd-kafka-compression-type"),
 		KafkaCompressionLevel:      viper.GetInt("publish-cmd-kafka-compression-level"),
 		KafkaMessageMaxBytes:       viper.GetInt("publish-cmd-kafka-message-max-bytes"),

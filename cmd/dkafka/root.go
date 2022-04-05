@@ -38,12 +38,7 @@ func init() {
 	RootCmd.PersistentFlags().String("kafka-ssl-client-cert-file", "./client.crt.pem", "path to client certificate to authenticate to kafka endpoint")
 	RootCmd.PersistentFlags().String("kafka-ssl-client-key-file", "./client.key.pem", "path to client key to authenticate to kafka endpoint")
 
-	RootCmd.PersistentFlags().String("kafka-transaction-id", "dkafkatransaction", "Unique ID for transactions")
-
 	RootCmd.PersistentFlags().String("kafka-topic", "default", "kafka topic to use for all events writes or reads")
-	RootCmd.PersistentFlags().String("kafka-cursor-topic", "_dkafka_cursors", "kafka topic where cursor will be loaded and saved")
-	RootCmd.PersistentFlags().Uint32("kafka-cursor-partition", 0, "kafka partition where cursor will be loaded and saved")
-	RootCmd.PersistentFlags().String("kafka-cursor-consumer-group-id", "dkafkaconsumer", "Consumer group ID for reading cursor")
 
 	RootCmd.PersistentFlags().String("log-format", "text", "Format for logging to stdout. Either 'text' or 'stackdriver'")
 	RootCmd.PersistentFlags().CountP("verbose", "v", "Enables verbose output (-vvvv for max verbosity)")

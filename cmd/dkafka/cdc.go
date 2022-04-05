@@ -86,8 +86,7 @@ match your producers (same apply for consumers)
 	CdCCmd.PersistentFlags().Int64("start-block-num", 0, `If we are in {batch-mode} or no prior cursor exists,
 start streaming from this block number (if negative, relative to HEAD)`)
 	CdCCmd.PersistentFlags().Uint64("stop-block-num", 0, "If non-zero, stop processing before this block number")
-	CdCCmd.PersistentFlags().String("state-file", "./dkafka.state.json", "progress will be saved into this file")
-	CdCCmd.PersistentFlags().Bool("capture", false, "Activate the capture mode where blocks are saved on the file system in json format.")
+	CdCCmd.PersistentFlags().Bool("capture", false, "Activate the capture mode where blocks are saved on the file system in pb.json format.")
 
 	CdCCmd.PersistentFlags().Duration("delay-between-commits", time.Second*10, "no commits to kafka blow this delay, except un shutdown")
 	CdCCmd.PersistentFlags().String("event-source", "dkafka", "custom value for produced cloudevent source")
@@ -119,7 +118,6 @@ is used`)
 	CdCCmd.AddCommand(CdCSchemasCmd)
 	CdCSchemasCmd.Flags().StringP("output-dir", "o", "./", `Optional output directory for the avro schema. The file name pattern is
 	the <account>-<schema-type>.avsc in snake-case.`)
-
 }
 
 func cdcOnTables(cmd *cobra.Command, args []string) error {
@@ -186,22 +184,20 @@ func executeCdC(cmd *cobra.Command, args []string,
 		DfuseGRPCEndpoint: viper.GetString("global-dfuse-firehose-grpc-addr"),
 		IncludeFilterExpr: viper.GetString("global-dfuse-firehose-include-expr"),
 
-		DryRun:                     viper.GetBool("global-dry-run"),
-		KafkaEndpoints:             viper.GetString("global-kafka-endpoints"),
-		KafkaSSLEnable:             viper.GetBool("global-kafka-ssl-enable"),
-		KafkaSSLCAFile:             viper.GetString("global-kafka-ssl-ca-file"),
-		KafkaSSLAuth:               viper.GetBool("global-kafka-ssl-auth"),
-		KafkaSSLClientCertFile:     viper.GetString("global-kafka-ssl-client-cert-file"),
-		KafkaSSLClientKeyFile:      viper.GetString("global-kafka-ssl-client-key-file"),
-		KafkaTopic:                 viper.GetString("global-kafka-topic"),
-		KafkaCursorTopic:           viper.GetString("global-kafka-cursor-topic"),
-		KafkaCursorPartition:       int32(viper.GetUint32("global-kafka-cursor-partition")),
-		KafkaCursorConsumerGroupID: viper.GetString("global-kafka-cursor-consumer-group-id"),
-		KafkaTransactionID:         viper.GetString("global-kafka-transaction-id"),
-		KafkaCompressionType:       viper.GetString("cdc-cmd-kafka-compression-type"),
-		KafkaCompressionLevel:      viper.GetInt("cdc-cmd-kafka-compression-level"),
-		KafkaMessageMaxBytes:       viper.GetInt("cdc-cmd-kafka-message-max-bytes"),
-		CommitMinDelay:             viper.GetDuration("cdc-cmd-delay-between-commits"),
+		DryRun:                 viper.GetBool("global-dry-run"),
+		KafkaEndpoints:         viper.GetString("global-kafka-endpoints"),
+		KafkaSSLEnable:         viper.GetBool("global-kafka-ssl-enable"),
+		KafkaSSLCAFile:         viper.GetString("global-kafka-ssl-ca-file"),
+		KafkaSSLAuth:           viper.GetBool("global-kafka-ssl-auth"),
+		KafkaSSLClientCertFile: viper.GetString("global-kafka-ssl-client-cert-file"),
+		KafkaSSLClientKeyFile:  viper.GetString("global-kafka-ssl-client-key-file"),
+		KafkaTopic:             viper.GetString("global-kafka-topic"),
+		KafkaCursorTopic:       viper.GetString("global-kafka-cursor-topic"),
+		KafkaCursorPartition:   int32(viper.GetUint32("global-kafka-cursor-partition")),
+		KafkaCompressionType:   viper.GetString("cdc-cmd-kafka-compression-type"),
+		KafkaCompressionLevel:  viper.GetInt("cdc-cmd-kafka-compression-level"),
+		KafkaMessageMaxBytes:   viper.GetInt("cdc-cmd-kafka-message-max-bytes"),
+		CommitMinDelay:         viper.GetDuration("cdc-cmd-delay-between-commits"),
 
 		BatchMode:     viper.GetBool("cdc-cmd-batch-mode"),
 		StartBlockNum: viper.GetInt64("cdc-cmd-start-block-num"),
