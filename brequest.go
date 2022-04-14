@@ -68,6 +68,9 @@ func LoadCursor(config kafka.ConfigMap, topic string) (opaqueCursor string, err 
 		if err != nil {
 			return opaqueCursor, err
 		}
+		if c == nil {
+			continue
+		}
 		if cursor == nil || cursor.Block.Num() < c.Block.Num() {
 			zlog.Debug("found max cursor", zap.Int32("partition", partition.ID), zap.Uint64("block_num", c.Block.Num()))
 			cursor = c
