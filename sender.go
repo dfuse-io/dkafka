@@ -69,6 +69,15 @@ func (s *FastKafkaSender) SaveCP(ctx context.Context, cursor string) error {
 			Key:   "ce_time",
 			Value: []byte(time.Now().UTC().Format(time.RFC3339)),
 		},
+		// even if the value is empty let's put a supported mime time
+		kafka.Header{
+			Key:   "content-type",
+			Value: []byte("application/json"),
+		},
+		kafka.Header{
+			Key:   "ce_datacontenttype",
+			Value: []byte("application/json"),
+		},
 		newCursorHeader(cursor),
 	)
 
