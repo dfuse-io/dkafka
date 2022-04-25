@@ -225,7 +225,7 @@ func (a *App) NewCDCCtx(ctx context.Context, producer *kafka.Producer, hearders 
 	var filter string
 	var sender Sender = NewFastSender(ctx, producer, a.config.KafkaTopic, hearders)
 	var cursor string
-
+	eos.LegacyJSON4Asset = false
 	appCtx := appCtx{}
 	cursor, err := LoadCursor(createKafkaConfig(a.config), a.config.KafkaTopic)
 	if err != nil {
@@ -318,6 +318,7 @@ func (a *App) NewLegacyCtx(ctx context.Context, producer *kafka.Producer, hearde
 	var sender Sender
 	var cursor string
 	var err error
+	eos.LegacyJSON4Asset = true
 	appCtx := appCtx{}
 	hearders = append(hearders,
 		kafka.Header{

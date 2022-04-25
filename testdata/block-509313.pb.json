@@ -1,0 +1,371 @@
+{
+    "id": "0007c581c915a38b9a997d83df1ed1622012dcbb08436cd611b4744cd255a9c4",
+    "number": 509313,
+    "version": 1,
+    "header": {
+        "timestamp": "2022-04-22T11:19:41Z",
+        "producer": "produceracc2",
+        "previous": "0007c580f98bbb0c8c588921ca9a681d7c8a1fcb3b50fe87eb054454fbb3c0fd",
+        "transactionMroot": "F9qof5QtZhhNlFsVXrGOva0vcQo5xPisJVeconQQuc4=",
+        "actionMroot": "YMUAICoPM5pLpX6uuwt7RP1rmu9B8mdQvWckDRRypbY=",
+        "scheduleVersion": 1
+    },
+    "producerSignature": "SIG_K1_K7AbukviBPgADFzJXmkcbfPuLrDgF4PmG3UQYjRQ5yTYxkQK1kHTAWiMHkUw793qJZ3Bd4nrKV4aPjTzTTFiGJeQs6vpkK",
+    "dposProposedIrreversibleBlocknum": 509290,
+    "dposIrreversibleBlocknum": 509266,
+    "blockrootMerkle": {
+        "nodeCount": 509312,
+        "activeNodes": [
+            "geLnDlfGNAaf/TAVhRzRrdvbaFo7YzRi4XbXgEYp+Gs=",
+            "FV8LsjXC0SXMp7d4A2gZpV5xmbO9nw4XWKOQgM0xiEo=",
+            "SiYNy9CLyyh5TcREvS1yQNMFcIWR/DLx+aT+yzKC52k=",
+            "Zb0I2/+QFNLggZxGqpF5wq2oFgeR3naLran0H8AezcI=",
+            "yfAkrUR9PVnyJEmt/gP8OH0cEy/4DHpivVu7VOOpMAo=",
+            "OmsUwU2mL5w5RRdEfTseOSKjm6yHVHJfMCvHgMflR3U=",
+            "2yGh2OkC9jVnnm53Nh34dVPuNPGW0Eu8EQ17Fn8tUqM=",
+            "LcALOsN3c7QX0oOWSrmQE7uMjPt1Uf/iOZQWa96sLmA=",
+            "JoFlthnIQQo6ZoNOQ4dRmxLa56sRvnyvrfhyuCF9skc="
+        ]
+    },
+    "producerToLastProduced": [
+        {
+            "name": "eosio",
+            "lastBlockNumProduced": 10371
+        },
+        {
+            "name": "produceracc1",
+            "lastBlockNumProduced": 509302
+        },
+        {
+            "name": "produceracc2",
+            "lastBlockNumProduced": 509313
+        },
+        {
+            "name": "produceracc3",
+            "lastBlockNumProduced": 509290
+        }
+    ],
+    "producerToLastImpliedIrb": [
+        {
+            "name": "produceracc1",
+            "lastBlockNumProduced": 509278
+        },
+        {
+            "name": "produceracc2",
+            "lastBlockNumProduced": 509290
+        },
+        {
+            "name": "produceracc3",
+            "lastBlockNumProduced": 509266
+        }
+    ],
+    "confirmCount": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+    ],
+    "pendingSchedule": {
+        "scheduleLibNum": 10370,
+        "scheduleHash": "JVwLbyk3q9w6Sdx+VNMCDU4BCXbPJFMSn6mkeE9eNAQ=",
+        "scheduleV2": {
+            "version": 1
+        }
+    },
+    "activatedProtocolFeatures": {
+        "protocolFeatures": [
+            "DsfggBd7LAKyeNUIhhFoa0nXOZJaktm/ys1/xrdAU70=",
+            "GpmlnYfgbgnsWwKKnLt3SbSlrYgZAENl0C3EN5qLckE=",
+            "JlL1+WAGKUEJs90LveY2k/VTJK9FK3me4TeoGpBe7SU=",
+            "KZ3LavaSMkuJmznxbVpTCjMGKATkHwncl+nxVrRHZwc=",
+            "SpDADVVFTcWwWQVcohNXnG6oVpZ3EqVgF0h4hqTUzA8=",
+            "TnvzSNoAqUVImypoF0nrVvXeALkAAU4Tfdrjn0j2nWc=",
+            "T8qL2Cu9GB5xTig/g+G0XZXKWvQPuJrTl3tlPESPeMI=",
+            "aNyqNMBRfRlmbmszrdZzUdjF9p6ZnKHjeTG8QQopdCg=",
+            "i6Uv56OVbFzTplajF0uTHTuyq7RVeL78WfKD7NgWpAU=",
+            "rZ49j2UGh3Cf1o9LkLQffYJaNlsCwjpjbO+IrCrADEM=",
+            "4PtksQhcxVOJcBWNBaAJwk4nb7lOGgv2pSi0j7xP9SY=",
+            "70MRLGVDuI2yKDouB3J4wxWuLIRxmosl8lzIhWX76pk=",
+            "8K9W0sWkjWCkpbXJA+37fbOnNqlO1YnQt5ffM/+dPh0="
+        ]
+    },
+    "rlimitOps": [
+        {
+            "operation": "OPERATION_UPDATE",
+            "state": {
+                "averageBlockNetUsage": {
+                    "lastOrdinal": 509312,
+                    "valueEx": "151886153",
+                    "consumed": "184"
+                },
+                "averageBlockCpuUsage": {
+                    "lastOrdinal": 509312,
+                    "valueEx": "55713028",
+                    "consumed": "66"
+                },
+                "pendingNetUsage": "2176",
+                "pendingCpuUsage": "828",
+                "virtualNetLimit": "1048576",
+                "virtualCpuLimit": "400000"
+            }
+        },
+        {
+            "operation": "OPERATION_UPDATE",
+            "state": {
+                "averageBlockNetUsage": {
+                    "lastOrdinal": 509313,
+                    "valueEx": "168753769",
+                    "consumed": "2327"
+                },
+                "averageBlockCpuUsage": {
+                    "lastOrdinal": 509313,
+                    "valueEx": "62148752",
+                    "consumed": "884"
+                },
+                "virtualNetLimit": "1048576",
+                "virtualCpuLimit": "400000"
+            }
+        }
+    ],
+    "filteredTransactions": [
+        {
+            "id": "817b9c455cfd7bccb02c7748d8565e96f05a078f1e480a08b460b1e9705b6d66",
+            "status": "TRANSACTIONSTATUS_EXECUTED",
+            "cpuUsageMicroSeconds": 818,
+            "netUsageWords": 268,
+            "packedTransaction": {
+                "signatures": [
+                    "SIG_K1_JzPR5FKAm1CNSgZPUcrswMPUShLCz1DLFaAby4qCuSK42dz2xGQqAMP3VT343eSBZ4jGWfw8eJbgzmNeFo9WioBthXw7qM"
+                ],
+                "packedTransaction": "wY9iYnnFOLdP1QAAAAABkBfIawLqMFUAAAAAAKUxdgGQF8hrAnNz1AAAACBNBZE5NgFAYhzGCGOCMQEBRAAAAAAAAAABAAAABG51bGwBGDYyNjI4ZjRhMzhkZTdmMWViMzI2Njc5OQA="
+            }
+        }
+    ],
+    "unfilteredTransactionCount": 1,
+    "filteredTransactionCount": 1,
+    "filteredTransactionTraces": [
+        {
+            "id": "817b9c455cfd7bccb02c7748d8565e96f05a078f1e480a08b460b1e9705b6d66",
+            "blockNum": "509313",
+            "index": "1",
+            "blockTime": "2022-04-22T11:19:41Z",
+            "producerBlockId": "0007c581c915a38b9a997d83df1ed1622012dcbb08436cd611b4744cd255a9c4",
+            "receipt": {
+                "status": "TRANSACTIONSTATUS_EXECUTED",
+                "cpuUsageMicroSeconds": 818,
+                "netUsageWords": 268
+            },
+            "elapsed": "904",
+            "netUsage": "2144",
+            "actionTraces": [
+                {
+                    "receiver": "eosio.nft.ft",
+                    "receipt": {
+                        "receiver": "eosio.nft.ft",
+                        "digest": "dd016727b67b13695b80e8494b3d8bfcd49dc1f884f1d4e1e2a5257656eaa71f",
+                        "globalSequence": "605348",
+                        "authSequence": [
+                            {
+                                "accountName": "ultra.nft.ft",
+                                "sequence": "199"
+                            }
+                        ],
+                        "recvSequence": "5420",
+                        "codeSequence": "3",
+                        "abiSequence": "3"
+                    },
+                    "action": {
+                        "account": "eosio.nft.ft",
+                        "name": "issue",
+                        "authorization": [
+                            {
+                                "actor": "ultra.nft.ft",
+                                "permission": "backend"
+                            }
+                        ],
+                        "jsonData": "{\"issue\":{\"memo\":\"62628f4a38de7f1eb3266799\",\"to\":\"aa1aa2aa3ll4\",\"token_configs\":[{\"amount\":1,\"custom_data\":\"null\",\"token_factory_id\":68}]}}",
+                        "rawData": "AUBiHMYIY4IxAQFEAAAAAAAAAAEAAAAEbnVsbAEYNjI2MjhmNGEzOGRlN2YxZWIzMjY2Nzk5"
+                    },
+                    "elapsed": "756",
+                    "transactionId": "817b9c455cfd7bccb02c7748d8565e96f05a078f1e480a08b460b1e9705b6d66",
+                    "blockNum": "509313",
+                    "producerBlockId": "0007c581c915a38b9a997d83df1ed1622012dcbb08436cd611b4744cd255a9c4",
+                    "blockTime": "2022-04-22T11:19:41Z",
+                    "accountRamDeltas": [
+                        {
+                            "account": "eosio.nft.ft",
+                            "delta": "136"
+                        },
+                        {
+                            "account": "ultra.nft.ft",
+                            "delta": "2"
+                        }
+                    ],
+                    "actionOrdinal": 1,
+                    "filteringMatched": true
+                }
+            ],
+            "dbOps": [
+                {
+                    "operation": "OPERATION_UPDATE",
+                    "code": "eosio.nft.ft",
+                    "tableName": "next.token",
+                    "primaryKey": "next.token",
+                    "oldPayer": "eosio.nft.ft",
+                    "newPayer": "eosio.nft.ft",
+                    "oldData": "CwAAAAAAAAA=",
+                    "newData": "DAAAAAAAAAA="
+                },
+                {
+                    "operation": "OPERATION_INSERT",
+                    "code": "eosio.nft.ft",
+                    "scope": "aa1aa2aa3ll4",
+                    "tableName": "token.a",
+                    "primaryKey": "............f",
+                    "newPayer": "eosio.nft.ft",
+                    "newData": "CwAAAAAAAABEAAAAAAAAAE2PYmIEAAAA"
+                },
+                {
+                    "operation": "OPERATION_UPDATE",
+                    "code": "eosio.nft.ft",
+                    "scope": "eosio.nft.ft",
+                    "tableName": "factory.a",
+                    "primaryKey": "...........44",
+                    "oldPayer": "ultra.nft.ft",
+                    "newPayer": "ultra.nft.ft",
+                    "oldData": "RAAAAAAAAACQF8hrAnNz1JAXyGsCc3PUAAAAAAAAAAAAAAAAAAAAAAAIVVNEAAAAAAGQF8hrAnNz1OgDAAAAAAEAAAAAAAEAAAAAAZAXyGsCc3PUAAF4aHR0cHM6Ly9zMy51cy1lYXN0LTEud2FzYWJpc3lzLmNvbS91bHRyYWlvLXVuaXEtZGV2L2RjNzJhYzNhYTkyYzJlMmM0MGJmMjE0YWJkYjllOWE0MTdkYjQ1OWNiZjI2OGQ5NThmMDBmZTVlODZiMjc1NDAuemlw3HKsOqksLixAvyFKvbnppBfbRZy/Jo2VjwD+XoaydUAB6AMAAAMAAAADAAAA",
+                    "newData": "RAAAAAAAAACQF8hrAnNz1JAXyGsCc3PUAAAAAAAAAAAAAAAAAAAAAAAIVVNEAAAAAAGQF8hrAnNz1OgDAAAAAAEAAAAAAAEAAAAAAZAXyGsCc3PUAAF4aHR0cHM6Ly9zMy51cy1lYXN0LTEud2FzYWJpc3lzLmNvbS91bHRyYWlvLXVuaXEtZGV2L2RjNzJhYzNhYTkyYzJlMmM0MGJmMjE0YWJkYjllOWE0MTdkYjQ1OWNiZjI2OGQ5NThmMDBmZTVlODZiMjc1NDAuemlw3HKsOqksLixAvyFKvbnppBfbRZy/Jo2VjwD+XoaydUAB6AMAAAQAAAAEAAAAAAA="
+                }
+            ],
+            "ramOps": [
+                {
+                    "operation": "OPERATION_PRIMARY_INDEX_ADD",
+                    "payer": "eosio.nft.ft",
+                    "delta": "136",
+                    "usage": "1897720",
+                    "namespace": "NAMESPACE_TABLE_ROW",
+                    "uniqueKey": "eosio.nft.ft:aa1aa2aa3ll4:token.a:............f",
+                    "action": "ACTION_ADD"
+                },
+                {
+                    "operation": "OPERATION_PRIMARY_INDEX_UPDATE",
+                    "payer": "ultra.nft.ft",
+                    "delta": "2",
+                    "usage": "64399",
+                    "namespace": "NAMESPACE_TABLE_ROW",
+                    "uniqueKey": "eosio.nft.ft:eosio.nft.ft:factory.a:...........44",
+                    "action": "ACTION_UPDATE"
+                }
+            ],
+            "rlimitOps": [
+                {
+                    "operation": "OPERATION_UPDATE",
+                    "accountUsage": {
+                        "owner": "ultra.nft.ft",
+                        "netUsage": {
+                            "lastOrdinal": 1407883162,
+                            "valueEx": "45646",
+                            "consumed": "2145"
+                        },
+                        "cpuUsage": {
+                            "lastOrdinal": 1407883162,
+                            "valueEx": "17393",
+                            "consumed": "819"
+                        },
+                        "ramUsage": "64399"
+                    }
+                }
+            ],
+            "creationTree": [
+                {
+                    "creatorActionIndex": -1
+                }
+            ]
+        }
+    ],
+    "unfilteredTransactionTraceCount": 2,
+    "filteredTransactionTraceCount": 1,
+    "unfilteredExecutedInputActionCount": 2,
+    "filteredExecutedInputActionCount": 1,
+    "unfilteredExecutedTotalActionCount": 2,
+    "filteredExecutedTotalActionCount": 1,
+    "validBlockSigningAuthorityV2": {
+        "v0": {
+            "threshold": 1,
+            "keys": [
+                {
+                    "publicKey": "EOS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV",
+                    "weight": 1
+                }
+            ]
+        }
+    },
+    "activeScheduleV2": {
+        "version": 1,
+        "producers": [
+            {
+                "accountName": "produceracc1",
+                "blockSigningAuthority": {
+                    "v0": {
+                        "threshold": 1,
+                        "keys": [
+                            {
+                                "publicKey": "EOS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV",
+                                "weight": 1
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                "accountName": "produceracc2",
+                "blockSigningAuthority": {
+                    "v0": {
+                        "threshold": 1,
+                        "keys": [
+                            {
+                                "publicKey": "EOS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV",
+                                "weight": 1
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                "accountName": "produceracc3",
+                "blockSigningAuthority": {
+                    "v0": {
+                        "threshold": 1,
+                        "keys": [
+                            {
+                                "publicKey": "EOS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV",
+                                "weight": 1
+                            }
+                        ]
+                    }
+                }
+            }
+        ]
+    },
+    "filteringApplied": true,
+    "filteringIncludeFilterExpr": "executed \u0026\u0026 (action==\"create\" || action==\"update\" || action==\"issue\") \u0026\u0026 account==\"eosio.nft.ft\" \u0026\u0026 receiver==\"eosio.nft.ft\""
+}

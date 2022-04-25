@@ -389,7 +389,8 @@ func TestAssetToString(t *testing.T) {
 	}
 }
 
-func TestAssetToJSON(t *testing.T) {
+func TestLegacyAssetToJSON(t *testing.T) {
+	LegacyJSON4Asset = true
 	tests := []struct {
 		in  Asset
 		out string
@@ -397,37 +398,104 @@ func TestAssetToJSON(t *testing.T) {
 		// Haven't seen such a thing yet though..
 		{
 			Asset{6000000, Symbol{Precision: 4, Symbol: "EOS"}},
-			"{}",
+			"\"600.0000 EOS\"",
 		},
 		{
 			Asset{-6000000, Symbol{Precision: 4, Symbol: "EOS"}},
-			"-600.0000 EOS",
+			"\"-600.0000 EOS\"",
 		},
 		{
 			Asset{10, Symbol{Precision: 5, Symbol: "SYS"}},
-			"0.00010 SYS",
+			"\"0.00010 SYS\"",
 		},
 		{
 			Asset{-10, Symbol{Precision: 5, Symbol: "SYS"}},
-			"-0.00010 SYS",
+			"\"-0.00010 SYS\"",
 		},
 		{
 			Asset{6000, Symbol{Precision: 0, Symbol: "MAMA"}},
-			"6000 MAMA",
+			"\"6000 MAMA\"",
 		},
 		{
 			Asset{-6000, Symbol{Precision: 0, Symbol: "MAMA"}},
-			"-6000 MAMA",
+			"\"-6000 MAMA\"",
 		},
 		{
 			Asset{0, Symbol{Precision: 255, Symbol: "EOS"}},
-			"0.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 EOS",
+			"\"0.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 EOS\"",
 		},
 	}
 
 	for _, test := range tests {
-		assert.Equal(t, test.out, test.in.String())
+		bytes, err := test.in.MarshalJSON()
+		if err != nil {
+			t.Error("MarshalJSON() error: %w", err)
+		}
+		assert.Equal(t, test.out, string(bytes))
 	}
+}
+
+func TestAssetToJSON(t *testing.T) {
+	LegacyJSON4Asset = false
+	tests := []struct {
+		in  Asset
+		out string
+	}{
+		// Haven't seen such a thing yet though..
+		{
+			Asset{6000000, Symbol{Precision: 4, Symbol: "EOS"}},
+			assetJson(t, 600, "EOS", 4),
+		},
+		{
+			Asset{-6000000, Symbol{Precision: 4, Symbol: "EOS"}},
+			assetJson(t, -600, "EOS", 4),
+		},
+		{
+			Asset{10, Symbol{Precision: 5, Symbol: "SYS"}},
+			assetJson(t, 0.0001, "SYS", 5),
+			// "\"0.00010 SYS\"",
+		},
+		{
+			Asset{-10, Symbol{Precision: 5, Symbol: "SYS"}},
+			assetJson(t, -0.0001, "SYS", 5),
+			// "\"-0.00010 SYS\"",
+		},
+		{
+			Asset{6000, Symbol{Precision: 0, Symbol: "MAMA"}},
+			assetJson(t, 6000, "MAMA", 0),
+			// "\"6000 MAMA\"",
+		},
+		{
+			Asset{-6000, Symbol{Precision: 0, Symbol: "MAMA"}},
+			assetJson(t, -6000, "MAMA", 0),
+			// "\"-6000 MAMA\"",
+		},
+		{
+			Asset{0, Symbol{Precision: 255, Symbol: "EOS"}},
+			assetJson(t, 0, "EOS", 255),
+		},
+	}
+
+	for _, test := range tests {
+		bytes, err := test.in.MarshalJSON()
+		if err != nil {
+			t.Error("MarshalJSON() error: %w", err)
+		}
+		assert.Equal(t, test.out, string(bytes))
+	}
+}
+
+func assetJson(t testing.TB, amount float64, symbol string, precision uint8) string {
+	t.Helper()
+	data, err := json.Marshal(map[string]interface{}{
+		"amount":    amount,
+		"symbol":    symbol,
+		"precision": precision,
+	})
+	if err != nil {
+		t.Fatal("json.Marshal error: %w", err)
+	}
+	return string(data)
 }
 
 func TestSimplePacking(t *testing.T) {

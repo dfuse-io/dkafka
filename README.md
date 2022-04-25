@@ -232,6 +232,80 @@ Examples:
 }
 ```
 
+## Contributing
+
+Everything is made around the `Makefile` if you want to use it please install `make` on you system.
+
+### Build (clean)
+
+```bash
+$ make clean build
+```
+
+### Test
+
+```bash
+$ make test
+```
+
+### Run
+There is several launcher in the `Makefile` and multiple variables can be overridden. 
+Please have look to the `Makefile` for more details.
+
+#### Prerequisite 
+Those commands are required for the streaming of message but not for the schema generation.
+Make sure your have at least in the following file: `~/.kube/dfuse.prod-testnet.kube`
+This will ensure you can run test against the testnet.
+
+Start the port forwarding to the firehouse and the abi registry.
+
+```
+$ make forward
+```
+I would suggest to start it in a different terminal
+
+If for any reasons the connectivity is broken with the firehouse close the port forwarding and re-open it.
+```
+$ make forward-stop
+$ make forward
+```
+
+Finally you need to launch the `docker-compose` configuration to enable `kafka`, `kafka-registry` and a topic browser accessible [here](http://localhost:8080)
+```
+$ make up
+```
+#### Change environment
+The `Makefile` defines a `ENV` variable that can be overridden if you want to point to a different environment.
+By default it points to the testnet: `prod-testnet`.
+```
+$ make forward ENV=dev
+```
+#### Run legacy streaming
+```
+$ make stream
+```
+#### Run CDC on tables
+```
+# json mode
+$ make cdc-tables
+# avro mode
+$ make cdc-tables CODEC=avro
+```
+#### Run CDC on action
+```
+$ make cdc-actions
+# json mode
+$ make cdc-actions
+# avro mode
+$ make cdc-tables CODEC=avro
+```
+
+#### Generate schema
+```
+$ make build
+$ build/dkafka cdc schemas eosio.nft.ft:./testdata/eosio.nft.ft.abi -o ./build -n io.ultra.test
+```
+
 ## Resources
 
 - https://developers.eos.io/manuals/eosio.cdt/latest/best-practices/abi/understanding-abi-files

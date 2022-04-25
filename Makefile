@@ -5,10 +5,15 @@ GO_FILES := $(shell find . -name '*.go' | grep -v /vendor/ | grep -v _test.go)
 BUILD_DIR := "./build"
 BINARY_PATH := $(BUILD_DIR)/$(PROJECT_NAME)
 COVERAGE_DIR := $(BUILD_DIR)
-KUBECONFIG ?= ~/.kube/dfuse.staging.kube
+ENV ?= prod-testnet
+KUBECONFIG ?= ~/.kube/dfuse.$(ENV).kube
+CODEC ?= "json"
+
+MESSAGE_TYPE ?= '{"create" : "EosioNftFtCreatedNotification","update" : "EosioNftFtUpdatedNotification","issue" : "EosioNftFtIssuedNotification"}[action]'
+KEY_EXPRESSION ?= '"action"=="create" ? [data.create.memo] : [transaction_id]'
+INCLUDE_EXPRESSION ?= 'executed && (action=="create" || action=="update" || action=="issue") && account=="eosio.nft.ft" && receiver=="eosio.nft.ft"'
 # INCLUDE_EXPRESSION ?= 'executed && action=="create" && account=="eosio.nft.ft" && receiver=="eosio.nft.ft"'
 # INCLUDE_EXPRESSION ?= 'executed && (action=="create" || action=="issue") && account=="eosio.nft.ft" && receiver=="eosio.nft.ft"'
-# KEY_EXPRESSION ?= '[string(db_ops[1].new_json.id)]'
 # ACTIONS_EXPRESSION ?= '{"create":[{"key":"transaction_id", "type":"TestType"}]}'
 # ACTIONS_EXPRESSION ?= '{"create":[{"filter": ["factory.a"], "key":"transaction_id", "type":"NftFtCreatedNotification"}]}'
 # ACTIONS_EXPRESSION ?= '{"create":[{"filter": ["factory.a"], "key":"string(db_ops[0].new_json.id)", "type":"TestType"}]}'
@@ -28,14 +33,13 @@ TABLE_NAMES ?= 'factory.a,factory.b,resale.a,token.a'
 ## CDC ACTIONS
 ACTIONS_EXPRESSION ?= '{"create":"transaction_id", "issue":"data.issue.to"}'
 
-# MESSAGE_TYPE ?= '"TestType"'
 COMPRESSION_TYPE ?= "snappy"
 COMPRESSION_LEVEL ?= -1
 MESSAGE_MAX_SIZE ?= 10000000
 # create
 # START_BLOCK ?= 37562000
 # issue
-START_BLOCK ?= 50705250
+START_BLOCK ?= 509300
 
 # START_BLOCK ?= 30080000
 STOP_BLOCK ?= 3994800
@@ -114,18 +118,7 @@ cdc-tables: build up ## CDC stream on tables
 		--kafka-compression-level=$(COMPRESSION_LEVEL) \
 		--start-block-num=$(START_BLOCK) \
 		--kafka-message-max-bytes=$(MESSAGE_MAX_SIZE) \
-		--table-name=$(TABLE_NAMES) $(ACCOUNT)
-
-cdc-tables-avro: build up ## CDC stream on tables
-	$(BINARY_PATH) cdc tables \
-		--dfuse-firehose-grpc-addr=localhost:9000 \
-		--abicodec-grpc-addr=localhost:9001 \
-		--kafka-topic="io.dkafka.test" \
-		--kafka-compression-type=$(COMPRESSION_TYPE) \
-		--kafka-compression-level=$(COMPRESSION_LEVEL) \
-		--start-block-num=$(START_BLOCK) \
-		--kafka-message-max-bytes=$(MESSAGE_MAX_SIZE) \
-		--codec="avro" \
+		--codec=$(CODEC) \
 		--table-name=$(TABLE_NAMES) $(ACCOUNT)
 
 cdc-actions: build up ## CDC stream on tables
@@ -135,12 +128,12 @@ cdc-actions: build up ## CDC stream on tables
 		--kafka-compression-level=$(COMPRESSION_LEVEL) \
 		--start-block-num=$(START_BLOCK) \
 		--kafka-message-max-bytes=$(MESSAGE_MAX_SIZE) \
+		--codec=$(CODEC) \
 		--actions-expr=$(ACTIONS_EXPRESSION) $(ACCOUNT)
 
 stream-act: build up ## stream actions based localy
 	$(BINARY_PATH) publish \
 		--dfuse-firehose-grpc-addr=localhost:9000 \
-		--capture \
 		--abicodec-grpc-addr=localhost:9001 \
 		--fail-on-undecodable-db-op \
 		--kafka-cursor-topic="cursor" \
@@ -169,8 +162,8 @@ batch: build up ## run batch localy
 		--kafka-message-max-bytes=$(MESSAGE_MAX_SIZE)
 
 forward: ## open port forwarding on dfuse dev
-	KUBECONFIG=$(KUBECONFIG) kubectl -n ultra-prod-testnet port-forward firehose-v3-0 9000 &
-	KUBECONFIG=$(KUBECONFIG) kubectl -n ultra-prod-testnet port-forward svc/abicodec-v3 9001:9000 &
+	KUBECONFIG=$(KUBECONFIG) kubectl -n ultra-$(ENV) port-forward firehose-v3-0 9000 &
+	KUBECONFIG=$(KUBECONFIG) kubectl -n ultra-$(ENV) port-forward svc/abicodec-v3 9001:9000 &
 
 forward-stop: ## stop port fowarding to dfuse
 	@ps -aux | grep forward | awk '{ print $$2 }' | xargs kill
