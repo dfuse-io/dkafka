@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 	"github.com/google/cel-go/cel"
@@ -38,7 +39,7 @@ func NewActivation(stepName string, transaction *pbcodec.TransactionTrace, trace
 	var activationMap = map[string]interface{}{
 		"block_num":         transaction.BlockNum,
 		"block_id":          transaction.ProducerBlockId,
-		"block_time":        func() interface{} { return transaction.BlockTime.AsTime().Format("2006-01-02T15:04:05.0Z07:00") },
+		"block_time":        func() interface{} { return transaction.BlockTime.AsTime().UTC().Format(time.RFC3339) },
 		"transaction_id":    transaction.Id,
 		"transaction_index": transaction.Index,
 		"step":              stepName,
@@ -172,7 +173,7 @@ func NewActionActivation(stepName string, transaction *pbcodec.TransactionTrace,
 	var activationMap = map[string]interface{}{
 		"block_num":         transaction.BlockNum,
 		"block_id":          transaction.ProducerBlockId,
-		"block_time":        func() interface{} { return transaction.BlockTime.AsTime().Format("2006-01-02T15:04:05.0Z07:00") },
+		"block_time":        func() interface{} { return transaction.BlockTime.AsTime().UTC().Format(time.RFC3339) },
 		"transaction_id":    transaction.Id,
 		"transaction_index": transaction.Index,
 		"step":              stepName,

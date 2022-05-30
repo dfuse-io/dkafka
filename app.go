@@ -374,7 +374,7 @@ func (a *App) NewLegacyCtx(ctx context.Context, producer *kafka.Producer, hearde
 		case nil:
 			c, err := forkable.CursorFromOpaque(cursor)
 			if err != nil {
-				zlog.Error("cannot decode cursor", zap.Error(err))
+				zlog.Error("cannot decode cursor", zap.String("cursor", cursor), zap.Error(err))
 				return appCtx, err
 			}
 			zlog.Info("running in live mode, found cursor",
@@ -441,12 +441,6 @@ func iterate(ctx context.Context, cancel context.CancelFunc, adapter Adapter, s 
 	}
 }
 
-type BlockStep struct {
-	blk    *pbcodec.Block
-	step   string
-	cursor string
-}
-
 func blockHandler(ctx context.Context, adapter Adapter, s Sender, in <-chan BlockStep, ticks <-chan time.Time, out chan<- error) {
 	var lastCursor string
 	hasFail := false
@@ -457,7 +451,7 @@ func blockHandler(ctx context.Context, adapter Adapter, s Sender, in <-chan Bloc
 				zlog.Debug("skip incoming block message after failure")
 				continue
 			}
-			kafkaMsgs, err := adapter.Adapt(blkStep.blk, blkStep.step)
+			kafkaMsgs, err := adapter.Adapt(blkStep)
 			if err != nil {
 				hasFail = true
 				zlog.Debug("fail fast on adapter.Adapt() send message to -> out chan", zap.Error(err))

@@ -121,8 +121,12 @@ func Test_adapter_adapt(t *testing.T) {
 					default_headers,
 				)
 			}
-
-			if msg, err := adp.Adapt(block, "New"); (err != nil) != tt.wantErr {
+			blockStep := BlockStep{
+				blk:    block,
+				step:   "New",
+				cursor: "123",
+			}
+			if msg, err := adp.Adapt(blockStep); (err != nil) != tt.wantErr {
 				t.Errorf("adapter.adapt() error = %v, wantErr %v", err, tt.wantErr)
 			} else {
 				if tt.expected != "" {
@@ -330,9 +334,14 @@ func Benchmark_adapter_adapt(b *testing.B) {
 				headers: default_headers,
 			}
 		}
+		blockStep := BlockStep{
+			blk:    block,
+			step:   "New",
+			cursor: "123",
+		}
 		b.Run(tt.name, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				adp.Adapt(block, "New")
+				adp.Adapt(blockStep)
 			}
 		})
 	}
@@ -371,8 +380,12 @@ func Test_adapter_correlation_id(t *testing.T) {
 		},
 		headers: default_headers,
 	}
-
-	if msgs, err := adp.Adapt(block, "New"); err != nil {
+	blockStep := BlockStep{
+		blk:    block,
+		step:   "New",
+		cursor: "123",
+	}
+	if msgs, err := adp.Adapt(blockStep); err != nil {
 		t.Errorf("adapter.adapt() error = %v", err)
 	} else {
 		assert.Equal(t, len(msgs), 2, "should produce 2 messages")

@@ -1,4 +1,4 @@
-FROM golang:1.17-buster AS build
+FROM golang:1.18-bullseye AS build
 
 WORKDIR /app
 
@@ -12,7 +12,7 @@ COPY cmd ./cmd
 
 RUN go build -o /dkafka -v ./cmd/dkafka
 
-FROM gcr.io/distroless/base-debian10
+FROM gcr.io/distroless/base-debian11
 
 WORKDIR /
 

@@ -75,7 +75,7 @@ func Test_exprToCelProgram(t *testing.T) {
 			args{
 				"block_time",
 			},
-			"2021-11-17T10:16:19.0Z",
+			"2021-11-17T10:16:19Z",
 			false,
 		},
 		{
@@ -253,7 +253,7 @@ func Benchmark_exprToCelProgram_activation(b *testing.B) {
 			args{
 				"block_time",
 			},
-			"2021-11-17T10:16:19.0Z",
+			"2021-11-17T10:16:19Z",
 			false,
 		},
 		{

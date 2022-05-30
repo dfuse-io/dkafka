@@ -23,6 +23,7 @@ type GenContext struct {
 	transaction *pbcodec.TransactionTrace
 	actionTrace *pbcodec.ActionTrace
 	correlation *Correlation
+	cursor      string
 }
 
 type Generator2 interface {
@@ -103,7 +104,7 @@ func (tg TableGenerator) Apply(gc GenContext) (generations []Generation2, err er
 func (tg TableGenerator) doApply(gc GenContext) ([]generation, error) {
 	dbOps := gc.transaction.DBOpsForAction(gc.actionTrace.ExecutionIndex)
 	generations := []generation{}
-	for _, dbOp := range dbOps {
+	for dbOpIndex, dbOp := range dbOps {
 		if dbOp.Operation == pbcodec.DBOp_OPERATION_UNKNOWN {
 			continue
 		}
@@ -119,14 +120,11 @@ func (tg TableGenerator) doApply(gc GenContext) ([]generation, error) {
 		key := extractKey(dbOp)
 		tableCamelCase, ceType := tableCeType(dbOp.TableName)
 		ceId := hashString(fmt.Sprintf(
-			"%s%s%d%d%s%s%s",
-			gc.block.Id,
+			"%s%s%d%d",
+			gc.cursor,
 			gc.transaction.Id,
 			gc.actionTrace.ExecutionIndex,
-			dbOp.Operation,
-			dbOp.TableName,
-			gc.stepName,
-			key))
+			dbOpIndex))
 		value := newTableNotification(
 			notificationContextMap(gc),
 			actionInfoBasicMap(gc),
@@ -211,13 +209,11 @@ func (ag ActionGenerator2) doApply(gc GenContext) ([]generation, error) {
 	}
 	_, ceType := actionCeType(actionName)
 	ceId := hashString(fmt.Sprintf(
-		"%s%s%d%s%s%s",
-		gc.block.Id,
+		"%s%s%d",
+		gc.cursor,
 		gc.transaction.Id,
 		gc.actionTrace.ExecutionIndex,
-		ceType,
-		gc.stepName,
-		key))
+	))
 	jsonData := make(map[string]interface{})
 	if stringData := gc.actionTrace.Action.JsonData; stringData != "" {
 		err = json.Unmarshal(json.RawMessage(stringData), &jsonData)

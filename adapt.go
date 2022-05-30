@@ -1,13 +1,21 @@
 package dkafka
 
 import (
+	"time"
+
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 	"go.uber.org/zap"
 )
 
 type Adapter interface {
-	Adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message, error)
+	Adapt(blkStep BlockStep) ([]*kafka.Message, error)
+}
+
+type BlockStep struct {
+	blk    *pbcodec.Block
+	step   string
+	cursor string
 }
 
 type CdCAdapter struct {
@@ -17,7 +25,10 @@ type CdCAdapter struct {
 	headers   []kafka.Header
 }
 
-func (m *CdCAdapter) Adapt(blk *pbcodec.Block, step string) ([]*kafka.Message, error) {
+func (m *CdCAdapter) Adapt(blkStep BlockStep) ([]*kafka.Message, error) {
+	blk := blkStep.blk
+	step := blkStep.step
+
 	m.saveBlock(blk)
 	if blk.Number%100 == 0 {
 		zlog.Info("incoming block 1/100", zap.Uint32("blk_number", blk.Number), zap.String("step", step), zap.Int("length_filtered_trx_traces", len(blk.FilteredTransactionTraces)))
@@ -27,6 +38,10 @@ func (m *CdCAdapter) Adapt(blk *pbcodec.Block, step string) ([]*kafka.Message, e
 	}
 	msgs := make([]*kafka.Message, 0)
 	trxs := blk.TransactionTraces()
+	blkTime := blk.MustTime().UTC()
+	// blkTimeStr := blkTime.Format("2006-01-02T15:04:05.9Z")
+	blkTimeStr := blkTime.Format(time.RFC3339)
+	blkTimeBytes := []byte(blkTimeStr)
 	zlog.Debug("adapt block", zap.Uint32("num", blk.Number), zap.Int("nb_trx", len(trxs)))
 	for _, trx := range trxs {
 		transactionTracesReceived.Inc()
@@ -49,6 +64,7 @@ func (m *CdCAdapter) Adapt(blk *pbcodec.Block, step string) ([]*kafka.Message, e
 				transaction: trx,
 				actionTrace: act,
 				correlation: correlation,
+				cursor:      blkStep.cursor,
 			})
 
 			if err != nil {
@@ -68,7 +84,7 @@ func (m *CdCAdapter) Adapt(blk *pbcodec.Block, step string) ([]*kafka.Message, e
 					},
 					kafka.Header{
 						Key:   "ce_time",
-						Value: []byte(blk.MustTime().Format("2006-01-02T15:04:05.9Z")),
+						Value: blkTimeBytes,
 					},
 					kafka.Header{
 						Key:   "ce_blkstep",
@@ -92,6 +108,8 @@ func (m *CdCAdapter) Adapt(blk *pbcodec.Block, step string) ([]*kafka.Message, e
 						Topic:     &m.topic,
 						Partition: kafka.PartitionAny,
 					},
+					Timestamp:     blkTime,
+					TimestampType: kafka.TimestampCreateTime,
 				}
 				msgs = append(msgs, msg)
 			}

@@ -58,7 +58,12 @@ func TestCdCAdapter_AdaptJSON(t *testing.T) {
 				generator: tt.fields.generator,
 				headers:   default_headers,
 			}
-			got, err := m.Adapt(block, tt.args.rawStep)
+			blockStep := BlockStep{
+				blk:    block,
+				step:   tt.args.rawStep,
+				cursor: "123",
+			}
+			got, err := m.Adapt(blockStep)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CdCAdapter.Adapt() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -181,7 +186,12 @@ func TestCdCAdapter_Adapt_pb(t *testing.T) {
 				generator: g,
 				headers:   default_headers,
 			}
-			messages, err := a.Adapt(block, "New")
+			blockStep := BlockStep{
+				blk:    block,
+				step:   "New",
+				cursor: "123",
+			}
+			messages, err := a.Adapt(blockStep)
 			if err != nil {
 				t.Fatalf("Adapt() error: %v", err)
 			}

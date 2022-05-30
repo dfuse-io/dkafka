@@ -16,7 +16,7 @@ stages:
 .golang_based:
   tags:
     - docker
-  image: golang:1.17
+  image: golang:1.18-bullseye
 
 unit-tests:
   extends:

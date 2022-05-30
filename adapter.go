@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strings"
+	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
@@ -108,7 +109,9 @@ func newAdapter(
 	return &adapter{topic, saveBlock, decodeDBOps, failOnUndecodableDBOP, NewExpressionsGenerator(eventKeyProg, eventTypeProg), headers}
 }
 
-func (m *adapter) Adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message, error) {
+func (m *adapter) Adapt(blkStep BlockStep) ([]*kafka.Message, error) {
+	blk := blkStep.blk
+	rawStep := blkStep.step
 	m.saveBlock(blk)
 	step := sanitizeStep(rawStep)
 
@@ -119,6 +122,10 @@ func (m *adapter) Adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message, e
 		zlog.Debug("incoming block 1/10", zap.Uint32("blk_number", blk.Number), zap.String("step", step), zap.Int("length_filtered_trx_traces", len(blk.FilteredTransactionTraces)))
 	}
 	msgs := make([]*kafka.Message, 0, 1)
+	blkTime := blk.MustTime().UTC()
+	// blkTimeStr := blkTime.Format("2006-01-02T15:04:05.9Z")
+	blkTimeStr := blkTime.Format(time.RFC3339)
+	blkTimeBytes := []byte(blkTimeStr)
 
 	for _, trx := range blk.TransactionTraces() {
 		transactionTracesReceived.Inc()
@@ -204,7 +211,7 @@ func (m *adapter) Adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message, e
 					},
 					kafka.Header{
 						Key:   "ce_time",
-						Value: []byte(blk.MustTime().Format("2006-01-02T15:04:05.9Z")),
+						Value: []byte(blkTimeBytes),
 					},
 					kafka.Header{
 						Key:   "ce_blkstep",
@@ -219,6 +226,8 @@ func (m *adapter) Adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message, e
 						Topic:     &m.topic,
 						Partition: kafka.PartitionAny,
 					},
+					Timestamp:     blkTime,
+					TimestampType: kafka.TimestampCreateTime,
 				}
 				msgs = append(msgs, msg)
 			}
@@ -230,7 +239,7 @@ func (m *adapter) Adapt(blk *pbcodec.Block, rawStep string) ([]*kafka.Message, e
 func hashString(data string) []byte {
 	h := sha512.New()
 	h.Write([]byte(data))
-	return []byte(base64.StdEncoding.EncodeToString(([]byte(h.Sum(nil)))))
+	return []byte(base64.StdEncoding.EncodeToString(h.Sum(nil)))
 }
 
 func sanitizeStep(step string) string {
