@@ -120,11 +120,13 @@ func (tg TableGenerator) doApply(gc GenContext) ([]generation, error) {
 		key := extractKey(dbOp)
 		tableCamelCase, ceType := tableCeType(dbOp.TableName)
 		ceId := hashString(fmt.Sprintf(
-			"%s%s%d%d",
+			"%s%s%d%d%s",
 			gc.cursor,
 			gc.transaction.Id,
 			gc.actionTrace.ExecutionIndex,
-			dbOpIndex))
+			dbOpIndex,
+			gc.stepName,
+		))
 		value := newTableNotification(
 			notificationContextMap(gc),
 			actionInfoBasicMap(gc),
@@ -201,18 +203,17 @@ func (ag ActionGenerator2) doApply(gc GenContext) ([]generation, error) {
 	if err != nil {
 		return nil, err
 	}
-	// TODO see if we need a defaulting on the key
-	// key := fmt.Sprintf("%s:%d", gc.transaction.Id, gc.actionTrace.ExecutionIndex)
 	key, err := evalString(extractor, activation)
 	if err != nil {
 		return nil, err
 	}
 	_, ceType := actionCeType(actionName)
 	ceId := hashString(fmt.Sprintf(
-		"%s%s%d",
+		"%s%s%d%s",
 		gc.cursor,
 		gc.transaction.Id,
 		gc.actionTrace.ExecutionIndex,
+		gc.stepName,
 	))
 	jsonData := make(map[string]interface{})
 	if stringData := gc.actionTrace.Action.JsonData; stringData != "" {
