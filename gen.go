@@ -222,9 +222,14 @@ func (ag ActionGenerator2) doApply(gc GenContext) ([]generation, error) {
 			return nil, err
 		}
 	}
+	dbOps := gc.transaction.DBOpsForAction(gc.actionTrace.ExecutionIndex)
+	dbOpsGen := make([]map[string]interface{}, len(dbOps))
+	for dbOpIndex, dbOp := range dbOps {
+		dbOpsGen[dbOpIndex] = newDBOpBasic(dbOp)
+	}
 	value := newActionNotification(
 		notificationContextMap(gc),
-		newActionInfo(actionInfoBasicMap(gc), jsonData),
+		newActionInfo(actionInfoBasicMap(gc), jsonData, dbOpsGen),
 	)
 	return []generation{{
 		CeId:       ceId,

@@ -25,13 +25,17 @@ STREAM_ACT_INCLUDE_EXPRESSION := 'executed && action=="transfer" && account=="eo
 STREAM_ACT_ACTIONS_EXPRESSION ?= '{"create":[{"key":"transaction_id", "type":"NftFtCreatedNotification"}],"issue":[{"key":"transaction_id", "type":"NftFtIssuedNotification"}]}'
 STREAM_ACT_START_BLOCK ?= 49608000
 # CDC
-ACCOUNT ?= 'eosio.token'
+CDC_TABLES_ACCOUNT ?= 'eosio.token'
 # ACCOUNT ?= 'eosio.nft.ft'
 ## CDC TABLES
 # TABLE_NAMES ?= 'factory.a,factory.b,resale.a,token.a'
-TABLE_NAMES ?= 'accounts:s+k'
+CDC_TABLES_TABLE_NAMES ?= 'accounts:s+k'
+CDC_TABLES_START_BLOCK ?= 59721000
 ## CDC ACTIONS
-ACTIONS_EXPRESSION ?= '{"create":"transaction_id", "issue":"data.issue.to"}'
+CDC_ACTIONS_EXPRESSION ?= '{"create":"transaction_id", "issue":"data.issue.to"}'
+CDC_ACTIONS_START_BLOCK ?= 30079000
+CDC_ACTIONS_ACCOUNT ?= 'eosio.nft.ft'
+##
 
 COMPRESSION_TYPE ?= "snappy"
 COMPRESSION_LEVEL ?= -1
@@ -116,20 +120,23 @@ cdc-tables: build up ## CDC stream on tables
 		--kafka-topic="io.dkafka.test" \
 		--kafka-compression-type=$(COMPRESSION_TYPE) \
 		--kafka-compression-level=$(COMPRESSION_LEVEL) \
-		--start-block-num=$(START_BLOCK) \
+		--start-block-num=$(CDC_TABLES_START_BLOCK) \
 		--kafka-message-max-bytes=$(MESSAGE_MAX_SIZE) \
 		--codec=$(CODEC) \
-		--table-name=$(TABLE_NAMES) $(ACCOUNT)
+		--table-name=$(CDC_TABLES_TABLE_NAMES) $(CDC_TABLES_ACCOUNT)
 
 cdc-actions: build up ## CDC stream on tables
 	$(BINARY_PATH) cdc actions \
+		--dfuse-firehose-grpc-addr=localhost:9000 \
+		--abicodec-grpc-addr=localhost:9001 \
 		--kafka-topic="io.dkafka.test" \
 		--kafka-compression-type=$(COMPRESSION_TYPE) \
 		--kafka-compression-level=$(COMPRESSION_LEVEL) \
-		--start-block-num=$(START_BLOCK) \
+		--start-block-num=$(CDC_ACTIONS_START_BLOCK) \
 		--kafka-message-max-bytes=$(MESSAGE_MAX_SIZE) \
 		--codec=$(CODEC) \
-		--actions-expr=$(ACTIONS_EXPRESSION) $(ACCOUNT)
+		--actions-expr=$(CDC_ACTIONS_EXPRESSION) $(CDC_ACTIONS_ACCOUNT) \
+		-vvvv
 
 stream-act: build up ## stream actions based localy
 	$(BINARY_PATH) publish \
@@ -161,6 +168,13 @@ batch: build up ## run batch localy
 		--stop-block-num=$(STOP_BLOCK) \
 		--kafka-message-max-bytes=$(MESSAGE_MAX_SIZE)
 
+schemas: build ## Generate schemas
+	$(BINARY_PATH) cdc schemas eosio.nft.ft:./testdata/eosio.nft.ft.abi -o ./build
+
+# schemas: ## Generate schemas
+# 	@echo ${BINARY_PATH}
+#     $(BINARY_PATH) cdc schemas eosio.nft.ft:./testdata/eosio.token.abi -o ./build -n io.ultra.test
+
 forward: ## open port forwarding on dfuse dev
 	KUBECONFIG=$(KUBECONFIG) kubectl -n ultra-$(ENV) port-forward firehose-v3-0 9000 &
 	KUBECONFIG=$(KUBECONFIG) kubectl -n ultra-$(ENV) port-forward svc/abicodec-v3 9001:9000 &
@@ -170,3 +184,4 @@ forward-stop: ## stop port fowarding to dfuse
 
 help: ## Display this help screen
 	@grep -h -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+

@@ -220,10 +220,10 @@ type appCtx struct {
 	cursor  string
 }
 
-func (a *App) NewCDCCtx(ctx context.Context, producer *kafka.Producer, hearders []kafka.Header, abiDecoder *ABIDecoder, saveBlock SaveBlock) (appCtx, error) {
+func (a *App) NewCDCCtx(ctx context.Context, producer *kafka.Producer, headers []kafka.Header, abiDecoder *ABIDecoder, saveBlock SaveBlock) (appCtx, error) {
 	var adapter Adapter
 	var filter string
-	var sender Sender = NewFastSender(ctx, producer, a.config.KafkaTopic, hearders)
+	var sender Sender = NewFastSender(ctx, producer, a.config.KafkaTopic, headers)
 	var cursor string
 	eos.LegacyJSON4Asset = false
 	appCtx := appCtx{}
@@ -271,7 +271,7 @@ func (a *App) NewCDCCtx(ctx context.Context, producer *kafka.Producer, hearders 
 		adapter = &CdCAdapter{
 			topic:     a.config.KafkaTopic,
 			saveBlock: saveBlock,
-			headers:   hearders,
+			headers:   headers,
 			generator: generator,
 		}
 	case ACTIONS_CDC_TYPE:
@@ -299,7 +299,7 @@ func (a *App) NewCDCCtx(ctx context.Context, producer *kafka.Producer, hearders 
 		adapter = &CdCAdapter{
 			topic:     a.config.KafkaTopic,
 			saveBlock: saveBlock,
-			headers:   hearders,
+			headers:   headers,
 			generator: generator,
 		}
 	default:

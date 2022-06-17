@@ -80,5 +80,5 @@ services:
     ports:
       - 8090:8080
     links:
-      - kafka
+      - broker
       - schema-registry

@@ -99,16 +99,16 @@ start streaming from this block number (if negative, relative to HEAD)`)
 
 	CdCCmd.PersistentFlags().StringP("namespace", "n", "", "namespace of the schema(s). Default: account name")
 	CdCCmd.PersistentFlags().StringP("version", "V", "", "Optional but strongly recommended version of the schema(s) in a semver form: 1.2.3.")
+	CdCCmd.PersistentFlags().StringSlice("local-abi-files", []string{}, `repeatable, ABI file definition in this format:
+'{account}:{path/to/filename}' (ex: 'eosio.token:/tmp/eosio_token.abi').
+ABIs are used to decode DB ops. Provided ABIs have highest priority and
+will never be fetched or updated`)
+	CdCCmd.PersistentFlags().String("abicodec-grpc-addr", "", "if set, will connect to this endpoint to fetch contract ABIs")
 
 	CdCCmd.AddCommand(CdCActionsCmd)
 	CdCActionsCmd.Flags().String("actions-expr", "", "A JSON Object that associate the a name of an action to CEL expression for the message key extration.")
 
 	CdCCmd.AddCommand(CdCTablesCmd)
-	CdCTablesCmd.Flags().StringSlice("local-abi-files", []string{}, `repeatable, ABI file definition in this format:
-'{account}:{path/to/filename}' (ex: 'eosio.token:/tmp/eosio_token.abi').
-ABIs are used to decode DB ops. Provided ABIs have highest priority and
-will never be fetched or updated`)
-	CdCTablesCmd.Flags().String("abicodec-grpc-addr", "", "if set, will connect to this endpoint to fetch contract ABIs")
 	CdCTablesCmd.Flags().StringSlice("table-name", []string{}, `table name(s) on which the message must be produced.
 The name can include the key extractor pattern as follow:
 <table-name>[:{k|s|s+k}]. Where k is for DBOp.PrimaryKey 
@@ -127,14 +127,7 @@ func cdcOnTables(cmd *cobra.Command, args []string) error {
 		"CDC on table",
 		zap.String("account", account),
 	)
-	localABIFiles, err := dkafka.ParseABIFileSpecs(viper.GetStringSlice("cdc-tables-cmd-local-abi-files"))
-	if err != nil {
-		return err
-	}
-
 	return executeCdC(cmd, args, dkafka.TABLES_CDC_TYPE, func(c *dkafka.Config) *dkafka.Config {
-		c.LocalABIFiles = localABIFiles
-		c.ABICodecGRPCAddr = viper.GetString("cdc-tables-cmd-abicodec-grpc-addr")
 		c.TableNames = viper.GetStringSlice("cdc-tables-cmd-table-name")
 		return c
 	})
@@ -178,6 +171,10 @@ func executeCdC(cmd *cobra.Command, args []string,
 		"CDC on action",
 		zap.String("account", account),
 	)
+	localABIFiles, err := dkafka.ParseABIFileSpecs(viper.GetStringSlice("cdc-cmd-local-abi-files"))
+	if err != nil {
+		return err
+	}
 
 	conf := &dkafka.Config{
 		DfuseToken:        viper.GetString("global-dfuse-auth-token"),
@@ -216,6 +213,8 @@ func executeCdC(cmd *cobra.Command, args []string,
 		SchemaRegistryURL: viper.GetString("cdc-cmd-schema-registry-url"),
 		SchemaNamespace:   viper.GetString("cdc-cmd-namespace"),
 		SchemaVersion:     viper.GetString("cdc-cmd-version"),
+		LocalABIFiles:     localABIFiles,
+		ABICodecGRPCAddr:  viper.GetString("cdc-cmd-abicodec-grpc-addr"),
 	}
 	conf = f(conf)
 	cmd.SilenceUsage = true

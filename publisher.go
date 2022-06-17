@@ -2,6 +2,8 @@ package dkafka
 
 import (
 	"encoding/json"
+
+	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 )
 
 const dkafkaNamespace = "io.dkafka"
@@ -83,9 +85,37 @@ func newActionInfoDetailsSchema(name string, jsonData RecordSchema, dbOpsRecord 
 	)
 }
 
-func newDBOpInfoRecord(tableName string, jsonData RecordSchema) RecordSchema {
-	return newRecordS(
-		tableName,
+func newDBOpBasic(dbOp *pbcodec.DBOp) map[string]interface{} {
+	asMap := map[string]interface{}{
+		"operation":    int32(dbOp.Operation),
+		"action_index": dbOp.ActionIndex,
+	}
+	addOptionalString(&asMap, "code", dbOp.Code)
+	addOptionalString(&asMap, "scope", dbOp.Scope)
+	addOptionalString(&asMap, "table_name", dbOp.TableName)
+	addOptionalString(&asMap, "primary_key", dbOp.PrimaryKey)
+	addOptionalString(&asMap, "old_payer", dbOp.OldPayer)
+	addOptionalString(&asMap, "new_payer", dbOp.NewPayer)
+	addOptionalBytes(&asMap, "old_data", dbOp.OldData)
+	addOptionalBytes(&asMap, "new_data", dbOp.NewData)
+	return asMap
+}
+
+func addOptionalBytes(m *map[string]interface{}, key string, value []byte) {
+	if len(value) > 0 {
+		(*m)[key] = value
+	}
+}
+
+func addOptionalString(m *map[string]interface{}, key string, value string) {
+	if value != "" {
+		(*m)[key] = value
+	}
+}
+func newDBOpBasicSchema() ActionInfoBasicSchema {
+	return newRecordFQN(
+		dkafkaNamespace,
+		"DBOpBasic",
 		[]FieldSchema{
 			NewOptionalField("operation", "int"),
 			NewOptionalField("action_index", "long"),
@@ -97,10 +127,19 @@ func newDBOpInfoRecord(tableName string, jsonData RecordSchema) RecordSchema {
 			NewOptionalField("new_payer", "string"),
 			NewOptionalField("old_data", "bytes"),
 			NewOptionalField("new_data", "bytes"),
-			NewOptionalField("old_json", jsonData),
-			NewOptionalField("new_json", jsonData.Name),
 		},
 	)
+}
+
+func newDBOpInfoRecord(tableName string, jsonData RecordSchema) RecordSchema {
+	result := newDBOpBasicSchema()
+	result.Name = tableName
+	result.Namespace = ""
+	result.Fields = append(result.Fields,
+		NewOptionalField("old_json", jsonData),
+		NewOptionalField("new_json", jsonData.Name),
+	)
+	return result
 }
 
 func newActionInfoBasic(
@@ -120,6 +159,7 @@ func newActionInfoBasic(
 }
 
 type ActionInfoBasicSchema = RecordSchema
+type DBOpBasicSchema = RecordSchema
 
 func newActionInfoBasicSchema() ActionInfoBasicSchema {
 	return newActionInfoBasicSchemaFQN("ActionInfoBasic", dkafkaNamespace)
@@ -361,8 +401,10 @@ func newActionNotificationSchema(name string, namespace string, version string, 
 func newActionInfo(
 	actionInfoBasic map[string]interface{},
 	jsonData map[string]interface{},
+	dbOps []map[string]interface{},
 ) map[string]interface{} {
 	actionInfoBasic["json_data"] = jsonData
+	actionInfoBasic["db_ops"] = dbOps
 	return actionInfoBasic
 }
 
@@ -370,8 +412,13 @@ type ActionInfoSchema = RecordSchema
 
 func newActionInfoSchema(name string, jsonData RecordSchema) ActionInfoSchema {
 	result := newActionInfoBasicSchemaN(name)
-	result.Fields = append(result.Fields, FieldSchema{Name: "json_data",
-		Type: jsonData,
-	})
+	result.Fields = append(result.Fields,
+		FieldSchema{Name: "json_data",
+			Type: jsonData,
+		},
+		FieldSchema{Name: "db_ops",
+			Type: NewArray(newDBOpBasicSchema()),
+		},
+	)
 	return result
 }

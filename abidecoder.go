@@ -203,35 +203,12 @@ type decodedDBOp struct {
 }
 
 func (dbOp *decodedDBOp) asMap(dbOpRecordName string) map[string]interface{} {
-	asMap := map[string]interface{}{
-		"operation":    int32(dbOp.Operation),
-		"action_index": dbOp.ActionIndex,
-	}
-	addOptionalString(&asMap, "code", dbOp.Code)
-	addOptionalString(&asMap, "scope", dbOp.Scope)
-	addOptionalString(&asMap, "table_name", dbOp.TableName)
-	addOptionalString(&asMap, "primary_key", dbOp.PrimaryKey)
-	addOptionalString(&asMap, "old_payer", dbOp.OldPayer)
-	addOptionalString(&asMap, "new_payer", dbOp.NewPayer)
-	addOptionalBytes(&asMap, "old_data", dbOp.OldData)
-	addOptionalBytes(&asMap, "new_data", dbOp.NewData)
+	asMap := newDBOpBasic(dbOp.DBOp)
 	addOptional(&asMap, "old_json", dbOp.OldJSON)
 	addOptional(&asMap, "new_json", dbOp.NewJSON)
 	// addOptionalRecord(&asMap, "old_json", dbOpRecordName, dbOp.OldJSON)
 	// addOptionalRecord(&asMap, "new_json", dbOpRecordName, dbOp.NewJSON)
 	return asMap
-}
-
-func addOptionalBytes(m *map[string]interface{}, key string, value []byte) {
-	if len(value) > 0 {
-		(*m)[key] = value
-	}
-}
-
-func addOptionalString(m *map[string]interface{}, key string, value string) {
-	if value != "" {
-		(*m)[key] = value
-	}
 }
 
 func addOptional(m *map[string]interface{}, key string, value map[string]interface{}) {
