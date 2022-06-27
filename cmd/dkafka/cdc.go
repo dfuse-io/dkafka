@@ -150,7 +150,7 @@ func generateAllAvroSchema(cmd *cobra.Command, args []string) {
 	zlog.Info("generate all schemas for:", zap.String("account", opts.abiSpec.Account))
 	zlog.Info("generate all Actions")
 	for _, action := range opts.abiSpec.Abi.Actions {
-		err = doGenActionAvroSchema(action.Type, opts)
+		err = doGenActionAvroSchema(action.Name.String(), opts)
 		if err != nil {
 			zlog.Fatal("doGenActionAvroSchema()", zap.Error(err))
 		}
@@ -305,7 +305,7 @@ func doGenAvroSchema(name string, opts GenOptions, f func(dkafka.NamedSchemaGenO
 }
 
 func saveSchema(schema dkafka.MessageSchema, prefix string, outputDir string) error {
-	fileName := strcase.ToSnake(fmt.Sprintf("%s%s", prefix, schema.Name))
+	fileName := strcase.ToKebab(fmt.Sprintf("%s%s", prefix, schema.Name))
 	fileName = fmt.Sprintf("%s.avsc", fileName)
 	filePath := filepath.Join(outputDir, fileName)
 	zlog.Info("save schema", zap.String("path", filePath))
