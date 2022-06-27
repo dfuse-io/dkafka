@@ -1,0 +1,23 @@
+{
+    "____comment": "This file was generated with eosio-abigen. DO NOT EDIT ",
+    "version": "eosio::abi/1.1",
+    "types": [
+    ],
+    "structs": [
+    {
+        "name": "activers",
+        "base": "",
+        "fields": []
+    }
+    ],
+    "actions": [
+        {
+            "name": "activers",
+            "type": "activers",
+            "ricardian_contract": "---\nspec_version: \"0.2.0\"\ntitle: activate the new nft version\nsummary: 'activate the new nft version to migrate to'\nicon: http://127.0.0.1/ricardian_assets/eosio.contracts/icons/account.png#3d55a2fc3a5c20b456f5657faf666bc25ffd06f4836c5e8256f741149b0b294f\n---\n\non-the-fly migration is activated and continuous migration will be allowed. v1 business logic becomes active."
+        }
+    ],
+    "tables": [],
+    "ricardian_clauses": [],
+    "variants": []
+}

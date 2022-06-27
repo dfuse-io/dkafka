@@ -91,7 +91,7 @@ type RecordSchema struct {
 	// available in the goavro schema builder context.
 	Convert string `json:"convert,omitempty"`
 	// Fields a JSON array, listing fields (required). Each field is a JSON object.
-	Fields []FieldSchema `json:"fields,omitempty"`
+	Fields []FieldSchema `json:"fields"`
 }
 
 func newRecordS(name string, fields []FieldSchema) RecordSchema {

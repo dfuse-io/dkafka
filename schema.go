@@ -164,6 +164,9 @@ func structToRecord(abi *eos.ABI, structName string, visited map[string]string) 
 	}
 	fields, err := abiFieldsToRecordFields(abi, s.Fields, visited)
 	fields = append(parentRecord.Fields, fields...)
+	if cap(fields) == 0 {
+		fields = make([]FieldSchema, 0)
+	}
 	if err != nil {
 		return RecordSchema{}, fmt.Errorf("%s abiFieldsToRecordFields() error: %v", structName, err)
 	}
