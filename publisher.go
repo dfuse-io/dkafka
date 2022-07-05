@@ -2,6 +2,7 @@ package dkafka
 
 import (
 	"encoding/json"
+	"time"
 
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 )
@@ -276,6 +277,7 @@ func newNotificationContext(
 	step string,
 	transactionID string,
 	correlation map[string]interface{},
+	time time.Time,
 ) map[string]interface{} {
 	nc := map[string]interface{}{
 		"block_id":   blockID,
@@ -284,6 +286,7 @@ func newNotificationContext(
 		"executed":   executed,
 		"block_step": step,
 		"trx_id":     transactionID,
+		"time":       time,
 	}
 	if len(correlation) > 0 {
 		nc["correlation"] = correlation
@@ -322,6 +325,13 @@ func newNotificationContextSchema() NotificationContextSchema {
 			{
 				Name: "trx_id",
 				Type: "string",
+			},
+			{
+				Name: "time",
+				Type: map[string]string{
+					"type":        "long",
+					"logicalType": "timestamp-millis",
+				},
 			},
 		},
 	)

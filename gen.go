@@ -71,8 +71,6 @@ type TableGenerator struct {
 type void struct{}
 type StringSet = map[string]void
 
-var empty = void{}
-
 func (tg TableGenerator) Apply(gc GenContext) (generations []Generation2, err error) {
 	gens, err := tg.doApply(gc)
 	if err != nil {
@@ -252,6 +250,7 @@ func notificationContextMap(gc GenContext) map[string]interface{} {
 		gc.stepName,
 		gc.transaction.Id,
 		newOptionalCorrelation(gc.correlation),
+		gc.block.MustTime().UTC(),
 	)
 }
 
