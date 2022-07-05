@@ -32,7 +32,7 @@ func NewJSONCodec() Codec {
 
 type JSONCodec struct{}
 
-var jsonKafkaHearder []kafka.Header = []kafka.Header{
+var jsonKafkaHeader []kafka.Header = []kafka.Header{
 	{
 		Key:   "content-type",
 		Value: []byte("application/json"),
@@ -63,7 +63,7 @@ func (c JSONCodec) Unmarshal(buf []byte) (interface{}, error) {
 }
 
 func (c JSONCodec) GetHeaders() []kafka.Header {
-	return jsonKafkaHearder
+	return jsonKafkaHeader
 }
 
 func NewKafkaAvroCodec(schemaRegistryURL string, schema *srclient.Schema, codec *goavro.Codec) Codec {
@@ -126,7 +126,7 @@ func (c KafkaAvroCodec) Unmarshal(buf []byte) (interface{}, error) {
 	return value, err
 }
 
-var avroKafkaHearder []kafka.Header = []kafka.Header{
+var avroKafkaHeader []kafka.Header = []kafka.Header{
 	{
 		Key:   "content-type",
 		Value: []byte("application/avro"),
@@ -139,7 +139,7 @@ var avroKafkaHearder []kafka.Header = []kafka.Header{
 
 func (c KafkaAvroCodec) GetHeaders() []kafka.Header {
 	u := fmt.Sprintf(c.schemaURLTemplate, c.schema.id)
-	return append(avroKafkaHearder, kafka.Header{
+	return append(avroKafkaHeader, kafka.Header{
 		Key:   "ce_dataschema",
 		Value: []byte(u),
 	})

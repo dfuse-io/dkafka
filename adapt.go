@@ -18,6 +18,26 @@ type BlockStep struct {
 	cursor string
 }
 
+func (bs BlockStep) time() time.Time {
+	return bs.blk.MustTime().UTC()
+}
+
+func (bs BlockStep) timeString() string {
+	blkTime := bs.time()
+	return blkTime.Format(time.RFC3339)
+}
+
+func (bs BlockStep) timeHeader() kafka.Header {
+	return kafka.Header{
+		Key:   "ce_time",
+		Value: []byte(bs.timeString()),
+	}
+}
+
+func (bs BlockStep) opaqueCursor() string {
+	return bs.cursor
+}
+
 type CdCAdapter struct {
 	topic     string
 	saveBlock SaveBlock
@@ -39,9 +59,6 @@ func (m *CdCAdapter) Adapt(blkStep BlockStep) ([]*kafka.Message, error) {
 	msgs := make([]*kafka.Message, 0)
 	trxs := blk.TransactionTraces()
 	blkTime := blk.MustTime().UTC()
-	// blkTimeStr := blkTime.Format("2006-01-02T15:04:05.9Z")
-	blkTimeStr := blkTime.Format(time.RFC3339)
-	blkTimeBytes := []byte(blkTimeStr)
 	zlog.Debug("adapt block", zap.Uint32("num", blk.Number), zap.Int("nb_trx", len(trxs)))
 	for _, trx := range trxs {
 		transactionTracesReceived.Inc()
@@ -82,10 +99,7 @@ func (m *CdCAdapter) Adapt(blkStep BlockStep) ([]*kafka.Message, error) {
 						Key:   "ce_type",
 						Value: []byte(generation.CeType),
 					},
-					kafka.Header{
-						Key:   "ce_time",
-						Value: blkTimeBytes,
-					},
+					blkStep.timeHeader(),
 					kafka.Header{
 						Key:   "ce_blkstep",
 						Value: []byte(step),

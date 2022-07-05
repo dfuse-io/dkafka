@@ -6,8 +6,6 @@ import (
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 )
 
-const dkafkaNamespace = "io.dkafka"
-
 func newCorrelationRecord() RecordSchema {
 	return newRecordFQN(
 		dkafkaNamespace,

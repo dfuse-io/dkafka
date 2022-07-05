@@ -10,10 +10,97 @@ import (
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/bstream/forkable"
 	"go.uber.org/zap"
 )
 
-var NoCursorErr = errors.New("no cursor exists")
+const dkafkaCheckpoint = "DKafkaCheckpoint"
+
+var blockRef = RecordSchema{
+	Type:      "record",
+	Name:      "BlockRef",
+	Namespace: dkafkaNamespace,
+	Doc:       "BlockRef represents a reference to a block and is mainly define as the pair <BlockID, BlockNum>",
+	Fields: []FieldSchema{
+		{
+			Name: "id",
+			Type: "string",
+		},
+		{
+			Name: "num",
+			Type: "long",
+		},
+	},
+}
+
+func newBlockRefMap(blockRef bstream.BlockRef) map[string]interface{} {
+	return map[string]interface{}{
+		"id":  blockRef.ID(),
+		"num": blockRef.Num(),
+	}
+}
+
+var CheckpointSchema = RecordSchema{
+	Type:      "record",
+	Name:      dkafkaCheckpoint,
+	Namespace: dkafkaNamespace,
+	Doc:       "Periodically emitted checkpoint used to save the current position",
+	Fields: []FieldSchema{
+		{
+			Name: "step",
+			Type: "int",
+			Doc: `Step of the current block value can be: 1(New),2(Undo),3(Redo),4(Handoff),5(Irreversible),6(Stalled)
+ - 1(New): First time we're seeing this block
+ - 2(Undo): We are undoing this block (it was done previously)
+ - 4(Redo): We are redoing this block (it was done previously)
+ - 8(Handoff): The block passed a handoff from one producer to another
+ - 16(Irreversible): This block passed the LIB barrier and is in chain
+ - 32(Stalled): This block passed the LIB and is definitely forked out
+`,
+		},
+		{
+			Name: "block",
+			Type: blockRef,
+		},
+		{
+			Name: "headBlock",
+			Type: "BlockRef",
+		},
+		{
+			Name: "lastIrreversibleBlock",
+			Type: "BlockRef",
+		},
+		{
+			Name: "time",
+			Type: map[string]string{
+				"type":        "long",
+				"logicalType": "timestamp-millis",
+			},
+		},
+	},
+}
+
+var CheckpointMessageSchema = MessageSchema{
+	CheckpointSchema,
+	MetaSchema{
+		Compatibility: "FORWARD",
+		Type:          "notification",
+		Version:       "1.0.0",
+	},
+}
+
+func newCheckpointMap(cursor *forkable.Cursor, time time.Time) map[string]interface{} {
+	return map[string]interface{}{
+		"step":                  int(cursor.Step),
+		"block":                 newBlockRefMap(cursor.Block),
+		"headBlock":             newBlockRefMap(cursor.HeadBlock),
+		"lastIrreversibleBlock": newBlockRefMap(cursor.LIB),
+		"time":                  time,
+	}
+}
+
+var ErrNoCursor = errors.New("no cursor exists")
 
 type checkpointer interface {
 	Save(cursor string) error
@@ -27,7 +114,7 @@ func (n *nilCheckpointer) Save(string) error {
 }
 
 func (n *nilCheckpointer) Load() (string, error) {
-	return "", NoCursorErr
+	return "", ErrNoCursor
 }
 
 func newKafkaCheckpointer(conf kafka.ConfigMap, cursorTopic string, cursorPartition int32, dataTopic string, consumerGroupID string, producer *kafka.Producer) *kafkaCheckpointer {
@@ -163,13 +250,13 @@ func (c *kafkaCheckpointer) Load() (string, error) {
 				}
 			}
 			if cursor.Cursor == "" {
-				err = NoCursorErr
+				err = ErrNoCursor
 			}
 			return cursor.Cursor, err
 		default:
 		}
 	}
-	return "", NoCursorErr
+	return "", ErrNoCursor
 }
 
 func cloneConfig(in kafka.ConfigMap) kafka.ConfigMap {

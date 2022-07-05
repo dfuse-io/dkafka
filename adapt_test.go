@@ -199,7 +199,7 @@ func TestCdCAdapter_Adapt_pb(t *testing.T) {
 			for _, m := range messages {
 				assert.Equal(t, findHeader("content-type", m.Headers), "application/avro")
 				assert.Equal(t, findHeader("ce_datacontenttype", m.Headers), "application/avro")
-				assert.Equal(t, findHeader("ce_dataschema", m.Headers), "mock://bench-adapter/schemas/ids/1")
+				assert.Equal(t, findHeader("ce_dataschema", m.Headers), "mock://bench-adapter/schemas/ids/2")
 			}
 		})
 	}

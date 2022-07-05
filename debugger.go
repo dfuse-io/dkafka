@@ -122,7 +122,7 @@ func (d *Debugger) Write(key, val string) error {
 		},
 	}
 	fmt.Printf("sending message: %s:%s to topic %s\n", key, val, d.config.KafkaTopic)
-	if err := s.Send(ctx, []*kafka.Message{&msg}, ""); err != nil {
+	if err := s.Send(ctx, []*kafka.Message{&msg}, nil); err != nil {
 		return fmt.Errorf("sending message: %w", err)
 	}
 	producer.Close()

@@ -155,12 +155,17 @@ func generateAllAvroSchema(cmd *cobra.Command, args []string) {
 			zlog.Fatal("doGenActionAvroSchema()", zap.Error(err))
 		}
 	}
+	zlog.Info("generate all Tables")
 	for _, table := range opts.abiSpec.Abi.Tables {
 		err = doGenTableAvroSchema(string(table.Name), opts)
 		if err != nil {
 			zlog.Fatal("doGenTableAvroSchema()", zap.Error(err))
 		}
 
+	}
+	zlog.Info("generate static dkafka schemas")
+	if err = saveSchema(dkafka.CheckpointMessageSchema, "", opts.outputDir); err != nil {
+		zlog.Fatal("fail to saveSchema()", zap.String("schema", dkafka.CheckpointMessageSchema.Name), zap.Error(err))
 	}
 }
 

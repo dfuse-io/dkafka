@@ -157,7 +157,7 @@ func (a *App) Run() (err error) {
 		Value: []byte("1.0"),
 	}
 
-	hearders := []kafka.Header{
+	headers := []kafka.Header{
 		sourceHeader,
 		specHeader,
 	}
@@ -181,9 +181,9 @@ func (a *App) Run() (err error) {
 
 	var appCtx appCtx
 	if a.config.CdCType != "" {
-		appCtx, err = a.NewCDCCtx(ctx, producer, hearders, abiDecoder, saveBlock)
+		appCtx, err = a.NewCDCCtx(ctx, producer, headers, abiDecoder, saveBlock)
 	} else {
-		appCtx, err = a.NewLegacyCtx(ctx, producer, hearders, abiDecoder, saveBlock)
+		appCtx, err = a.NewLegacyCtx(ctx, producer, headers, abiDecoder, saveBlock)
 	}
 	if err != nil {
 		return err
@@ -223,8 +223,8 @@ type appCtx struct {
 func (a *App) NewCDCCtx(ctx context.Context, producer *kafka.Producer, headers []kafka.Header, abiDecoder *ABIDecoder, saveBlock SaveBlock) (appCtx, error) {
 	var adapter Adapter
 	var filter string
-	var sender Sender = NewFastSender(ctx, producer, a.config.KafkaTopic, headers)
 	var cursor string
+	var abiCodec ABICodec
 	eos.LegacyJSON4Asset = false
 	appCtx := appCtx{}
 	cursor, err := LoadCursor(createKafkaConfig(a.config), a.config.KafkaTopic)
@@ -238,7 +238,7 @@ func (a *App) NewCDCCtx(ctx context.Context, producer *kafka.Producer, headers [
 			Version:   a.config.SchemaVersion,
 			Account:   a.config.Account,
 		}
-		abiCodec, err := newABICodec(
+		abiCodec, err = newABICodec(
 			a.config.Codec, a.config.Account, a.config.SchemaRegistryURL, abiDecoder,
 			msg.getTableSchema,
 		)
@@ -285,7 +285,7 @@ func (a *App) NewCDCCtx(ctx context.Context, producer *kafka.Producer, headers [
 			Version:   a.config.SchemaVersion,
 			Account:   a.config.Account,
 		}
-		abiCodec, err := newABICodec(
+		abiCodec, err = newABICodec(
 			a.config.Codec, a.config.Account, a.config.SchemaRegistryURL, abiDecoder,
 			msg.getActionSchema,
 		)
@@ -308,11 +308,11 @@ func (a *App) NewCDCCtx(ctx context.Context, producer *kafka.Producer, headers [
 	appCtx.adapter = adapter
 	appCtx.cursor = cursor
 	appCtx.filter = filter
-	appCtx.sender = sender
+	appCtx.sender = NewFastSender(ctx, producer, a.config.KafkaTopic, headers, abiCodec)
 	return appCtx, nil
 }
 
-func (a *App) NewLegacyCtx(ctx context.Context, producer *kafka.Producer, hearders []kafka.Header, abiDecoder *ABIDecoder, saveBlock SaveBlock) (appCtx, error) {
+func (a *App) NewLegacyCtx(ctx context.Context, producer *kafka.Producer, headers []kafka.Header, abiDecoder *ABIDecoder, saveBlock SaveBlock) (appCtx, error) {
 	var adapter Adapter
 	var filter string = a.config.IncludeFilterExpr
 	var sender Sender
@@ -320,7 +320,7 @@ func (a *App) NewLegacyCtx(ctx context.Context, producer *kafka.Producer, hearde
 	var err error
 	eos.LegacyJSON4Asset = true
 	appCtx := appCtx{}
-	hearders = append(hearders,
+	headers = append(headers,
 		kafka.Header{
 			Key:   "content-type",
 			Value: []byte("application/json"),
@@ -336,7 +336,7 @@ func (a *App) NewLegacyCtx(ctx context.Context, producer *kafka.Producer, hearde
 			abiDecoder.DecodeDBOps,
 			a.config.FailOnUndecodableDBOP,
 			a.config.ActionsExpr,
-			hearders,
+			headers,
 		)
 		if err != nil {
 			return appCtx, err
@@ -357,7 +357,7 @@ func (a *App) NewLegacyCtx(ctx context.Context, producer *kafka.Producer, hearde
 			a.config.FailOnUndecodableDBOP,
 			eventTypeProg,
 			eventKeyProg,
-			hearders,
+			headers,
 		)
 	}
 	var cp checkpointer
@@ -369,7 +369,7 @@ func (a *App) NewLegacyCtx(ctx context.Context, producer *kafka.Producer, hearde
 
 		cursor, err = cp.Load()
 		switch err {
-		case NoCursorErr:
+		case ErrNoCursor:
 			zlog.Info("running in live mode, no cursor found: starting from beginning", zap.Int64("start_block_num", a.config.StartBlockNum))
 		case nil:
 			c, err := forkable.CursorFromOpaque(cursor)
@@ -442,7 +442,7 @@ func iterate(ctx context.Context, cancel context.CancelFunc, adapter Adapter, s 
 }
 
 func blockHandler(ctx context.Context, adapter Adapter, s Sender, in <-chan BlockStep, ticks <-chan time.Time, out chan<- error) {
-	var lastCursor string
+	var lastBlkStep BlockStep
 	hasFail := false
 	for {
 		select {
@@ -457,11 +457,11 @@ func blockHandler(ctx context.Context, adapter Adapter, s Sender, in <-chan Bloc
 				zlog.Debug("fail fast on adapter.Adapt() send message to -> out chan", zap.Error(err))
 				out <- fmt.Errorf("transform to kafka message at block_num: %d, cursor: %s, , %w", blkStep.blk.Number, blkStep.cursor, err)
 			}
-			lastCursor = blkStep.cursor
+			lastBlkStep = blkStep
 			if len(kafkaMsgs) == 0 {
 				continue
 			}
-			if err = s.Send(ctx, kafkaMsgs, blkStep.cursor); err != nil {
+			if err = s.Send(ctx, kafkaMsgs, blkStep); err != nil {
 				hasFail = true
 				zlog.Debug("fail fast on sender.Send() send message to -> out chan", zap.Error(err))
 				out <- fmt.Errorf("send to kafka message at: %s, %w", blkStep.cursor, err)
@@ -472,22 +472,10 @@ func blockHandler(ctx context.Context, adapter Adapter, s Sender, in <-chan Bloc
 				zlog.Debug("skip incoming tick message after failure")
 				continue
 			}
-			c, err := forkable.CursorFromOpaque(lastCursor)
-			if err != nil {
-				zlog.Error("cannot decode cursor", zap.String("cursor", lastCursor), zap.Error(err))
-				continue
-			}
-			zlog.Info("save checkpoint",
-				zap.String("cursor", lastCursor),
-				zap.Stringer("plain_cursor", c),
-				zap.Stringer("cursor_block", c.Block),
-				zap.Stringer("cursor_head_block", c.HeadBlock),
-				zap.Stringer("cursor_LIB", c.LIB),
-			)
-			if err := s.SaveCP(ctx, lastCursor); err != nil {
+			if err := s.SaveCP(ctx, lastBlkStep); err != nil {
 				hasFail = true
 				zlog.Debug("fail fast on sender.SaveCP() send message to -> out chan", zap.Error(err))
-				out <- fmt.Errorf("fail to save check point: %s, %w", lastCursor, err)
+				out <- fmt.Errorf("fail to save check point: %s, %w", lastBlkStep.cursor, err)
 			}
 		}
 	}
@@ -513,6 +501,7 @@ func createCdcKeyExpressions(cdcExpression string, env cel.EnvOption) (cdcProgra
 }
 
 func createCdCFilter(account string, executed bool) string {
+	// FIXME fixaccount!!!
 	filter := fmt.Sprintf("account==\"%s\" && receiver==\"%s\" && action!=\"fixaccount\"", account, account)
 	if executed {
 		filter = fmt.Sprintf("executed && %s", filter)
@@ -531,7 +520,6 @@ func createKafkaConfig(appConf *Config) kafka.ConfigMap {
 	if appConf.KafkaSSLAuth {
 		conf["ssl.certificate.location"] = appConf.KafkaSSLClientCertFile
 		conf["ssl.key.location"] = appConf.KafkaSSLClientKeyFile
-		//conf["ssl.key.password"] = "keypass"
 	}
 	return conf
 }

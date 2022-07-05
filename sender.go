@@ -7,31 +7,37 @@ import (
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"github.com/google/uuid"
+	"github.com/streamingfast/bstream/forkable"
 	"go.uber.org/zap"
 )
 
 const CursorHeaderKey = "dkafka_cursor"
 
+type location interface {
+	opaqueCursor() string
+	time() time.Time
+	timeHeader() kafka.Header
+}
+
 type Sender interface {
-	Send(ctx context.Context, messages []*kafka.Message, cursor string) error
-	SaveCP(ctx context.Context, cursor string) error
+	Send(ctx context.Context, messages []*kafka.Message, location location) error
+	SaveCP(ctx context.Context, location location) error
 }
 
 type DryRunSender struct{}
 
-func (s *DryRunSender) Send(ctx context.Context, messages []*kafka.Message, cursor string) error {
+func (s *DryRunSender) Send(ctx context.Context, messages []*kafka.Message, location location) error {
 	for i, msg := range messages {
-		outjson, err := messageToJSON(msg)
+		outJson, err := messageToJSON(msg)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("%d: %s", i, string(outjson))
+		fmt.Printf("%d: %s", i, string(outJson))
 	}
 	return nil
 }
 
-func (s *DryRunSender) SaveCP(ctx context.Context, cursor string) error {
+func (s *DryRunSender) SaveCP(ctx context.Context, location location) error {
 	return nil
 }
 
@@ -39,12 +45,13 @@ type FastKafkaSender struct {
 	producer *kafka.Producer
 	headers  []kafka.Header
 	topic    string
+	abiCodec ABICodec
 }
 
-func (s *FastKafkaSender) Send(ctx context.Context, messages []*kafka.Message, cursor string) error {
+func (s *FastKafkaSender) Send(ctx context.Context, messages []*kafka.Message, location location) error {
 	zlog.Debug("send messages", zap.Int("nb", len(messages)))
 	for _, msg := range messages {
-		msg.Headers = appendCursor(msg.Headers, cursor)
+		msg.Headers = appendCursor(msg.Headers, location.opaqueCursor())
 		if err := s.producer.Produce(msg, nil); err != nil {
 			return err
 		}
@@ -53,38 +60,52 @@ func (s *FastKafkaSender) Send(ctx context.Context, messages []*kafka.Message, c
 	return nil
 }
 
-func (s *FastKafkaSender) SaveCP(ctx context.Context, cursor string) error {
-	id := uuid.New()
-	ce_id := id[:]
+func (s *FastKafkaSender) SaveCP(ctx context.Context, location location) error {
+	cursor := location.opaqueCursor()
+	c, err := forkable.CursorFromOpaque(cursor)
+	if err != nil {
+		zlog.Error("FastKafkaSender.SaveCP() cannot decode cursor", zap.String("cursor", cursor), zap.Error(err))
+		return err
+	}
+	zlog.Info("save checkpoint",
+		zap.String("cursor", cursor),
+		zap.Stringer("plain_cursor", c),
+		zap.Stringer("cursor_block", c.Block),
+		zap.Stringer("cursor_head_block", c.HeadBlock),
+		zap.Stringer("cursor_LIB", c.LIB),
+	)
+	checkpoint := newCheckpointMap(c, location.time())
+	codec, err := s.abiCodec.GetCodec(dkafkaCheckpoint, 0)
+	if err != nil {
+		return fmt.Errorf("SaveCP() fail to get codec for %s: %w", dkafkaCheckpoint, err)
+	}
+	value, err := codec.Marshal(nil, checkpoint)
+	if err != nil {
+		return fmt.Errorf("SaveCP() fail to marshal %s: %w", dkafkaCheckpoint, err)
+	}
+	ce_id := hashString(cursor)
 	headers := append(s.headers,
+		// add codec specific content type
+		codec.GetHeaders()...,
+	)
+	headers = append(headers,
 		kafka.Header{
 			Key:   "ce_id",
 			Value: ce_id,
 		},
 		kafka.Header{
 			Key:   "ce_type",
-			Value: []byte("DkafkaCheckPoint"),
+			Value: []byte(dkafkaCheckpoint),
 		},
-		kafka.Header{
-			Key:   "ce_time",
-			Value: []byte(time.Now().UTC().Format(time.RFC3339)),
-		},
-		// even if the value is empty let's put a supported mime time
-		kafka.Header{
-			Key:   "content-type",
-			Value: []byte("application/json"),
-		},
-		kafka.Header{
-			Key:   "ce_datacontenttype",
-			Value: []byte("application/json"),
-		},
+		location.timeHeader(),
 		newCursorHeader(cursor),
 	)
 
 	msg := kafka.Message{
-		Key:     nil,
-		Headers: headers,
-		Value:   nil,
+		Key:       nil,
+		Headers:   headers,
+		Value:     value,
+		Timestamp: location.time(),
 		TopicPartition: kafka.TopicPartition{
 			Topic:     &s.topic,
 			Partition: kafka.PartitionAny,
@@ -107,11 +128,12 @@ func newCursorHeader(cursor string) kafka.Header {
 	}
 }
 
-func NewFastSender(ctx context.Context, producer *kafka.Producer, topic string, headers []kafka.Header) Sender {
+func NewFastSender(ctx context.Context, producer *kafka.Producer, topic string, headers []kafka.Header, abiCodec ABICodec) Sender {
 	ks := FastKafkaSender{
 		producer: producer,
 		headers:  headers,
 		topic:    topic,
+		abiCodec: abiCodec,
 	}
 	return &ks
 }
@@ -121,20 +143,20 @@ type KafkaSender struct {
 	cp       checkpointer
 }
 
-func (s *KafkaSender) Send(ctx context.Context, messages []*kafka.Message, cursor string) error {
+func (s *KafkaSender) Send(ctx context.Context, messages []*kafka.Message, location location) error {
 	for _, msg := range messages {
 		if err := s.producer.Produce(msg, nil); err != nil {
 			return err
 		}
 	}
-	if err := s.cp.Save(cursor); err != nil {
+	if err := s.cp.Save(location.opaqueCursor()); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *KafkaSender) SaveCP(ctx context.Context, cursor string) error {
-	return s.cp.Save(cursor)
+func (s *KafkaSender) SaveCP(ctx context.Context, location location) error {
+	return s.cp.Save(location.opaqueCursor())
 }
 
 type TransactionalKafkaSender struct {
@@ -157,17 +179,17 @@ func NewSender(ctx context.Context, producer *kafka.Producer, cp checkpointer, u
 	return &ks, nil
 }
 
-func (s *TransactionalKafkaSender) Send(ctx context.Context, messages []*kafka.Message, cursor string) error {
+func (s *TransactionalKafkaSender) Send(ctx context.Context, messages []*kafka.Message, location location) error {
 	if err := s.delegate.producer.BeginTransaction(); err != nil {
 		return fmt.Errorf("producer.BeginTransaction() error: %w", err)
 	}
-	if err := s.delegate.Send(ctx, messages, cursor); err != nil {
+	if err := s.delegate.Send(ctx, messages, location); err != nil {
 		if e := s.delegate.producer.AbortTransaction(ctx); e != nil {
 			zlog.Error("fail to call producer.AbortTransaction() on Send() failure", zap.NamedError("send_error", err), zap.Error(e))
 		}
 		return fmt.Errorf("Send() error: %w", err)
 	}
-	if err := s.delegate.SaveCP(ctx, cursor); err != nil {
+	if err := s.delegate.SaveCP(ctx, location); err != nil {
 		if e := s.delegate.producer.AbortTransaction(ctx); e != nil {
 			zlog.Error("fail to call producer.AbortTransaction() on SaveCP() failure", zap.NamedError("save_cp_error", err), zap.Error(e))
 		}
@@ -182,11 +204,11 @@ func (s *TransactionalKafkaSender) Send(ctx context.Context, messages []*kafka.M
 	return nil
 }
 
-func (s *TransactionalKafkaSender) SaveCP(ctx context.Context, cursor string) error {
+func (s *TransactionalKafkaSender) SaveCP(ctx context.Context, location location) error {
 	if err := s.delegate.producer.BeginTransaction(); err != nil {
 		return fmt.Errorf("producer.BeginTransaction() error: %w", err)
 	}
-	if err := s.delegate.SaveCP(ctx, cursor); err != nil {
+	if err := s.delegate.SaveCP(ctx, location); err != nil {
 		if e := s.delegate.producer.AbortTransaction(ctx); e != nil {
 			zlog.Error("fail to call producer.AbortTransaction() on SaveCP() failure", zap.NamedError("save_cp_error", err), zap.Error(e))
 		}

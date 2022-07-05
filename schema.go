@@ -13,6 +13,8 @@ import (
 	"go.uber.org/zap"
 )
 
+const dkafkaNamespace = "io.dkafka"
+
 type AbiSpec struct {
 	Account string
 	Abi     *eos.ABI

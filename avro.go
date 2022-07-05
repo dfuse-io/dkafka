@@ -62,20 +62,6 @@ type FieldSchema struct {
 	Default json.RawMessage `json:"default,omitempty"`
 }
 
-var _defaultNull = json.RawMessage("null")
-
-func NewNullableField(n string, t Schema) FieldSchema {
-	return FieldSchema{
-		Name:    n,
-		Type:    t,
-		Default: _defaultNull,
-	}
-}
-
-func NewOptionalField(n string, t Schema) FieldSchema {
-	return NewNullableField(n, NewOptional(t))
-}
-
 type RecordSchema struct {
 	// type always equal to "record"
 	Type string `json:"type"`
@@ -115,6 +101,8 @@ type ArraySchema struct {
 	// todo manage default
 }
 
+type Union = []Schema
+
 func NewArray(itemType Schema) ArraySchema {
 	return ArraySchema{
 		Type:  "array",
@@ -122,7 +110,19 @@ func NewArray(itemType Schema) ArraySchema {
 	}
 }
 
-type Union = []Schema
+var _defaultNull = json.RawMessage("null")
+
+func NewNullableField(n string, t Schema) FieldSchema {
+	return FieldSchema{
+		Name:    n,
+		Type:    t,
+		Default: _defaultNull,
+	}
+}
+
+func NewOptionalField(n string, t Schema) FieldSchema {
+	return NewNullableField(n, NewOptional(t))
+}
 
 func NewOptional(schema Schema) Union {
 	return []Schema{"null", schema}

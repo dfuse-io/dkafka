@@ -74,6 +74,16 @@ func (c *KafkaAvroABICodec) GetCodec(name string, blockNum uint32) (Codec, error
 	if err != nil {
 		return nil, err
 	}
+	codec, err := c.newCodec(messageSchema)
+	if err != nil {
+		return nil, fmt.Errorf("KafkaAvroABICodec.GetCodec fail to create codec for schema %s, error: %w", messageSchema.Name, err)
+	}
+	zlog.Debug("register codec into cache", zap.String("name", name))
+	c.codecCache[name] = codec
+	return codec, nil
+}
+
+func (c *KafkaAvroABICodec) newCodec(messageSchema MessageSchema) (Codec, error) {
 	subject := fmt.Sprintf("%s.%s", messageSchema.Namespace, messageSchema.Name)
 	jsonSchema, err := json.Marshal(messageSchema)
 	if err != nil {
@@ -93,8 +103,6 @@ func (c *KafkaAvroABICodec) GetCodec(name string, blockNum uint32) (Codec, error
 		return nil, fmt.Errorf("goavro.NewCodecWithConverters error: %w, with schema %s", err, string(jsonSchema))
 	}
 	codec := NewKafkaAvroCodec(c.schemaRegistryURL, schema, ac)
-	zlog.Debug("register codec into cache")
-	c.codecCache[name] = codec
 	return codec, nil
 }
 
@@ -105,7 +113,17 @@ func (c *KafkaAvroABICodec) Refresh(blockNum uint32) error {
 
 func (c *KafkaAvroABICodec) onReload() {
 	zlog.Info("clear schema cache on reload")
-	c.codecCache = make(map[string]Codec)
+	c.codecCache = c.initStaticSchema(make(map[string]Codec))
+}
+
+func (c *KafkaAvroABICodec) initStaticSchema(cache map[string]Codec) map[string]Codec {
+	codec, err := c.newCodec(CheckpointMessageSchema)
+	if err != nil {
+		zlog.Error("initStaticSchema fail to create codec", zap.String("schema", dkafkaCheckpoint), zap.Error(err))
+		panic(1)
+	}
+	cache[dkafkaCheckpoint] = codec
+	return cache
 }
 
 func NewKafkaAvroABICodec(
@@ -124,6 +142,7 @@ func NewKafkaAvroABICodec(
 		schemaRegistryURL,
 	}
 	decoder.onReload = codec.onReload
+	codec.onReload()
 	return codec
 }
 
