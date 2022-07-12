@@ -251,6 +251,7 @@ func notificationContextMap(gc GenContext) map[string]interface{} {
 		gc.transaction.Id,
 		newOptionalCorrelation(gc.correlation),
 		gc.block.MustTime().UTC(),
+		gc.cursor,
 	)
 }
 

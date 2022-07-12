@@ -226,6 +226,7 @@ func (a *App) NewCDCCtx(ctx context.Context, producer *kafka.Producer, headers [
 	var cursor string
 	var abiCodec ABICodec
 	eos.LegacyJSON4Asset = false
+	eos.NativeType = true
 	appCtx := appCtx{}
 	cursor, err := LoadCursor(createKafkaConfig(a.config), a.config.KafkaTopic)
 	if err != nil {
@@ -319,6 +320,7 @@ func (a *App) NewLegacyCtx(ctx context.Context, producer *kafka.Producer, header
 	var cursor string
 	var err error
 	eos.LegacyJSON4Asset = true
+	eos.NativeType = false
 	appCtx := appCtx{}
 	headers = append(headers,
 		kafka.Header{

@@ -278,6 +278,7 @@ func newNotificationContext(
 	transactionID string,
 	correlation map[string]interface{},
 	time time.Time,
+	cursor string,
 ) map[string]interface{} {
 	nc := map[string]interface{}{
 		"block_id":   blockID,
@@ -287,6 +288,7 @@ func newNotificationContext(
 		"block_step": step,
 		"trx_id":     transactionID,
 		"time":       time,
+		"cursor":     cursor,
 	}
 	if len(correlation) > 0 {
 		nc["correlation"] = correlation
@@ -326,12 +328,10 @@ func newNotificationContextSchema() NotificationContextSchema {
 				Name: "trx_id",
 				Type: "string",
 			},
+			NewTimestampMillisField("time"),
 			{
-				Name: "time",
-				Type: map[string]string{
-					"type":        "long",
-					"logicalType": "timestamp-millis",
-				},
+				Name: "cursor",
+				Type: "string",
 			},
 		},
 	)
