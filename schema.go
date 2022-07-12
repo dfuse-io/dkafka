@@ -338,9 +338,9 @@ func initBuiltInTypesForTables() {
 		"varuint32":            "long",
 		"float32":              "float",
 		"float64":              "double",
-		"time_point":           "string", // fork/eos-go/abidecoder.go TODO add ABI.nativeTime bool to skip time to string conversion in abidecoder read method
-		"time_point_sec":       "string", // fork/eos-go/abidecoder.go
-		"block_timestamp_type": "string", // fork/eos-go/abidecoder.go
+		"time_point":           NewTimestampMillisType(), // fork/eos-go/abidecoder.go TODO add ABI.nativeTime bool to skip time to string conversion in abidecoder read method
+		"time_point_sec":       NewTimestampMillisType(), // fork/eos-go/abidecoder.go
+		"block_timestamp_type": NewTimestampMillisType(), // fork/eos-go/abidecoder.go
 		"name":                 "string",
 		"bytes":                "bytes",
 		"string":               "string",
@@ -357,9 +357,16 @@ func initBuiltInTypesForTables() {
 	}
 }
 
+// initBuiltInTypesForActions must rewrite the default types provided by initBuiltInTypesForTables
+// because the action details is sent directly in json from the firehouse and the firehouse use the
+// string representation of most of the advance type like asset and time based.
+// FIXME Can be fixed by using the raw_data of the action trace ;)
 func initBuiltInTypesForActions() {
 	initBuiltInTypesForTables()
 	avroPrimitiveTypeByBuiltInTypes["asset"] = "string"
+	avroPrimitiveTypeByBuiltInTypes["time_point"] = "string"
+	avroPrimitiveTypeByBuiltInTypes["time_point_sec"] = "string"
+	avroPrimitiveTypeByBuiltInTypes["block_timestamp_type"] = "string"
 	avroRecordTypeByBuiltInTypes = map[string]RecordSchema{}
 }
 

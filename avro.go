@@ -127,3 +127,17 @@ func NewOptionalField(n string, t Schema) FieldSchema {
 func NewOptional(schema Schema) Union {
 	return []Schema{"null", schema}
 }
+
+func NewTimestampMillisField(name string) FieldSchema {
+	return FieldSchema{
+		Name: name,
+		Type: NewTimestampMillisType(),
+	}
+}
+
+func NewTimestampMillisType() Schema {
+	return map[string]string{
+		"type":        "long",
+		"logicalType": "timestamp-millis",
+	}
+}

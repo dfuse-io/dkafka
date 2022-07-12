@@ -12,6 +12,8 @@ import (
 	"go.uber.org/zap"
 )
 
+var NativeType = true
+
 func (a *ABI) DecodeAction(data []byte, actionName ActionName) ([]byte, error) {
 	binaryDecoder := NewDecoder(data)
 	action := a.ActionForName(actionName)
@@ -332,20 +334,33 @@ func (a *ABI) read(binaryDecoder *Decoder, fieldType string) (interface{}, error
 	case "time_point":
 		timePoint, e := binaryDecoder.ReadTimePoint() //todo double check
 		if e == nil {
-			value = formatTimePoint(timePoint, a.fitNodeos)
+			if NativeType {
+				value = time.Unix(0, int64(timePoint*1000)).UTC()
+			} else {
+				value = formatTimePoint(timePoint, a.fitNodeos)
+			}
 		}
 		err = e
 	case "time_point_sec":
 		timePointSec, e := binaryDecoder.ReadTimePointSec()
 		if e == nil {
-			t := time.Unix(int64(timePointSec), 0)
-			value = t.UTC().Format("2006-01-02T15:04:05")
+			t := time.Unix(int64(timePointSec), 0).UTC()
+			if NativeType {
+				value = t
+			} else {
+				value = t.UTC().Format("2006-01-02T15:04:05")
+			}
 		}
 		err = e
 	case "block_timestamp_type":
 		value, err = binaryDecoder.ReadBlockTimestamp()
 		if err == nil {
-			value = value.(BlockTimestamp).Time.UTC().Format("2006-01-02T15:04:05")
+			t := value.(BlockTimestamp).Time.UTC()
+			if NativeType {
+				value = t
+			} else {
+				value = t.Format("2006-01-02T15:04:05")
+			}
 		}
 	case "name":
 		value, err = binaryDecoder.ReadName()

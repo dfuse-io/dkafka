@@ -344,5 +344,6 @@ $ build/dkafka cdc schemas eosio.nft.ft:./testdata/eosio.nft.ft.abi -o ./build -
 - [ ] patch (pool request) on goavro to support uint32 and unit64... overflow => negative value
 - [ ] pool request on eos-go for native decode functions
 - [ ] add option to exclude certain actions when in cdc table mode
-- [ ] add the cursor details in `DkafkaCheckpoint` message in avro and json format depending of the codec.
+- [x] add the cursor details in `DkafkaCheckpoint` message in avro and json format depending of the codec.
 - [ ] optimize the bootstrap time to avoid to read all the blocks from 0.
+- [ ] make action and table schema consistent by using the same deserialization mechanism with the action trace row_data

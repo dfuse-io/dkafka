@@ -31,10 +31,10 @@ STREAM_ACT_START_BLOCK ?= 49608000
 # CDC_TABLES_TABLE_NAMES ?= 'accounts:s+k'
 CDC_TABLES_ACCOUNT ?= 'eosio.nft.ft'
 CDC_TABLES_TABLE_NAMES ?= 'factory.a,factory.b,resale.a,token.a'
-CDC_TABLES_START_BLOCK ?= 69687000
+CDC_TABLES_START_BLOCK ?= 70837000
 ## CDC ACTIONS
 CDC_ACTIONS_EXPRESSION ?= '{"create":"transaction_id", "issue":"data.issue.to"}'
-CDC_ACTIONS_START_BLOCK ?= 30079000
+CDC_ACTIONS_START_BLOCK ?= 70837000
 CDC_ACTIONS_ACCOUNT ?= 'eosio.nft.ft'
 ##
 
@@ -136,8 +136,7 @@ cdc-actions: build up ## CDC stream on tables
 		--start-block-num=$(CDC_ACTIONS_START_BLOCK) \
 		--kafka-message-max-bytes=$(MESSAGE_MAX_SIZE) \
 		--codec=$(CODEC) \
-		--actions-expr=$(CDC_ACTIONS_EXPRESSION) $(CDC_ACTIONS_ACCOUNT) \
-		-vvvv
+		--actions-expr=$(CDC_ACTIONS_EXPRESSION) $(CDC_ACTIONS_ACCOUNT)
 
 stream-act: build up ## stream actions based localy
 	$(BINARY_PATH) publish \
@@ -170,7 +169,7 @@ batch: build up ## run batch localy
 		--kafka-message-max-bytes=$(MESSAGE_MAX_SIZE)
 
 schemas: build ## Generate schemas
-	$(BINARY_PATH) cdc schemas eosio.nft.ft:./testdata/eosio.nft.ft.abi -o ./build
+	$(BINARY_PATH) cdc schemas eosio.nft.ft:./testdata/eosio.nft.ft-2.0.abi -o ./build
 
 # schemas: ## Generate schemas
 # 	@echo ${BINARY_PATH}
