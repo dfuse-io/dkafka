@@ -111,7 +111,7 @@ func addOptionalString(m *map[string]interface{}, key string, value string) {
 		(*m)[key] = value
 	}
 }
-func newDBOpBasicSchema() ActionInfoBasicSchema {
+func newDBOpBasicSchema() DBOpBasicSchema {
 	return newRecordFQN(
 		dkafkaNamespace,
 		"DBOpBasic",

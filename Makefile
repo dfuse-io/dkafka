@@ -121,8 +121,8 @@ cdc-tables: build up ## CDC stream on tables
 		--kafka-topic="io.dkafka.test" \
 		--kafka-compression-type=$(COMPRESSION_TYPE) \
 		--kafka-compression-level=$(COMPRESSION_LEVEL) \
-		--start-block-num=$(CDC_TABLES_START_BLOCK) \
 		--kafka-message-max-bytes=$(MESSAGE_MAX_SIZE) \
+		--start-block-num=$(CDC_TABLES_START_BLOCK) \
 		--codec=$(CODEC) \
 		--table-name=$(CDC_TABLES_TABLE_NAMES) $(CDC_TABLES_ACCOUNT)
 
