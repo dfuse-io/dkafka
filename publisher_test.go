@@ -31,6 +31,7 @@ func Test_newDBOpInfoRecord(t *testing.T) {
 				[]FieldSchema{
 					NewOptionalField("operation", "int"),
 					NewOptionalField("action_index", "long"),
+					NewIntField("index"),
 					NewOptionalField("code", "string"),
 					NewOptionalField("scope", "string"),
 					NewOptionalField("table_name", "string"),
