@@ -58,7 +58,6 @@ func (m *CdCAdapter) Adapt(blkStep BlockStep) ([]*kafka.Message, error) {
 	}
 	msgs := make([]*kafka.Message, 0)
 	trxs := blk.TransactionTraces()
-	// blkTime := blk.MustTime().UTC()
 	zlog.Debug("adapt block", zap.Uint32("num", blk.Number), zap.Int("nb_trx", len(trxs)))
 	for _, trx := range trxs {
 		transactionTracesReceived.Inc()
