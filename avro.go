@@ -41,7 +41,7 @@ func checkNamespace(np string) (string, error) {
 type Schema = interface{}
 
 type MetaSchema struct {
-	Compatibility string `json:"name"`
+	Compatibility string `json:"compatibility"`
 	Type          string `json:"type"`
 	Version       string `json:"version,omitempty"`
 }
