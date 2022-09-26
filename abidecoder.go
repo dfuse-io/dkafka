@@ -89,6 +89,18 @@ func (c *KafkaAvroABICodec) GetCodec(name string, blockNum uint32) (Codec, error
 	return codec, nil
 }
 
+func (c *KafkaAvroABICodec) setSubjectCompatibilityToForward(subject string) error {
+	zlog.Debug("Set subject compatibility to FORWARD", zap.String("subject", subject), zap.String("compatibility", string(srclient.Forward)))
+	_, err := c.schemaRegistryClient.ChangeSubjectCompatibilityLevel(subject, srclient.Forward)
+	if err != nil {
+		if strings.HasPrefix(err.Error(), "mock") {
+			return nil
+		}
+		return fmt.Errorf("cannot change compatibility level of subject: '%s', error: %w", subject, err)
+	}
+	return err
+}
+
 func (c *KafkaAvroABICodec) newCodec(messageSchema MessageSchema) (Codec, error) {
 	subject := fmt.Sprintf("%s.%s", messageSchema.Namespace, messageSchema.Name)
 	jsonSchema, err := json.Marshal(messageSchema)
@@ -98,11 +110,29 @@ func (c *KafkaAvroABICodec) newCodec(messageSchema MessageSchema) (Codec, error)
 	if traceEnabled {
 		zlog.Debug("register schema", zap.String("subject", subject), zap.ByteString("schema", jsonSchema))
 	}
+	zlog.Debug("get compatibility level of subject's schema", zap.String("subject", subject))
+	actualCompatibilityLevel, err := c.schemaRegistryClient.GetCompatibilityLevel(subject, true)
+	unknownSubject := false
+	if err != nil {
+		unknownSubject = true
+	} else if *actualCompatibilityLevel != srclient.Forward {
+		err = c.setSubjectCompatibilityToForward(subject)
+		if err != nil {
+			return nil, err
+		}
+	}
 	zlog.Debug("register schema", zap.String("subject", subject))
 	schema, err := c.schemaRegistryClient.CreateSchema(subject, string(jsonSchema), srclient.Avro)
 	if err != nil {
 		return nil, fmt.Errorf("CreateSchema on subject: '%s', schema:\n%s error: %w", subject, string(jsonSchema), err)
 	}
+	if unknownSubject {
+		err = c.setSubjectCompatibilityToForward(subject)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	zlog.Debug("create kafka avro codec", zap.Int("ID", schema.ID()))
 	ac, err := goavro.NewCodecWithConverters(schema.Schema(), schemaTypeConverters)
 	if err != nil {
@@ -368,7 +398,7 @@ func (a *ABIDecoder) DecodeDBOps(in []*pbcodec.DBOp, blockNum uint32) (decodedDB
 	return
 }
 
-type abiItem struct {
-	abi      *eos.ABI
-	blockNum uint32
-}
+// type abiItem struct {
+// 	abi      *eos.ABI
+// 	blockNum uint32
+// }
