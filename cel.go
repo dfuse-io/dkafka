@@ -43,8 +43,13 @@ func NewActivation(stepName string, transaction *pbcodec.TransactionTrace, trace
 		"transaction_id":    transaction.Id,
 		"transaction_index": transaction.Index,
 		"step":              stepName,
-		"global_seq":        trace.Receipt.GlobalSequence,
-		"execution_index":   trace.ExecutionIndex,
+		"global_seq": func() interface{} {
+			if trace.Receipt != nil {
+				return trace.Receipt.GlobalSequence
+			}
+			return 0
+		},
+		"execution_index": trace.ExecutionIndex,
 		"receiver": func() interface{} {
 			if trace.Receipt != nil {
 				return trace.Receipt.Receiver
@@ -65,6 +70,9 @@ func NewActivation(stepName string, transaction *pbcodec.TransactionTrace, trace
 			return jsonStringToMap(jsonData)
 		},
 		"db_ops": func() interface{} {
+			if trace.Receipt == nil {
+				return nil
+			}
 			// maybe we can have a look to https://github.com/mitchellh/mapstructure/blob/master/mapstructure.go
 			if rawJSON, err := json.Marshal(decodedDBOps); err != nil {
 				zlog.Error("invalid dpOps", zap.Error(err), zap.Uint64("globalSequence", trace.Receipt.GlobalSequence))
@@ -102,8 +110,13 @@ func NewTableActivation(stepName string, transaction *pbcodec.TransactionTrace, 
 		"transaction_id":    transaction.Id,
 		"transaction_index": transaction.Index,
 		"step":              stepName,
-		"global_seq":        trace.Receipt.GlobalSequence,
-		"execution_index":   trace.ExecutionIndex,
+		"global_seq": func() interface{} {
+			if trace.Receipt != nil {
+				return trace.Receipt.GlobalSequence
+			}
+			return 0
+		},
+		"execution_index": trace.ExecutionIndex,
 		"receiver": func() interface{} {
 			if trace.Receipt != nil {
 				return trace.Receipt.Receiver
@@ -113,6 +126,9 @@ func NewTableActivation(stepName string, transaction *pbcodec.TransactionTrace, 
 		"account": trace.Account(),
 		"action":  trace.Name(),
 		"db_op": func() interface{} {
+			if trace.Receipt == nil {
+				return nil
+			}
 			// maybe we can have a look to https://github.com/mitchellh/mapstructure/blob/master/mapstructure.go
 			if rawJSON, err := json.Marshal(decodedDBOp); err != nil {
 				zlog.Fatal("invalid dpOp", zap.Error(err), zap.Uint64("globalSequence", trace.Receipt.GlobalSequence))
@@ -122,6 +138,9 @@ func NewTableActivation(stepName string, transaction *pbcodec.TransactionTrace, 
 			return nil
 		},
 		"table": func() interface{} {
+			if trace.Receipt == nil {
+				return nil
+			}
 			switch op := decodedDBOp.Operation; op {
 			case pbcodec.DBOp_OPERATION_INSERT:
 				if rawJSON, err := json.Marshal(decodedDBOp.NewJSON); err != nil {
@@ -177,8 +196,13 @@ func NewActionActivation(stepName string, transaction *pbcodec.TransactionTrace,
 		"transaction_id":    transaction.Id,
 		"transaction_index": transaction.Index,
 		"step":              stepName,
-		"global_seq":        trace.Receipt.GlobalSequence,
-		"execution_index":   trace.ExecutionIndex,
+		"global_seq": func() interface{} {
+			if trace.Receipt != nil {
+				return trace.Receipt.GlobalSequence
+			}
+			return 0
+		},
+		"execution_index": trace.ExecutionIndex,
 		"receiver": func() interface{} {
 			if trace.Receipt != nil {
 				return trace.Receipt.Receiver
