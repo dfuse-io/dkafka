@@ -5,6 +5,7 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
+	pbbstream "github.com/streamingfast/pbgo/dfuse/bstream/v1"
 	"go.uber.org/zap"
 )
 
@@ -14,7 +15,7 @@ type Adapter interface {
 
 type BlockStep struct {
 	blk    *pbcodec.Block
-	step   string
+	step   pbbstream.ForkStep
 	cursor string
 }
 
@@ -45,9 +46,18 @@ type CdCAdapter struct {
 	headers   []kafka.Header
 }
 
+// orderSliceOnBlockStep reverse the slice order is the block step is UNDO
+func orderSliceOnBlockStep[T any](input []T, step pbbstream.ForkStep) []T {
+	output := input
+	if step == pbbstream.ForkStep_STEP_UNDO {
+		output = Reverse(input)
+	}
+	return output
+}
+
 func (m *CdCAdapter) Adapt(blkStep BlockStep) ([]*kafka.Message, error) {
 	blk := blkStep.blk
-	step := blkStep.step
+	step := sanitizeStep(blkStep.step.String())
 
 	m.saveBlock(blk)
 	if blk.Number%100 == 0 {
@@ -59,7 +69,7 @@ func (m *CdCAdapter) Adapt(blkStep BlockStep) ([]*kafka.Message, error) {
 	msgs := make([]*kafka.Message, 0)
 	trxs := blk.TransactionTraces()
 	zlog.Debug("adapt block", zap.Uint32("num", blk.Number), zap.Int("nb_trx", len(trxs)))
-	for _, trx := range trxs {
+	for _, trx := range orderSliceOnBlockStep(trxs, blkStep.step) {
 		transactionTracesReceived.Inc()
 		// manage correlation
 		correlation, err := getCorrelation(trx.ActionTraces)
@@ -68,7 +78,7 @@ func (m *CdCAdapter) Adapt(blkStep BlockStep) ([]*kafka.Message, error) {
 		}
 		acts := trx.ActionTraces
 		zlog.Debug("adapt transaction", zap.Uint32("blk_num", blk.Number), zap.Int("trx_index", int(trx.Index)), zap.Int("nb_acts", len(acts)))
-		for _, act := range acts {
+		for _, act := range orderSliceOnBlockStep(acts, blkStep.step) {
 			if !act.FilteringMatched {
 				continue
 			}
