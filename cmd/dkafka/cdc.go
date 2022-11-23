@@ -67,6 +67,13 @@ The schema type (CamelCase) is for:
 
 func init() {
 	RootCmd.AddCommand(CdCCmd)
+	// cursor migration flags
+	CdCCmd.PersistentFlags().String("kafka-cursor-topic", "_dkafka_cursors", `kafka topic where cursor were saved by a previous version of dkafka.
+This option can be used when you want to migrate from a previous version 
+of dkafka that was using the cursor topic to save checkpoints`)
+	CdCCmd.Flags().Uint32("kafka-cursor-partition", 0, "kafka partition where cursor will be loaded and saved")
+	CdCCmd.Flags().String("kafka-cursor-consumer-group-id", "dkafkaconsumer", "Consumer group ID for reading cursor")
+	//---
 	CdCCmd.PersistentFlags().Var(compressionTypes, "kafka-compression-type", compressionTypes.Help("Specify the compression type to use for compressing message sets."))
 	CdCCmd.PersistentFlags().Int8("kafka-compression-level", int8(-1), `Compression level parameter for algorithm selected by configuration property
 kafka-compression-type. Higher values will result in better compression at the
@@ -91,7 +98,8 @@ start streaming from this block number (if negative, relative to HEAD)`)
 	CdCCmd.PersistentFlags().Duration("delay-between-commits", time.Second*10, "no commits to kafka blow this delay, except un shutdown")
 	CdCCmd.PersistentFlags().String("event-source", "dkafka", "custom value for produced cloudevent source")
 
-	CdCCmd.PersistentFlags().Bool("executed", false, "Specify publish messages based only on executed actions => modify the state of the blockchain. This remove the error messages")
+	CdCCmd.PersistentFlags().Bool("executed", false, `Specify publish messages based only on executed actions => modify the state of the blockchain.
+This remove the error messages`)
 	CdCCmd.PersistentFlags().Bool("irreversible", false, "Specify publish messages based only on irreversible actions")
 
 	CdCCmd.PersistentFlags().Var(codecTypes, "codec", codecTypes.Help("Specify the codec to use to encode the messages."))
@@ -186,20 +194,21 @@ func executeCdC(cmd *cobra.Command, args []string,
 		DfuseGRPCEndpoint: viper.GetString("global-dfuse-firehose-grpc-addr"),
 		IncludeFilterExpr: viper.GetString("global-dfuse-firehose-include-expr"),
 
-		DryRun:                 viper.GetBool("global-dry-run"),
-		KafkaEndpoints:         viper.GetString("global-kafka-endpoints"),
-		KafkaSSLEnable:         viper.GetBool("global-kafka-ssl-enable"),
-		KafkaSSLCAFile:         viper.GetString("global-kafka-ssl-ca-file"),
-		KafkaSSLAuth:           viper.GetBool("global-kafka-ssl-auth"),
-		KafkaSSLClientCertFile: viper.GetString("global-kafka-ssl-client-cert-file"),
-		KafkaSSLClientKeyFile:  viper.GetString("global-kafka-ssl-client-key-file"),
-		KafkaTopic:             viper.GetString("global-kafka-topic"),
-		KafkaCursorTopic:       viper.GetString("global-kafka-cursor-topic"),
-		KafkaCursorPartition:   int32(viper.GetUint32("global-kafka-cursor-partition")),
-		KafkaCompressionType:   viper.GetString("cdc-cmd-kafka-compression-type"),
-		KafkaCompressionLevel:  viper.GetInt("cdc-cmd-kafka-compression-level"),
-		KafkaMessageMaxBytes:   viper.GetInt("cdc-cmd-kafka-message-max-bytes"),
-		CommitMinDelay:         viper.GetDuration("cdc-cmd-delay-between-commits"),
+		DryRun:                     viper.GetBool("global-dry-run"),
+		KafkaEndpoints:             viper.GetString("global-kafka-endpoints"),
+		KafkaSSLEnable:             viper.GetBool("global-kafka-ssl-enable"),
+		KafkaSSLCAFile:             viper.GetString("global-kafka-ssl-ca-file"),
+		KafkaSSLAuth:               viper.GetBool("global-kafka-ssl-auth"),
+		KafkaSSLClientCertFile:     viper.GetString("global-kafka-ssl-client-cert-file"),
+		KafkaSSLClientKeyFile:      viper.GetString("global-kafka-ssl-client-key-file"),
+		KafkaTopic:                 viper.GetString("global-kafka-topic"),
+		KafkaCursorTopic:           viper.GetString("cdc-cmd-kafka-cursor-topic"),
+		KafkaCursorPartition:       int32(viper.GetUint32("cdc-cmd-kafka-cursor-partition")),
+		KafkaCursorConsumerGroupID: viper.GetString("cdc-cmd-kafka-cursor-consumer-group-id"),
+		KafkaCompressionType:       viper.GetString("cdc-cmd-kafka-compression-type"),
+		KafkaCompressionLevel:      viper.GetInt("cdc-cmd-kafka-compression-level"),
+		KafkaMessageMaxBytes:       viper.GetInt("cdc-cmd-kafka-message-max-bytes"),
+		CommitMinDelay:             viper.GetDuration("cdc-cmd-delay-between-commits"),
 
 		BatchMode:     viper.GetBool("cdc-cmd-batch-mode"),
 		StartBlockNum: viper.GetInt64("cdc-cmd-start-block-num"),
