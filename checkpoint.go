@@ -1,7 +1,6 @@
 package dkafka
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,7 +11,6 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/forkable"
-	"go.uber.org/zap"
 )
 
 const dkafkaCheckpoint = "DKafkaCheckpoint"
@@ -223,13 +221,7 @@ func (c *kafkaCheckpointer) Load() (string, error) {
 		return "", fmt.Errorf("getting metadata: %w", err)
 	}
 	parts := md.Topics[c.topic].Partitions
-	if len(parts) == 0 {
-		zlog.Info("cursor topic does not exist, creating", zap.String("cursor_topic", c.topic))
-		err := createKafkaCursorTopic(consumer, c.topic, len(md.Brokers))
-		if err != nil {
-			return "", err
-		}
-	} else if len(parts)-1 < int(c.partition) {
+	if len(parts)-1 < int(c.partition) {
 		return "", fmt.Errorf("requested cursor partition does not exist in cursor topic")
 	}
 
@@ -280,33 +272,4 @@ func cloneConfig(in kafka.ConfigMap) kafka.ConfigMap {
 		out[k] = v
 	}
 	return out
-}
-
-func createKafkaCursorTopic(c *kafka.Consumer, cursorTopic string, maxAvailableBrokers int) error {
-	adminCli, err := kafka.NewAdminClientFromConsumer(c)
-	if err != nil {
-		return fmt.Errorf("creating admin client: %w", err)
-	}
-	numParts := 10
-	replicationFactor := 3
-	if replicationFactor > maxAvailableBrokers {
-		replicationFactor = maxAvailableBrokers
-	}
-
-	results, err := adminCli.CreateTopics(
-		context.Background(),
-		// Multiple topics can be created simultaneously
-		// by providing more TopicSpecification structs here.
-		[]kafka.TopicSpecification{{
-			Topic:             cursorTopic,
-			NumPartitions:     numParts,
-			ReplicationFactor: replicationFactor}},
-		// Admin options
-		kafka.SetAdminOperationTimeout(time.Second*10))
-	if err != nil {
-		return fmt.Errorf("creating topic: %w", err)
-	}
-
-	zlog.Info("creating topic", zap.Any("results", results), zap.Int("num_partitions", numParts), zap.Int("replication_factor", replicationFactor))
-	return nil
 }
