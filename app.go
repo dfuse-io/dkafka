@@ -533,12 +533,11 @@ func iterate(ctx context.Context, cancel context.CancelFunc, appCtx appCtx, tick
 				}
 				return fmt.Errorf("error on receive: %w", err)
 			}
-			zlog.Debug("Receive new block", zap.String("cursor", msg.Cursor))
 			blk := &pbcodec.Block{}
 			if err := ptypes.UnmarshalAny(msg.Block, blk); err != nil {
 				return fmt.Errorf("decoding any of type %q: %w", msg.Block.TypeUrl, err)
 			}
-			// step := sanitizeStep(msg.Step.String())
+			zlog.Info("Receive new block", zap.Uint32("block_num", blk.Number), zap.String("block_id", blk.Id), zap.String("cursor", msg.Cursor))
 			blocksReceived.Inc()
 			blkStep := BlockStep{
 				blk:    blk,

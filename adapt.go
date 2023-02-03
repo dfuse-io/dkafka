@@ -43,6 +43,12 @@ func (bs BlockStep) opaqueCursor() string {
 func (bs BlockStep) previousOpaqueCursor() string {
 	return bs.previousCursor
 }
+func (bs BlockStep) blockId() string {
+	return bs.blk.Id
+}
+func (bs BlockStep) blockNum() uint32 {
+	return bs.blk.Number
+}
 
 type CdCAdapter struct {
 	topic     string

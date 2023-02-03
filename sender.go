@@ -15,6 +15,8 @@ const CursorHeaderKey = "dkafka_cursor"
 const PreviousCursorHeaderKey = "dkafka_prev_cursor"
 
 type location interface {
+	blockId() string
+	blockNum() uint32
 	opaqueCursor() string
 	time() time.Time
 	timeHeader() kafka.Header
@@ -51,14 +53,14 @@ type FastKafkaSender struct {
 }
 
 func (s *FastKafkaSender) Send(ctx context.Context, messages []*kafka.Message, location location) error {
-	zlog.Debug("send messages", zap.Int("nb", len(messages)))
+	zlog.Debug("send messages", zap.Uint32("block_id", location.blockNum()), zap.String("block_id", location.blockId()), zap.Int("nb", len(messages)))
 	for _, msg := range messages {
 		msg.Headers = appendLocation(msg.Headers, location)
 		if err := s.producer.Produce(msg, nil); err != nil {
 			return fmt.Errorf("sender fail to Produce message to topic: '%s', with error: %w", s.topic, err)
 		}
 	}
-	zlog.Debug("messages sent", zap.Int("nb", len(messages)))
+	zlog.Info("messages sent", zap.Uint32("block_id", location.blockNum()), zap.String("block_id", location.blockId()), zap.Int("nb", len(messages)))
 	return nil
 }
 
