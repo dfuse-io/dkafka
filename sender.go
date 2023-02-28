@@ -56,8 +56,8 @@ func (s *FastKafkaSender) Send(ctx context.Context, messages []*kafka.Message, l
 	zlog.Debug("send messages", zap.Uint32("block_id", location.blockNum()), zap.String("block_id", location.blockId()), zap.Int("nb", len(messages)))
 	for _, msg := range messages {
 		msg.Headers = appendLocation(msg.Headers, location)
-		if err := s.producer.Produce(msg, nil); err != nil {
-			return fmt.Errorf("sender fail to Produce message to topic: '%s', with error: %w", s.topic, err)
+		if err := send(s.producer, msg); err != nil {
+			return err
 		}
 	}
 	zlog.Info("messages sent", zap.Uint32("block_id", location.blockNum()), zap.String("block_id", location.blockId()), zap.Int("nb", len(messages)))
@@ -115,10 +115,8 @@ func (s *FastKafkaSender) SaveCP(ctx context.Context, location location) error {
 			Partition: kafka.PartitionAny,
 		},
 	}
-	if err := s.producer.Produce(&msg, nil); err != nil {
-		return err
-	}
-	return nil
+
+	return send(s.producer, &msg)
 }
 
 func appendLocation(headers []kafka.Header, location location) []kafka.Header {
@@ -138,6 +136,21 @@ func newPreviousCursorHeader(cursor string) kafka.Header {
 		Key:   PreviousCursorHeaderKey,
 		Value: []byte(cursor),
 	}
+}
+
+func send(producer *kafka.Producer, msg *kafka.Message) error {
+	if err := producer.Produce(msg, nil); err != nil {
+		if err.(kafka.Error).Code() == kafka.ErrQueueFull {
+			// Producer queue is full, wait 1s for messages
+			// to be delivered then try again.
+			zlog.Info("kafka producer message queue full wait 1 second and retry")
+			time.Sleep(time.Second)
+			// retry recursively => succeed to send or crash
+			return send(producer, msg)
+		}
+		return fmt.Errorf("sender fail to produce message: %w", err)
+	}
+	return nil
 }
 
 func NewFastSender(ctx context.Context, producer *kafka.Producer, topic string, headers []kafka.Header, abiCodec ABICodec) Sender {
