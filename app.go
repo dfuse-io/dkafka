@@ -171,7 +171,11 @@ func (a *App) Run() (err error) {
 		cancel()
 	})
 	out := make(chan error, 1)
-	defer close(out)
+	closeOutChannel := func() {
+		zlog.Info("close error channel")
+		close(out)
+	}
+	defer closeOutChannel()
 	var producer *kafka.Producer
 	if !a.config.DryRun {
 		producer, err = getKafkaProducer(createKafkaConfigForMessageProducer(a.config))
@@ -179,6 +183,15 @@ func (a *App) Run() (err error) {
 			return fmt.Errorf("cannot get kafka producer: %w", err)
 		}
 		go func() {
+			firedError := false
+			fireError := func(msg string, err error) {
+				zlog.Debug("fire error", zap.String("msg", msg), zap.Bool("already", firedError))
+				if !firedError {
+					firedError = true
+					zlog.Error(msg, zap.Error(err))
+					out <- err
+				}
+			}
 			for e := range producer.Events() {
 				switch ev := e.(type) {
 				case *kafka.Message:
@@ -189,8 +202,7 @@ func (a *App) Run() (err error) {
 					m := ev
 					if m.TopicPartition.Error != nil {
 						err := m.TopicPartition.Error
-						zlog.Error("Delivery failed", zap.Stringp("topic", m.TopicPartition.Topic), zap.Int32("partition", m.TopicPartition.Partition), zap.Int64("offset", int64(m.TopicPartition.Offset)), zap.Error(err))
-						out <- err
+						fireError("Delivery failed", err)
 					} else {
 						zlog.Debug("Delivered message", zap.Stringp("topic", m.TopicPartition.Topic), zap.Int32("partition", m.TopicPartition.Partition), zap.Int64("offset", int64(m.TopicPartition.Offset)))
 					}
@@ -202,14 +214,17 @@ func (a *App) Run() (err error) {
 					// as the underlying client will automatically try to
 					// recover from any errors encountered, the application
 					// does not need to take action on them.
-					zlog.Error("Kafka client fail", zap.Error(ev))
-					out <- ev
+					fireError("Kafka client fail", ev)
 				default:
 					zlog.Debug("Ignored producer event", zap.Stringer("event", ev.(fmt.Stringer)))
 				}
 			}
 		}()
-		defer producer.Close()
+		closeProducer := func() {
+			zlog.Info("close kafka producer")
+			producer.Close()
+		}
+		defer closeProducer()
 	}
 
 	zlog.Info("setting up ABIDecoder")
@@ -552,15 +567,30 @@ func (a *App) NewLegacyCtx(ctx context.Context, producer *kafka.Producer, header
 func iterate(ctx context.Context, cancel context.CancelFunc, appCtx appCtx, tickDuration time.Duration, stream pbbstream.BlockStreamV2_BlocksClient, out chan error) error {
 	// loop: receive block,  transform block, send message...
 	zlog.Info("Start looping over blocks...")
+
 	in := make(chan BlockStep, 10)
+	closeIn := func() {
+		zlog.Info("close block input channel")
+		close(in)
+	}
+	defer closeIn()
+
 	ticker := time.NewTicker(tickDuration)
+	closeTicker := func() {
+		zlog.Info("stop ticker")
+		ticker.Stop()
+	}
+	defer closeTicker()
+
 	go blockHandler(ctx, appCtx, in, ticker.C, out)
 	for {
 		select {
-		case err := <-out:
+		case err, ok := <-out:
+			if !ok {
+				zlog.Info("error channel has been closed exit 'iterate' goroutine")
+				return nil
+			}
 			zlog.Error("exit block streaming on error", zap.Error(err))
-			ticker.Stop()
-			close(in)
 			return err
 		default:
 			msg, err := stream.Recv()
@@ -593,7 +623,11 @@ func blockHandler(ctx context.Context, appCtx appCtx, in <-chan BlockStep, ticks
 	var s Sender = appCtx.sender
 	for {
 		select {
-		case blkStep := <-in:
+		case blkStep, ok := <-in:
+			if !ok {
+				zlog.Info("incoming block channel is closed exit 'blockHandler' goroutine")
+				return
+			}
 			if hasFail {
 				zlog.Debug("skip incoming block message after failure")
 				continue
@@ -615,7 +649,11 @@ func blockHandler(ctx context.Context, appCtx appCtx, in <-chan BlockStep, ticks
 				out <- fmt.Errorf("send to kafka message at: %s, %w", blkStep.cursor, err)
 			}
 			messagesSent.Add(float64(len(kafkaMsgs)))
-		case <-ticks:
+		case _, ok := <-ticks:
+			if !ok {
+				zlog.Info("ticker channel is closed exit 'blockHandler' goroutine")
+				return
+			}
 			if hasFail {
 				zlog.Debug("skip incoming tick message after failure")
 				continue
