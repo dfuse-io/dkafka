@@ -11,6 +11,7 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
+	"github.com/eoscanada/eos-go"
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
 	"github.com/riferrei/srclient"
@@ -38,6 +39,7 @@ func readFileFromTestdata(t testing.TB, file string) []byte {
 }
 
 func Test_adapter_adapt(t *testing.T) {
+	eos.LegacyJSON4Asset = false
 	tests := []struct {
 		name                  string
 		file                  string

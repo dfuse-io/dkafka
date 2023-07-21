@@ -21,6 +21,7 @@ require (
 	github.com/streamingfast/dgrpc v0.0.0-20210811180351-8646818518b2
 	github.com/streamingfast/dlauncher v0.0.0-20210811194929-f06e488e63da
 	github.com/streamingfast/logging v0.0.0-20210811175431-f3b44b61606a
+	github.com/streamingfast/opaque v0.0.0-20210811180740-0c01d37ea308
 	github.com/streamingfast/pbgo v0.0.6-0.20210812023556-e996f9c4fb86
 	github.com/streamingfast/shutter v1.5.0
 	go.uber.org/zap v1.17.0
@@ -80,7 +81,6 @@ require (
 	github.com/streamingfast/dmetrics v0.0.0-20210811180524-8494aeb34447 // indirect
 	github.com/streamingfast/dstore v0.1.1-0.20210811180812-4db13e99cc22 // indirect
 	github.com/streamingfast/dtracing v0.0.0-20210811175635-d55665d3622a // indirect
-	github.com/streamingfast/opaque v0.0.0-20210811180740-0c01d37ea308 // indirect
 	github.com/subosito/gotenv v1.2.0 // indirect
 	github.com/teris-io/shortid v0.0.0-20201117134242-e59966efd125 // indirect
 	github.com/tidwall/gjson v1.6.7 // indirect
@@ -105,6 +105,6 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
-replace github.com/eoscanada/eos-go v0.9.1-0.20210812015252-984fc96878b6 => ./fork/eos-go
+replace github.com/eoscanada/eos-go v0.9.1-0.20210812015252-984fc96878b6 => github.com/ultraio/eos-go v0.9.1-0.20230721083853-e93454af9cae
 
 replace github.com/linkedin/goavro/v2 v2.11.0 => ./fork/goavro

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
+	"github.com/eoscanada/eos-go"
 	"github.com/google/cel-go/cel"
 )
 
@@ -194,6 +195,7 @@ func compileExpr(expr string) cel.Program {
 }
 
 func Test_ActionGenerator_Apply(t *testing.T) {
+	eos.LegacyJSON4Asset = false
 	tests := []struct {
 		name    string
 		file    string
