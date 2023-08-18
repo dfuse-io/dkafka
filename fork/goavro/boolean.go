@@ -33,8 +33,16 @@ func booleanNativeFromBinary(buf []byte) (interface{}, []byte, error) {
 }
 
 func booleanBinaryFromNative(buf []byte, datum interface{}) ([]byte, error) {
-	value, ok := datum.(bool)
-	if !ok {
+	var value bool
+	switch v := datum.(type) {
+	case bool:
+		value = v
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+		if v != 0 && v != 1 {
+			return nil, fmt.Errorf("cannot encode binary boolean: provided Go numeric is not 1 or 0: %f", v)
+		}
+		value = (v == 1)
+	default:
 		return nil, fmt.Errorf("cannot encode binary boolean: expected: Go bool; received: %T", datum)
 	}
 	var b byte
