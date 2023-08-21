@@ -26,13 +26,13 @@ func TestSchemaPrimitiveCodecBoolean(t *testing.T) {
 }
 
 func TestPrimitiveBooleanBinary(t *testing.T) {
-	testBinaryEncodeFailBadDatumType(t, `"boolean"`, 0)
-	testBinaryEncodeFailBadDatumType(t, `"boolean"`, 1)
+	testBinaryEncodePass(t, `"boolean"`, 0, []byte{0})
+	testBinaryEncodePass(t, `"boolean"`, 1, []byte{1})
 	testBinaryDecodeFailShortBuffer(t, `"boolean"`, nil)
 	testBinaryCodecPass(t, `"boolean"`, false, []byte{0})
 	testBinaryCodecPass(t, `"boolean"`, true, []byte{1})
-	testBinaryCodecPass(t, `"boolean"`, false, Float64ToByte(0))
-	testBinaryCodecPass(t, `"boolean"`, true, Float64ToByte(1))
+	testBinaryEncodePass(t, `"boolean"`, float64(0), []byte{0})
+	testBinaryEncodePass(t, `"boolean"`, float64(1), []byte{1})
 }
 
 func TestPrimitiveBooleanText(t *testing.T) {
