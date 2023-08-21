@@ -248,7 +248,7 @@ func ExampleCustomCodec() {
 		buildCodecForTypeDescribedByMap,
 		buildCodecForTypeDescribedByString,
 		buildCodecForTypeDescribedBySlice,
-	})
+	}, nil)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -266,7 +266,7 @@ func ExampleJSONStringToTextual() {
 		buildCodecForTypeDescribedByMap,
 		buildCodecForTypeDescribedByString,
 		buildCodecForTypeDescribedBySliceJSON,
-	})
+	}, nil)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -283,7 +283,7 @@ func ExampleJSONStringToNative() {
 		buildCodecForTypeDescribedByMap,
 		buildCodecForTypeDescribedByString,
 		buildCodecForTypeDescribedBySliceJSON,
-	})
+	}, nil)
 	if err != nil {
 		fmt.Println(err)
 	}

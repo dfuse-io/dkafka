@@ -69,7 +69,7 @@ func testJSONDecodePass(t *testing.T, schema string, datum interface{}, encoded 
 		buildCodecForTypeDescribedByMap,
 		buildCodecForTypeDescribedByString,
 		buildCodecForTypeDescribedBySliceJSON,
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("schema: %s; %s", schema, err)
 	}
