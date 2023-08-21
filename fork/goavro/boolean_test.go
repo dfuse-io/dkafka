@@ -9,7 +9,17 @@
 
 package goavro
 
-import "testing"
+import (
+	"bytes"
+	"encoding/binary"
+	"testing"
+)
+
+func Float64ToByte(f float64) []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.LittleEndian, f)
+	return buf.Bytes()
+}
 
 func TestSchemaPrimitiveCodecBoolean(t *testing.T) {
 	testSchemaPrimativeCodec(t, `"boolean"`)
@@ -21,6 +31,8 @@ func TestPrimitiveBooleanBinary(t *testing.T) {
 	testBinaryDecodeFailShortBuffer(t, `"boolean"`, nil)
 	testBinaryCodecPass(t, `"boolean"`, false, []byte{0})
 	testBinaryCodecPass(t, `"boolean"`, true, []byte{1})
+	testBinaryCodecPass(t, `"boolean"`, false, Float64ToByte(0))
+	testBinaryCodecPass(t, `"boolean"`, true, Float64ToByte(1))
 }
 
 func TestPrimitiveBooleanText(t *testing.T) {
