@@ -114,6 +114,7 @@ func (m *CdCAdapter) Adapt(blkStep BlockStep) ([]*kafka.Message, error) {
 			transaction: trx,
 			cursor:      blkStep.cursor,
 			step:        blkStep.step,
+			blockStep:   blkStep,
 		}
 		msgs1, err := m.generator.Apply(trxCtx)
 		if err != nil {

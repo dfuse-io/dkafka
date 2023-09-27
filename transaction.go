@@ -55,7 +55,7 @@ func (t transactionGenerator) Apply(genContext TransactionContext) ([]*kafka.Mes
 	transactionMap := newTransactionMap(genContext.transaction)
 	codec, err := t.abiCodec.GetCodec(transactionNotification, 0)
 	if err != nil {
-		return nil, fmt.Errorf("transactionGenerator.Apply() fail to get codec for %s: %w", dkafkaTransactionNotification, err)
+		return nil, fmt.Errorf("transactionGenerator.Apply() fail to get codec for %s: %w", transactionNotification, err)
 	}
 	value, err := codec.Marshal(nil, transactionMap)
 	if err != nil {

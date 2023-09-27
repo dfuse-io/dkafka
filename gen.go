@@ -318,6 +318,7 @@ func (t transaction2ActionsGenerator) Apply(genContext TransactionContext) ([]*k
 		generations, err := t.actionLevelGenerator.Apply(ActionContext{
 			TransactionContext: genContext,
 			actionTrace:        act,
+			correlation:        correlation,
 		})
 
 		if err != nil {

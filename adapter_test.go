@@ -278,9 +278,14 @@ func Benchmark_adapter_adapt(b *testing.B) {
 			adp = &CdCAdapter{
 				topic:     "test.topic",
 				saveBlock: saveBlockNoop,
-				generator: TableGenerator{
-					getExtractKey: finder,
-					abiCodec:      NewJsonABICodec(abiDecoder, "eosio.nft.ft"),
+				generator: transaction2ActionsGenerator{
+					actionLevelGenerator: TableGenerator{
+						getExtractKey: finder,
+						abiCodec:      NewJsonABICodec(abiDecoder, "eosio.nft.ft"),
+					},
+					abiCodec: NewJsonABICodec(abiDecoder, "eosio.token"),
+					headers:  default_headers,
+					topic:    "test.topic",
 				},
 				headers: default_headers,
 			}
@@ -293,10 +298,16 @@ func Benchmark_adapter_adapt(b *testing.B) {
 			adp = &CdCAdapter{
 				topic:     "test.topic",
 				saveBlock: saveBlockNoop,
-				generator: &ActionGenerator2{
-					keyExtractors: actionKeyExpressions,
-					abiCodec:      NewJsonABICodec(abiDecoder, "eosio.nft.ft"),
+				generator: transaction2ActionsGenerator{
+					actionLevelGenerator: &ActionGenerator2{
+						keyExtractors: actionKeyExpressions,
+						abiCodec:      NewJsonABICodec(abiDecoder, "eosio.nft.ft"),
+					},
+					abiCodec: NewJsonABICodec(abiDecoder, "eosio.token"),
+					headers:  default_headers,
+					topic:    "test.topic",
 				},
+
 				headers: default_headers,
 			}
 		case CDC_TABLE_ADAPTER_AVRO:
@@ -315,11 +326,16 @@ func Benchmark_adapter_adapt(b *testing.B) {
 			adp = &CdCAdapter{
 				topic:     "test.topic",
 				saveBlock: saveBlockNoop,
-				generator: TableGenerator{
-					getExtractKey: finder,
-					abiCodec:      abiCodec,
+				generator: transaction2ActionsGenerator{
+					actionLevelGenerator: TableGenerator{
+						getExtractKey: finder,
+						abiCodec:      abiCodec,
+					},
+					abiCodec: abiCodec,
+					headers:  default_headers,
 				},
-				headers: default_headers,
+				abiCodec: abiCodec,
+				headers:  default_headers,
 			}
 		case CDC_ACTION_ADAPTER_AVRO:
 			actionKeyExpressions, err := createCdcKeyExpressions(`{"create":"transaction_id"}`)
@@ -341,11 +357,16 @@ func Benchmark_adapter_adapt(b *testing.B) {
 			adp = &CdCAdapter{
 				topic:     "test.topic",
 				saveBlock: saveBlockNoop,
-				generator: &ActionGenerator2{
-					keyExtractors: actionKeyExpressions,
-					abiCodec:      abiCodec,
+				generator: transaction2ActionsGenerator{
+					actionLevelGenerator: &ActionGenerator2{
+						keyExtractors: actionKeyExpressions,
+						abiCodec:      abiCodec,
+					},
+					abiCodec: abiCodec,
+					headers:  default_headers,
 				},
-				headers: default_headers,
+				abiCodec: abiCodec,
+				headers:  default_headers,
 			}
 		}
 		blockStep := BlockStep{
@@ -386,14 +407,21 @@ func Test_adapter_correlation_id(t *testing.T) {
 	}
 	abiDecoder := NewABIDecoder(abiFiles, nil, context.Background())
 	finder, _ := buildTableKeyExtractorFinder([]string{"accounts:s+k"})
+	abiCodec := NewJsonABICodec(abiDecoder, "eosio.token")
 	adp := &CdCAdapter{
 		topic:     "test.topic",
 		saveBlock: saveBlockNoop,
-		generator: TableGenerator{
-			getExtractKey: finder,
-			abiCodec:      NewJsonABICodec(abiDecoder, "eosio.token"),
+		generator: transaction2ActionsGenerator{
+			actionLevelGenerator: TableGenerator{
+				getExtractKey: finder,
+				abiCodec:      abiCodec,
+			},
+			abiCodec: abiCodec,
+			headers:  default_headers,
+			topic:    "test.topic",
 		},
-		headers: default_headers,
+		abiCodec: abiCodec,
+		headers:  default_headers,
 	}
 	blockStep := BlockStep{
 		blk:    block,
