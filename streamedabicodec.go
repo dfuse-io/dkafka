@@ -234,6 +234,7 @@ func (s *StreamedAbiCodec) initStaticSchema(cache map[string]Codec) map[string]C
 		panic("initStaticSchema fail to create codec DKafkaCheckpoint")
 	}
 	cache[dkafkaCheckpoint] = codec
+	// TODO TransactionMessageSchema
 	return cache
 }
 

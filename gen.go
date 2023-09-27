@@ -18,21 +18,30 @@ const (
 	Table  EntityType = "table"
 )
 
-type GenContext struct {
+type TransactionContext struct {
 	block       *pbcodec.Block
 	stepName    string
 	transaction *pbcodec.TransactionTrace
-	actionTrace *pbcodec.ActionTrace
-	correlation *Correlation
+	blockStep   BlockStep
 	cursor      string
 	step        pbbstream.ForkStep
 }
 
-type Generator2 interface {
-	Apply(genContext GenContext) ([]Generation2, error)
+type ActionContext struct {
+	TransactionContext
+	correlation *Correlation
+	actionTrace *pbcodec.ActionTrace
 }
 
-type Generation2 struct {
+type GeneratorAtActionLevel interface {
+	Apply(genContext ActionContext) ([]Generation2, error)
+}
+
+type GeneratorAtTransactionLevel interface {
+	Apply(genContext TransactionContext) ([]*kafka.Message, error)
+}
+
+type Generation2 struct { // TODO rename to Message
 	CeType  string         `json:"ce_type,omitempty"`
 	CeId    []byte         `json:"ce_id,omitempty"`
 	Key     string         `json:"key,omitempty"`
@@ -65,7 +74,7 @@ func extractPrimaryKey(dbOp *pbcodec.DBOp) string {
 	return dbOp.PrimaryKey
 }
 
-func indexDbOps(gc GenContext) []*IndexedEntry[*pbcodec.DBOp] {
+func indexDbOps(gc ActionContext) []*IndexedEntry[*pbcodec.DBOp] {
 	return orderSliceOnBlockStep(NewIndexedEntrySlice(gc.transaction.DBOpsForAction(gc.actionTrace.ExecutionIndex)), gc.step)
 }
 
@@ -81,7 +90,7 @@ type TableGenerator struct {
 type void struct{}
 type StringSet = map[string]void
 
-func (tg TableGenerator) Apply(gc GenContext) (generations []Generation2, err error) {
+func (tg TableGenerator) Apply(gc ActionContext) (generations []Generation2, err error) {
 	gens, err := tg.doApply(gc)
 	if err != nil {
 		return
@@ -109,7 +118,7 @@ func (tg TableGenerator) Apply(gc GenContext) (generations []Generation2, err er
 	return generations, nil
 }
 
-func (tg TableGenerator) doApply(gc GenContext) ([]generation, error) {
+func (tg TableGenerator) doApply(gc ActionContext) ([]generation, error) {
 	indexedDbOps := indexDbOps(gc)
 	generations := []generation{}
 	for _, indexedDbOp := range indexedDbOps {
@@ -162,7 +171,7 @@ type ActionGenerator2 struct {
 	abiCodec      ABICodec
 }
 
-func (ag *ActionGenerator2) Apply(gc GenContext) ([]Generation2, error) {
+func (ag ActionGenerator2) Apply(gc ActionContext) ([]Generation2, error) {
 	gens, err := ag.doApply(gc)
 	if err != nil {
 		return nil, err
@@ -189,7 +198,7 @@ func (ag *ActionGenerator2) Apply(gc GenContext) ([]Generation2, error) {
 	}
 }
 
-func (ag *ActionGenerator2) doApply(gc GenContext) ([]generation, error) {
+func (ag ActionGenerator2) doApply(gc ActionContext) ([]generation, error) {
 	actionName := gc.actionTrace.Action.Name
 	extractor, found := ag.keyExtractors(actionName)
 	if !found {
@@ -241,7 +250,7 @@ func (ag *ActionGenerator2) doApply(gc GenContext) ([]generation, error) {
 	}}, nil
 }
 
-func notificationContextMap(gc GenContext) map[string]interface{} {
+func notificationContextMap(gc ActionContext) map[string]interface{} {
 	status := sanitizeStatus(gc.transaction.Receipt.Status.String())
 
 	return newNotificationContext(
@@ -257,7 +266,7 @@ func notificationContextMap(gc GenContext) map[string]interface{} {
 	)
 }
 
-func actionInfoBasicMap(gc GenContext) map[string]interface{} {
+func actionInfoBasicMap(gc ActionContext) map[string]interface{} {
 	var globalSeq uint64
 	if receipt := gc.actionTrace.Receipt; receipt != nil {
 		globalSeq = receipt.GlobalSequence
@@ -275,4 +284,83 @@ func actionInfoBasicMap(gc GenContext) map[string]interface{} {
 		globalSeq,
 		authorizations,
 	)
+}
+
+type transaction2ActionsGenerator struct {
+	actionLevelGenerator GeneratorAtActionLevel
+	abiCodec             ABICodec
+	headers              []kafka.Header
+	topic                string
+}
+
+func (t transaction2ActionsGenerator) Apply(genContext TransactionContext) ([]*kafka.Message, error) {
+	msgs := make([]*kafka.Message, 0)
+	// manage correlation
+	trx := genContext.transaction
+	// blkStep := genContext.step
+	correlation, err := getCorrelation(trx.ActionTraces)
+	if err != nil {
+		return nil, err
+	}
+	acts := trx.ActionTraces
+	zlog.Debug("adapt transaction", zap.Uint32("block_num", genContext.block.Number), zap.Int("trx_index", int(trx.Index)), zap.Int("nb_acts", len(acts)))
+	for _, act := range orderSliceOnBlockStep(acts, genContext.step) {
+		if !act.FilteringMatched {
+			continue
+		}
+		if act.Action.Name == "setabi" {
+			zlog.Info("new abi published defer clear ABI cache at end of this block parsing", zap.Uint32("block_num", genContext.block.Number), zap.Int("trx_index", int(trx.Index)), zap.String("trx_id", trx.Id))
+			t.abiCodec.UpdateABI(genContext.block.Number, genContext.step, trx.Id, act)
+			continue
+		}
+		actionTracesReceived.Inc()
+		// generation
+		generations, err := t.actionLevelGenerator.Apply(ActionContext{
+			TransactionContext: genContext,
+			actionTrace:        act,
+		})
+
+		if err != nil {
+			zlog.Debug("fail fast on generator.Apply()", zap.Error(err))
+			return nil, err
+		}
+
+		for _, generation := range generations {
+			headers := append(t.headers,
+				kafka.Header{
+					Key:   "ce_id",
+					Value: generation.CeId,
+				},
+				kafka.Header{
+					Key:   "ce_type",
+					Value: []byte(generation.CeType),
+				},
+				BlockStep{blk: genContext.block}.timeHeader(),
+				kafka.Header{
+					Key:   "ce_blkstep",
+					Value: []byte(genContext.stepName),
+				},
+			)
+			headers = append(headers, generation.Headers...)
+			if correlation != nil {
+				headers = append(headers,
+					kafka.Header{
+						Key:   "ce_parentid",
+						Value: []byte(correlation.Id),
+					},
+				)
+			}
+			msg := &kafka.Message{
+				Key:     []byte(generation.Key),
+				Headers: headers,
+				Value:   generation.Value,
+				TopicPartition: kafka.TopicPartition{
+					Topic:     &t.topic,
+					Partition: kafka.PartitionAny,
+				},
+			}
+			msgs = append(msgs, msg)
+		}
+	}
+	return msgs, nil
 }

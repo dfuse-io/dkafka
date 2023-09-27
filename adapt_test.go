@@ -18,7 +18,7 @@ import (
 
 func TestCdCAdapter_AdaptJSON(t *testing.T) {
 	type fields struct {
-		generator Generator2
+		generator GeneratorAtActionLevel
 	}
 	type args struct {
 		rawStep pbbstream.ForkStep
