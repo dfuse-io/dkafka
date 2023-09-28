@@ -345,6 +345,7 @@ func (a *App) NewCDCCtx(ctx context.Context, producer *kafka.Producer, headers [
 		headers:   headers,
 		generator: generator,
 		abiCodec:  abiCodec,
+		account:   a.config.Account,
 	}
 	appCtx.adapter = adapter
 	appCtx.cursor = cursor
