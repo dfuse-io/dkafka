@@ -1,6 +1,7 @@
 package dkafka
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
@@ -56,6 +57,7 @@ type CdCAdapter struct {
 	generator Generator2
 	headers   []kafka.Header
 	abiCodec  ABICodec
+	account   string
 }
 
 // orderSliceOnBlockStep reverse the slice order is the block step is UNDO
@@ -65,6 +67,30 @@ func orderSliceOnBlockStep[T any](input []T, step pbbstream.ForkStep) []T {
 		output = Reverse(input)
 	}
 	return output
+}
+
+func (m *CdCAdapter) isThisSmartContractABIUpdated(action *pbcodec.Action) bool {
+	return action.Name == "setabi" && (m.isSelfAuthorized(action.Authorization) || m.isSetABIOnTrackedAccount(action))
+}
+
+func (m *CdCAdapter) isSetABIOnTrackedAccount(action *pbcodec.Action) bool {
+	var actionParameters map[string]interface{}
+	if err := json.Unmarshal(json.RawMessage(action.JsonData), &actionParameters); err != nil {
+		return false
+	}
+	if account, found := actionParameters["account"]; found {
+		return account == m.account
+	}
+	return false
+}
+
+func (m *CdCAdapter) isSelfAuthorized(authorizations []*pbcodec.PermissionLevel) bool {
+	for _, permissionLevel := range authorizations {
+		if permissionLevel.Actor == m.account {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *CdCAdapter) Adapt(blkStep BlockStep) ([]*kafka.Message, error) {
@@ -94,7 +120,7 @@ func (m *CdCAdapter) Adapt(blkStep BlockStep) ([]*kafka.Message, error) {
 			if !act.FilteringMatched {
 				continue
 			}
-			if act.Action.Name == "setabi" {
+			if m.isThisSmartContractABIUpdated(act.Action) {
 				zlog.Info("new abi published defer clear ABI cache at end of this block parsing", zap.Uint32("block_num", blk.Number), zap.Int("trx_index", int(trx.Index)), zap.String("trx_id", trx.Id))
 				m.abiCodec.UpdateABI(blk.Number, blkStep.step, trx.Id, act)
 				continue
