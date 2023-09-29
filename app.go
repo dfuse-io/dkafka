@@ -349,6 +349,7 @@ func (a *App) NewCDCCtx(ctx context.Context, producer *kafka.Producer, headers [
 		}
 
 	case TRANSACTION_CDC_TYPE:
+		filter = "executed"
 		msg := MessageSchemaGenerator{
 			Namespace: a.config.SchemaNamespace,
 			Version:   a.config.SchemaVersion,
@@ -363,8 +364,9 @@ func (a *App) NewCDCCtx(ctx context.Context, producer *kafka.Producer, headers [
 			return appCtx, err
 		}
 		generator = transactionGenerator{
-			topic:   a.config.KafkaTopic,
-			headers: headers,
+			topic:    a.config.KafkaTopic,
+			headers:  headers,
+			abiCodec: abiCodec,
 		}
 	default:
 		return appCtx, fmt.Errorf("unsupported CDC type %s", cdcType)
