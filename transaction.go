@@ -349,7 +349,6 @@ func (t transactionGenerator) Apply(genContext TransactionContext) ([]*kafka.Mes
 			Key:   "ce_blkstep",
 			Value: []byte(genContext.stepName),
 		},
-		genContext.blockStep.timeHeader(),
 		newCursorHeader(genContext.cursor),
 		newPreviousCursorHeader(genContext.blockStep.previousCursor),
 	)
