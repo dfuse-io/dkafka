@@ -1,7 +1,6 @@
 package dkafka
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
@@ -54,10 +53,9 @@ func (bs BlockStep) blockNum() uint32 {
 type CdCAdapter struct {
 	topic     string
 	saveBlock SaveBlock
-	generator Generator2
+	generator GeneratorAtTransactionLevel
 	headers   []kafka.Header
 	abiCodec  ABICodec
-	account   string
 }
 
 // orderSliceOnBlockStep reverse the slice order is the block step is UNDO
@@ -67,30 +65,6 @@ func orderSliceOnBlockStep[T any](input []T, step pbbstream.ForkStep) []T {
 		output = Reverse(input)
 	}
 	return output
-}
-
-func (m *CdCAdapter) isThisSmartContractABIUpdated(action *pbcodec.Action) bool {
-	return action.Name == "setabi" && (m.isSelfAuthorized(action.Authorization) || m.isSetABIOnTrackedAccount(action))
-}
-
-func (m *CdCAdapter) isSetABIOnTrackedAccount(action *pbcodec.Action) bool {
-	var actionParameters map[string]interface{}
-	if err := json.Unmarshal(json.RawMessage(action.JsonData), &actionParameters); err != nil {
-		return false
-	}
-	if account, found := actionParameters["account"]; found {
-		return account == m.account
-	}
-	return false
-}
-
-func (m *CdCAdapter) isSelfAuthorized(authorizations []*pbcodec.PermissionLevel) bool {
-	for _, permissionLevel := range authorizations {
-		if permissionLevel.Actor == m.account {
-			return true
-		}
-	}
-	return false
 }
 
 func (m *CdCAdapter) Adapt(blkStep BlockStep) ([]*kafka.Message, error) {
@@ -109,75 +83,19 @@ func (m *CdCAdapter) Adapt(blkStep BlockStep) ([]*kafka.Message, error) {
 	zlog.Debug("adapt block", zap.Uint32("num", blk.Number), zap.Int("nb_trx", len(trxs)))
 	for _, trx := range orderSliceOnBlockStep(trxs, blkStep.step) {
 		transactionTracesReceived.Inc()
-		// manage correlation
-		correlation, err := getCorrelation(trx.ActionTraces)
+		trxCtx := TransactionContext{
+			block:       blk,
+			stepName:    step,
+			transaction: trx,
+			cursor:      blkStep.cursor,
+			step:        blkStep.step,
+			blockStep:   blkStep,
+		}
+		msgs1, err := m.generator.Apply(trxCtx)
 		if err != nil {
 			return nil, err
 		}
-		acts := trx.ActionTraces
-		zlog.Debug("adapt transaction", zap.Uint32("block_num", blk.Number), zap.Int("trx_index", int(trx.Index)), zap.Int("nb_acts", len(acts)))
-		for _, act := range orderSliceOnBlockStep(acts, blkStep.step) {
-			if !act.FilteringMatched {
-				continue
-			}
-			if m.isThisSmartContractABIUpdated(act.Action) {
-				zlog.Info("new abi published defer clear ABI cache at end of this block parsing", zap.Uint32("block_num", blk.Number), zap.Int("trx_index", int(trx.Index)), zap.String("trx_id", trx.Id))
-				m.abiCodec.UpdateABI(blk.Number, blkStep.step, trx.Id, act)
-				continue
-			}
-			actionTracesReceived.Inc()
-			// generation
-			generations, err := m.generator.Apply(GenContext{
-				block:       blk,
-				stepName:    step,
-				transaction: trx,
-				actionTrace: act,
-				correlation: correlation,
-				cursor:      blkStep.cursor,
-			})
-
-			if err != nil {
-				zlog.Debug("fail fast on generator.Apply()", zap.Error(err))
-				return nil, err
-			}
-
-			for _, generation := range generations {
-				headers := append(m.headers,
-					kafka.Header{
-						Key:   "ce_id",
-						Value: generation.CeId,
-					},
-					kafka.Header{
-						Key:   "ce_type",
-						Value: []byte(generation.CeType),
-					},
-					blkStep.timeHeader(),
-					kafka.Header{
-						Key:   "ce_blkstep",
-						Value: []byte(step),
-					},
-				)
-				headers = append(headers, generation.Headers...)
-				if correlation != nil {
-					headers = append(headers,
-						kafka.Header{
-							Key:   "ce_parentid",
-							Value: []byte(correlation.Id),
-						},
-					)
-				}
-				msg := &kafka.Message{
-					Key:     []byte(generation.Key),
-					Headers: headers,
-					Value:   generation.Value,
-					TopicPartition: kafka.TopicPartition{
-						Topic:     &m.topic,
-						Partition: kafka.PartitionAny,
-					},
-				}
-				msgs = append(msgs, msg)
-			}
-		}
+		msgs = append(msgs, msgs1...)
 	}
 	zlog.Debug("produced kafka messages", zap.Uint32("block_num", blk.Number), zap.String("step", step), zap.Int("nb_messages", len(msgs)))
 	return msgs, nil

@@ -18,7 +18,7 @@ import (
 
 func TestCdCAdapter_AdaptJSON(t *testing.T) {
 	type fields struct {
-		generator Generator2
+		generator GeneratorAtActionLevel
 	}
 	type args struct {
 		rawStep pbbstream.ForkStep
@@ -58,8 +58,12 @@ func TestCdCAdapter_AdaptJSON(t *testing.T) {
 			m := &CdCAdapter{
 				topic:     "test.topic",
 				saveBlock: saveBlockNoop,
-				generator: tt.fields.generator,
-				headers:   default_headers,
+				generator: transaction2ActionsGenerator{
+					actionLevelGenerator: tt.fields.generator,
+					topic:                "test.topic",
+					headers:              default_headers,
+				},
+				headers: default_headers,
 			}
 			blockStep := BlockStep{
 				blk:    block,
@@ -191,8 +195,12 @@ func TestCdCAdapter_Adapt_pb(t *testing.T) {
 			a := &CdCAdapter{
 				topic:     "test.topic",
 				saveBlock: saveBlockNoop,
-				generator: g,
-				headers:   default_headers,
+				generator: transaction2ActionsGenerator{
+					actionLevelGenerator: g,
+					topic:                "test.topic",
+					headers:              default_headers,
+				},
+				headers: default_headers,
 			}
 			blockStep := BlockStep{
 				blk:    block,
@@ -207,7 +215,7 @@ func TestCdCAdapter_Adapt_pb(t *testing.T) {
 			for _, m := range messages {
 				assert.Equal(t, findHeader("content-type", m.Headers), "application/avro")
 				assert.Equal(t, findHeader("ce_datacontenttype", m.Headers), "application/avro")
-				assert.Equal(t, findHeader("ce_dataschema", m.Headers), "mock://bench-adapter/schemas/ids/2")
+				assert.Equal(t, findHeader("ce_dataschema", m.Headers), "mock://bench-adapter/schemas/ids/3")
 			}
 		})
 	}

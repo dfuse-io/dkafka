@@ -50,6 +50,15 @@ This argument is the smart contract account to capture.`,
 	RunE:      cdcOnActions,
 }
 
+var CdCTransactionsCmd = &cobra.Command{
+	Use:   dkafka.TRANSACTION_CDC_TYPE,
+	Short: "Change Data Capture on block transactions",
+	Long: `Change Data Capture on block transactions.
+Produces one message per transaction in a block.`,
+	Args: cobra.ExactArgs(0),
+	RunE: cdcOnTransactions,
+}
+
 var CdCSchemasCmd = &cobra.Command{
 	Use:   "schemas [-n namespace] [-V version] [-o output-dir] abi-file-def",
 	Short: "Generate all tables and actions messages avro schemas from ABI file definition",
@@ -131,6 +140,15 @@ Example: --table-name=factory.a:k,token.a:k,*:s+k`)
 	CdCCmd.AddCommand(CdCSchemasCmd)
 	CdCSchemasCmd.Flags().StringP("output-dir", "o", "./", `Optional output directory for the avro schema. The file name pattern is
 	the <account>-<schema-type>.avsc in snake-case.`)
+	CdCCmd.AddCommand(CdCTransactionsCmd)
+}
+
+func cdcOnTransactions(cmd *cobra.Command, args []string) error {
+	SetupLogger()
+	zlog.Debug("CDC on transaction")
+	return executeCdC(cmd, args, dkafka.TRANSACTION_CDC_TYPE, func(c *dkafka.Config, args []string) *dkafka.Config {
+		return c
+	})
 }
 
 func cdcOnTables(cmd *cobra.Command, args []string) error {
@@ -140,18 +158,30 @@ func cdcOnTables(cmd *cobra.Command, args []string) error {
 		"CDC on table",
 		zap.String("account", account),
 	)
-	return executeCdC(cmd, args, dkafka.TABLES_CDC_TYPE, func(c *dkafka.Config) *dkafka.Config {
+	return executeCdC(cmd, args, dkafka.TABLES_CDC_TYPE, configAccount(func(c *dkafka.Config) *dkafka.Config {
 		c.TableNames = viper.GetStringSlice("cdc-tables-cmd-table-name")
 		return c
-	})
+	}))
 }
 
 func cdcOnActions(cmd *cobra.Command, args []string) error {
 	SetupLogger()
-	return executeCdC(cmd, args, dkafka.ACTIONS_CDC_TYPE, func(c *dkafka.Config) *dkafka.Config {
+	return executeCdC(cmd, args, dkafka.ACTIONS_CDC_TYPE, configAccount(func(c *dkafka.Config) *dkafka.Config {
 		c.ActionExpressions = viper.GetString("cdc-actions-cmd-actions-expr")
 		return c
-	})
+	}))
+}
+
+func configAccount(f func(*dkafka.Config) *dkafka.Config) func(*dkafka.Config, []string) *dkafka.Config {
+	return func(c *dkafka.Config, args []string) *dkafka.Config {
+		account := args[0]
+		zlog.Debug(
+			"CDC on action",
+			zap.String("account", account),
+		)
+		c.Account = account
+		return f(c)
+	}
 }
 
 func generateAllAvroSchema(cmd *cobra.Command, args []string) {
@@ -180,15 +210,13 @@ func generateAllAvroSchema(cmd *cobra.Command, args []string) {
 	if err = saveSchema(dkafka.CheckpointMessageSchema, "", opts.outputDir); err != nil {
 		zlog.Fatal("fail to saveSchema()", zap.String("schema", dkafka.CheckpointMessageSchema.Name), zap.Error(err))
 	}
+	if err = saveSchema(dkafka.TransactionMessageSchema, "", opts.outputDir); err != nil {
+		zlog.Fatal("fail to saveSchema()", zap.String("schema", dkafka.TransactionMessageSchema.Name), zap.Error(err))
+	}
 }
 
 func executeCdC(cmd *cobra.Command, args []string,
-	cdcType string, f func(*dkafka.Config) *dkafka.Config) error {
-	account := args[0]
-	zlog.Debug(
-		"CDC on action",
-		zap.String("account", account),
-	)
+	cdcType string, f func(*dkafka.Config, []string) *dkafka.Config) error {
 	localABIFiles, err := dkafka.ParseABIFileSpecs(viper.GetStringSlice("cdc-cmd-local-abi-files"))
 	if err != nil {
 		return err
@@ -225,7 +253,6 @@ func executeCdC(cmd *cobra.Command, args []string,
 		EventSource: viper.GetString("cdc-cmd-event-source"),
 
 		CdCType:      cdcType,
-		Account:      account,
 		Irreversible: viper.GetBool("cdc-cmd-irreversible"),
 		Executed:     viper.GetBool("cdc-cmd-executed"),
 
@@ -236,7 +263,7 @@ func executeCdC(cmd *cobra.Command, args []string,
 		LocalABIFiles:     localABIFiles,
 		ABICodecGRPCAddr:  viper.GetString("cdc-cmd-abicodec-grpc-addr"),
 	}
-	conf = f(conf)
+	conf = f(conf, args)
 	cmd.SilenceUsage = true
 	signalHandler := derr.SetupSignalHandler(time.Second)
 

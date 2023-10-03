@@ -32,6 +32,7 @@ import (
 
 const TABLES_CDC_TYPE = "tables"
 const ACTIONS_CDC_TYPE = "actions"
+const TRANSACTION_CDC_TYPE = "transactions"
 
 type Config struct {
 	DfuseGRPCEndpoint string
@@ -280,7 +281,7 @@ func (a *App) NewCDCCtx(ctx context.Context, producer *kafka.Producer, headers [
 	var filter string
 	var cursor string
 	var abiCodec ABICodec
-	var generator Generator2
+	var generator GeneratorAtTransactionLevel
 	var err error
 	eos.LegacyJSON4Asset = false
 	eos.NativeType = true
@@ -309,9 +310,15 @@ func (a *App) NewCDCCtx(ctx context.Context, producer *kafka.Producer, headers [
 		if finder, err = buildTableKeyExtractorFinder(a.config.TableNames); err != nil {
 			return appCtx, err
 		}
-		generator = TableGenerator{
-			getExtractKey: finder,
-			abiCodec:      abiCodec,
+		generator = transaction2ActionsGenerator{
+			actionLevelGenerator: TableGenerator{
+				getExtractKey: finder,
+				abiCodec:      abiCodec,
+			},
+			abiCodec: abiCodec,
+			headers:  headers,
+			topic:    a.config.KafkaTopic,
+			account:  a.config.Account,
 		}
 	case ACTIONS_CDC_TYPE:
 		filter = createCdCFilter(a.config.Account, a.config.Executed)
@@ -332,9 +339,40 @@ func (a *App) NewCDCCtx(ctx context.Context, producer *kafka.Producer, headers [
 		if err != nil {
 			return appCtx, err
 		}
-		generator = &ActionGenerator2{
-			keyExtractors: actionKeyExpressions,
-			abiCodec:      abiCodec,
+		generator = transaction2ActionsGenerator{
+			actionLevelGenerator: ActionGenerator2{
+				keyExtractors: actionKeyExpressions,
+				abiCodec:      abiCodec,
+			},
+			abiCodec: abiCodec,
+			headers:  headers,
+			topic:    a.config.KafkaTopic,
+			account:  a.config.Account,
+		}
+
+	case TRANSACTION_CDC_TYPE:
+		if a.config.Executed {
+			filter = "executed"
+		} else {
+			filter = ""
+		}
+		msg := MessageSchemaGenerator{
+			Namespace: a.config.SchemaNamespace,
+			Version:   a.config.SchemaVersion,
+			Account:   a.config.Account,
+			Source:    source,
+		}
+		abiCodec, err = newABICodec(
+			a.config.Codec, a.config.Account, a.config.SchemaRegistryURL, abiDecoder,
+			msg.getNoopSchema,
+		)
+		if err != nil {
+			return appCtx, err
+		}
+		generator = transactionGenerator{
+			topic:    a.config.KafkaTopic,
+			headers:  headers,
+			abiCodec: abiCodec,
 		}
 	default:
 		return appCtx, fmt.Errorf("unsupported CDC type %s", cdcType)
@@ -345,7 +383,6 @@ func (a *App) NewCDCCtx(ctx context.Context, producer *kafka.Producer, headers [
 		headers:   headers,
 		generator: generator,
 		abiCodec:  abiCodec,
-		account:   a.config.Account,
 	}
 	appCtx.adapter = adapter
 	appCtx.cursor = cursor
@@ -765,16 +802,12 @@ func (msg MessageSchemaGenerator) getTableSchema(tableName string, abi *ABI) (Me
 	return GenerateTableSchema(msg.newNamedSchemaGenOptions(tableName, abi))
 }
 
-func schemaVersion(version string, abiBlockNumber uint32) string {
-	if version == "" {
-		return fmt.Sprintf("0.%d.0", abiBlockNumber)
-	} else {
-		return version
-	}
-}
-
 func (msg MessageSchemaGenerator) getActionSchema(actionName string, abi *ABI) (MessageSchema, error) {
 	return GenerateActionSchema(msg.newNamedSchemaGenOptions(actionName, abi))
+}
+
+func (msg MessageSchemaGenerator) getNoopSchema(name string, _ *ABI) (MessageSchema, error) {
+	return MessageSchema{}, fmt.Errorf("noop schema generator cannot produce schema for: %s", name)
 }
 
 func (msg MessageSchemaGenerator) newNamedSchemaGenOptions(name string, abi *ABI) NamedSchemaGenOptions {
@@ -788,5 +821,13 @@ func (msg MessageSchemaGenerator) newNamedSchemaGenOptions(name string, abi *ABI
 		},
 		Source: msg.Source,
 		Domain: msg.Account,
+	}
+}
+
+func schemaVersion(version string, abiBlockNumber uint32) string {
+	if version == "" {
+		return fmt.Sprintf("0.%d.0", abiBlockNumber)
+	} else {
+		return version
 	}
 }

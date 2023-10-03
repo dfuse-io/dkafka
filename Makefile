@@ -156,6 +156,16 @@ cdc-actions: build up ## CDC stream on tables
 		--codec=$(CODEC) \
 		--actions-expr='$(CDC_ACTIONS_EXPRESSION)' '$(CDC_ACTIONS_ACCOUNT)'
 
+cdc-transactions: build up ## CDC stream on tables
+	$(BINARY_PATH) cdc transactions \
+		--dfuse-firehose-grpc-addr=localhost:9000 \
+		--kafka-topic=$(TOPIC) \
+		--kafka-compression-type=$(COMPRESSION_TYPE) \
+		--kafka-compression-level=$(COMPRESSION_LEVEL) \
+		--start-block-num=$(CDC_ACTIONS_START_BLOCK) \
+		--kafka-message-max-bytes=$(MESSAGE_MAX_SIZE) \
+		--codec=$(CODEC)
+
 stream-act: ## stream actions based localy
 	$(BINARY_PATH) publish \
 		--dfuse-firehose-grpc-addr=localhost:9000 \

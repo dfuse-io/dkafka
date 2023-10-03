@@ -53,8 +53,8 @@ func (a *DfuseAbiRepository) GetAbi(contract string, blockNum uint32) (*ABI, err
 	return &abi, nil
 }
 
-func (b *DfuseAbiRepository) IsNOOP() bool {
-	return b.overrides == nil && b.abiCodecCli == nil
+func (a *DfuseAbiRepository) IsNOOP() bool {
+	return a.overrides == nil && a.abiCodecCli == nil
 }
 
 // TODO converge AbiItem with dkafka.ABI
@@ -224,17 +224,22 @@ func (s *StreamedAbiCodec) doUpdateABI(abi *eos.ABI, blockNum uint32, step pbbst
 
 func (s *StreamedAbiCodec) resetCodecs() {
 	zlog.Info("reset schema cache on reload static schema")
-	s.codecCache = s.initStaticSchema(make(map[string]Codec))
+	s.codecCache = s.initStaticSchemas(make(map[string]Codec))
 }
 
-func (s *StreamedAbiCodec) initStaticSchema(cache map[string]Codec) map[string]Codec {
-	codec, err := s.newCodec(CheckpointMessageSchema)
-	if err != nil {
-		zlog.Error("initStaticSchema fail to create codec", zap.String("schema", dkafkaCheckpoint), zap.Error(err))
-		panic("initStaticSchema fail to create codec DKafkaCheckpoint")
-	}
-	cache[dkafkaCheckpoint] = codec
+func (s *StreamedAbiCodec) initStaticSchemas(cache map[string]Codec) map[string]Codec {
+	s.registerStaticSchema(cache, CheckpointMessageSchema)
+	s.registerStaticSchema(cache, TransactionMessageSchema)
 	return cache
+}
+
+func (s *StreamedAbiCodec) registerStaticSchema(cache map[string]Codec, schema MessageSchema) {
+	codec, err := s.newCodec(schema)
+	if err != nil {
+		zlog.Error("initStaticSchemas fail to create codec", zap.String("schema", schema.Name), zap.Error(err))
+		panic(fmt.Sprintf("initStaticSchemas fail to create codec %s", schema.Name))
+	}
+	cache[schema.Name] = codec
 }
 
 func (s *StreamedAbiCodec) setSubjectCompatibilityToForward(subject string) error {
@@ -249,7 +254,7 @@ func (s *StreamedAbiCodec) setSubjectCompatibilityToForward(subject string) erro
 	return err
 }
 
-func (c *StreamedAbiCodec) newCodec(messageSchema MessageSchema) (Codec, error) {
+func (s *StreamedAbiCodec) newCodec(messageSchema MessageSchema) (Codec, error) {
 	subject := fmt.Sprintf("%s.%s", messageSchema.Namespace, messageSchema.Name)
 	jsonSchema, err := json.Marshal(messageSchema)
 	if err != nil {
@@ -257,22 +262,22 @@ func (c *StreamedAbiCodec) newCodec(messageSchema MessageSchema) (Codec, error) 
 	}
 	zlog.Debug("register schema", zap.String("subject", subject), zap.ByteString("schema", jsonSchema))
 	zlog.Debug("get compatibility level of subject's schema", zap.String("subject", subject))
-	actualCompatibilityLevel, err := c.schemaRegistryClient.GetCompatibilityLevel(subject, true)
+	actualCompatibilityLevel, err := s.schemaRegistryClient.GetCompatibilityLevel(subject, true)
 	unknownSubject := false
 	if err != nil {
 		unknownSubject = true
 	} else if *actualCompatibilityLevel != srclient.Forward {
-		err = c.setSubjectCompatibilityToForward(subject)
+		err = s.setSubjectCompatibilityToForward(subject)
 		if err != nil {
 			return nil, err
 		}
 	}
-	schema, err := c.schemaRegistryClient.CreateSchema(subject, string(jsonSchema), srclient.Avro)
+	schema, err := s.schemaRegistryClient.CreateSchema(subject, string(jsonSchema), srclient.Avro)
 	if err != nil {
 		return nil, fmt.Errorf("CreateSchema on subject: '%s', schema:\n%s error: %w", subject, string(jsonSchema), err)
 	}
 	if unknownSubject {
-		err = c.setSubjectCompatibilityToForward(subject)
+		err = s.setSubjectCompatibilityToForward(subject)
 		if err != nil {
 			return nil, err
 		}
@@ -283,7 +288,7 @@ func (c *StreamedAbiCodec) newCodec(messageSchema MessageSchema) (Codec, error) 
 	if err != nil {
 		return nil, fmt.Errorf("goavro.NewCodecWithConverters error: %w, with schema %s", err, string(jsonSchema))
 	}
-	codec := NewKafkaAvroCodec(c.schemaRegistryURL, schema, ac)
+	codec := NewKafkaAvroCodec(s.schemaRegistryURL, schema, ac)
 	return codec, nil
 }
 
