@@ -238,6 +238,24 @@ Examples:
 
 Everything is made around the `Makefile` if you want to use it please install `make` on you system.
 
+### ARM64 architecture prerequisites (MacOS M chip)
+
+Confluent libraries are not natively build for ARM64 architectures, therefore, you need to:
+
+```bash
+$ # Install pkg-config
+$ brew install pkg-config
+
+$ # Install OpenSSL
+$ brew install openssl
+
+$ # Make pkg-config aware of OpenSSL installation
+$ export PKG_CONFIG_PATH="/opt/homebrew/opt/openssl@3/lib/pkgconfig"
+
+$ # Run go with "-tags dynamic" to link ARM incompatible libraries dynamically
+$ go [go-command] -tags dynamic [parameters]
+```
+
 ### Build (clean)
 
 ```bash

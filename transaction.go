@@ -2,7 +2,6 @@ package dkafka
 
 import (
 	"fmt"
-
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 )
@@ -53,7 +52,7 @@ func Map[T, U any](ts []T, f func(T) U) []U {
 
 func newTransactionReceiptHeaderBasicSchema() TransactionReceiptHeaderBasicSchema {
 	return newRecordS(
-		dkafkaNamespace,
+		"TransactionReceiptHeader",
 		[]FieldSchema{
 			NewOptionalField("status", "int"),
 			NewOptionalField("cpu_usage_micro_micro_seconds", "long"),
@@ -64,7 +63,7 @@ func newTransactionReceiptHeaderBasicSchema() TransactionReceiptHeaderBasicSchem
 
 func newActionTraceBasicSchema() ActionTraceBasicSchema {
 	return newRecordS(
-		dkafkaNamespace,
+		"ActionTrace",
 		[]FieldSchema{
 			NewOptionalField("receiver", "string"),
 			NewOptionalField("action", newActionBasicSchema()),
@@ -88,7 +87,7 @@ func newActionTraceBasicSchema() ActionTraceBasicSchema {
 
 func newActionBasicSchema() ActionBasicSchema {
 	return newRecordS(
-		dkafkaNamespace,
+		"Action",
 		[]FieldSchema{
 			NewOptionalField("account", "string"),
 			NewOptionalField("name", "string"),
@@ -98,7 +97,7 @@ func newActionBasicSchema() ActionBasicSchema {
 }
 func newPermissionLevelBasicSchema() PermissionLevelBasicSchema {
 	return newRecordS(
-		dkafkaNamespace,
+		"PermissionLevel",
 		[]FieldSchema{
 			NewOptionalField("actor", "string"),
 			NewOptionalField("permission", "string"),
@@ -108,7 +107,7 @@ func newPermissionLevelBasicSchema() PermissionLevelBasicSchema {
 
 func newAccountRamDeltasBasicSchema() AccountRamDeltasBasicSchema {
 	return newRecordS(
-		dkafkaNamespace,
+		"AccountRamDelta",
 		[]FieldSchema{
 			NewOptionalField("account", "string"),
 			NewOptionalField("delta", "long"),
@@ -118,7 +117,7 @@ func newAccountRamDeltasBasicSchema() AccountRamDeltasBasicSchema {
 
 func newExceptionBasicSchema() ExceptionBasicSchema {
 	return newRecordS(
-		dkafkaNamespace,
+		"Exception",
 		[]FieldSchema{
 			NewOptionalField("code", "int"),
 			NewOptionalField("name", "string"),
@@ -129,7 +128,7 @@ func newExceptionBasicSchema() ExceptionBasicSchema {
 
 func newRAMOpBasicSchema() RAMOpBasicSchema {
 	return newRecordS(
-		dkafkaNamespace,
+		"RAMOp",
 		[]FieldSchema{
 			NewOptionalField("operation", "int"),
 			NewOptionalField("action_index", "long"),
@@ -142,7 +141,7 @@ func newRAMOpBasicSchema() RAMOpBasicSchema {
 
 func newCreationTreeBasicSchema() CreationTreeBasicSchema {
 	return newRecordS(
-		dkafkaNamespace,
+		"CreationFlatNode",
 		[]FieldSchema{
 			NewOptionalField("creator_action_index", "long"),
 			NewOptionalField("execution_action_index", "long"),
@@ -166,7 +165,7 @@ var transactionSchema = RecordSchema{
 		NewOptionalField("net_usage", "long"),
 		{Name: "action_traces", Type: NewArray(newActionTraceBasicSchema())},
 		NewOptionalField("exception", newExceptionBasicSchema()),
-		NewOptionalField("error_code", "long"),
+		NewOptionalField("error_code", "int"),
 		{Name: "ram_ops", Type: NewArray(newRAMOpBasicSchema())},
 		{Name: "creation_tree", Type: NewArray(newCreationTreeBasicSchema())},
 	},

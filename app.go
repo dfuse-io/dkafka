@@ -349,7 +349,11 @@ func (a *App) NewCDCCtx(ctx context.Context, producer *kafka.Producer, headers [
 		}
 
 	case TRANSACTION_CDC_TYPE:
-		filter = "executed"
+		if a.config.Executed {
+			filter = "executed"
+		} else {
+			filter = ""
+		}
 		msg := MessageSchemaGenerator{
 			Namespace: a.config.SchemaNamespace,
 			Version:   a.config.SchemaVersion,
