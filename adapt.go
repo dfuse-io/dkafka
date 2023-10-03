@@ -58,31 +58,6 @@ type CdCAdapter struct {
 	abiCodec  ABICodec
 }
 
-func NewActionLevelCdCAdapter(topic string, saveBlock SaveBlock, headers []kafka.Header, generator GeneratorAtActionLevel, abiCodec ABICodec) *CdCAdapter {
-	return &CdCAdapter{
-		topic:     topic,
-		saveBlock: saveBlock,
-		headers:   headers,
-		generator: transaction2ActionsGenerator{
-			actionLevelGenerator: generator,
-			abiCodec:             abiCodec,
-			headers:              headers,
-			topic:                topic,
-		},
-		abiCodec: abiCodec,
-	}
-}
-
-func NewTransactionLevelCdCAdapter(topic string, saveBlock SaveBlock, headers []kafka.Header, generator GeneratorAtTransactionLevel, abiCodec ABICodec) *CdCAdapter {
-	return &CdCAdapter{
-		topic:     topic,
-		saveBlock: saveBlock,
-		headers:   headers,
-		generator: generator,
-		abiCodec:  abiCodec,
-	}
-}
-
 // orderSliceOnBlockStep reverse the slice order is the block step is UNDO
 func orderSliceOnBlockStep[T any](input []T, step pbbstream.ForkStep) []T {
 	output := input

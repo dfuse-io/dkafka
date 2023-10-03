@@ -291,6 +291,31 @@ type transaction2ActionsGenerator struct {
 	abiCodec             ABICodec
 	headers              []kafka.Header
 	topic                string
+	account              string
+}
+
+func (t transaction2ActionsGenerator) isThisSmartContractABIUpdated(action *pbcodec.Action) bool {
+	return action.Name == "setabi" && (t.isSelfAuthorized(action.Authorization) || t.isSetABIOnTrackedAccount(action))
+}
+
+func (t transaction2ActionsGenerator) isSetABIOnTrackedAccount(action *pbcodec.Action) bool {
+	var actionParameters map[string]interface{}
+	if err := json.Unmarshal(json.RawMessage(action.JsonData), &actionParameters); err != nil {
+		return false
+	}
+	if account, found := actionParameters["account"]; found {
+		return account == t.account
+	}
+	return false
+}
+
+func (t transaction2ActionsGenerator) isSelfAuthorized(authorizations []*pbcodec.PermissionLevel) bool {
+	for _, permissionLevel := range authorizations {
+		if permissionLevel.Actor == t.account {
+			return true
+		}
+	}
+	return false
 }
 
 func (t transaction2ActionsGenerator) Apply(genContext TransactionContext) ([]*kafka.Message, error) {
@@ -308,7 +333,7 @@ func (t transaction2ActionsGenerator) Apply(genContext TransactionContext) ([]*k
 		if !act.FilteringMatched {
 			continue
 		}
-		if act.Action.Name == "setabi" {
+		if t.isThisSmartContractABIUpdated(act.Action) {
 			zlog.Info("new abi published defer clear ABI cache at end of this block parsing", zap.Uint32("block_num", genContext.block.Number), zap.Int("trx_index", int(trx.Index)), zap.String("trx_id", trx.Id))
 			t.abiCodec.UpdateABI(genContext.block.Number, genContext.step, trx.Id, act)
 			continue

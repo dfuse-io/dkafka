@@ -318,6 +318,7 @@ func (a *App) NewCDCCtx(ctx context.Context, producer *kafka.Producer, headers [
 			abiCodec: abiCodec,
 			headers:  headers,
 			topic:    a.config.KafkaTopic,
+			account:  a.config.Account,
 		}
 	case ACTIONS_CDC_TYPE:
 		filter = createCdCFilter(a.config.Account, a.config.Executed)
@@ -346,6 +347,7 @@ func (a *App) NewCDCCtx(ctx context.Context, producer *kafka.Producer, headers [
 			abiCodec: abiCodec,
 			headers:  headers,
 			topic:    a.config.KafkaTopic,
+			account:  a.config.Account,
 		}
 
 	case TRANSACTION_CDC_TYPE:
