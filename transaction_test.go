@@ -15,7 +15,11 @@ func Test_transactionGenerator_Apply(t *testing.T) {
 	timestamp := time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	blockStep := BlockStep{
-		blk:    &pbcodec.Block{},
+		blk: &pbcodec.Block{
+			Header: &pbcodec.BlockHeader{
+				Timestamp: timestamppb.New(timestamp),
+			},
+		},
 		step:   pbbstream.ForkStep_STEP_NEW,
 		cursor: "123",
 	}
@@ -42,11 +46,6 @@ func Test_transactionGenerator_Apply(t *testing.T) {
 			name:   "default",
 			fields: fields{topic: "dkafka.test", headers: default_headers},
 			args: TransactionContext{
-				block: &pbcodec.Block{
-					Header: &pbcodec.BlockHeader{
-						Timestamp: timestamppb.New(timestamp),
-					},
-				},
 				stepName: "",
 				transaction: &pbcodec.TransactionTrace{
 					Id:              "trx-1",
@@ -210,11 +209,6 @@ func Test_transactionGenerator_Apply(t *testing.T) {
 			name:   "empty_arrays_object",
 			fields: fields{topic: "dkafka.test", headers: default_headers},
 			args: TransactionContext{
-				block: &pbcodec.Block{
-					Header: &pbcodec.BlockHeader{
-						Timestamp: timestamppb.New(timestamp),
-					},
-				},
 				stepName: "",
 				transaction: &pbcodec.TransactionTrace{
 					Id:               "trx-1",
