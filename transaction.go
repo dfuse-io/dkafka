@@ -2,6 +2,7 @@ package dkafka
 
 import (
 	"fmt"
+
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 )
@@ -69,11 +70,6 @@ func newActionTraceBasicSchema() ActionTraceBasicSchema {
 			NewOptionalField("action", newActionBasicSchema()),
 			NewOptionalField("context_free", "boolean"),
 			NewOptionalField("elapsed", "long"),
-			NewOptionalField("console", "string"),
-			NewOptionalField("transaction_id", "string"),
-			NewOptionalField("block_num", "long"),
-			NewOptionalField("producer_block_id", "string"),
-			NewOptionalField("block_time", NewTimestampMillisType()),
 			{Name: "account_ram_deltas", Type: NewArray(newAccountRamDeltasBasicSchema())},
 			NewOptionalField("exception", newExceptionBasicSchema()),
 			NewOptionalField("error_code", "int"),
@@ -212,11 +208,6 @@ func newActionTraceMap(actionTrace *pbcodec.ActionTrace) map[string]interface{} 
 			"action":                 newActionMap(actionTrace.Action),
 			"context_free":           actionTrace.ContextFree,
 			"elapsed":                actionTrace.Elapsed,
-			"console":                actionTrace.Console,
-			"transaction_id":         actionTrace.TransactionId,
-			"block_num":              actionTrace.BlockNum,
-			"producer_block_id":      actionTrace.ProducerBlockId,
-			"block_time":             actionTrace.BlockTime.AsTime(),
 			"account_ram_deltas":     newAccountRamDeltasMap(actionTrace.AccountRamDeltas),
 			"exception":              newExceptionMap(actionTrace.Exception),
 			"error_code":             actionTrace.ErrorCode,

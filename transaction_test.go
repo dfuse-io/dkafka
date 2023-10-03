@@ -1,14 +1,15 @@
 package dkafka
 
 import (
+	"reflect"
+	"testing"
+	"time"
+
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
 	"github.com/riferrei/srclient"
 	pbbstream "github.com/streamingfast/pbgo/dfuse/bstream/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"reflect"
-	"testing"
-	"time"
 )
 
 func Test_transactionGenerator_Apply(t *testing.T) {
@@ -153,13 +154,8 @@ func Test_transactionGenerator_Apply(t *testing.T) {
 									},
 								},
 							}},
-							"context_free":      map[string]interface{}{"boolean": false},
-							"elapsed":           map[string]interface{}{"long": int64(0)},
-							"console":           map[string]interface{}{"string": ""},
-							"transaction_id":    map[string]interface{}{"string": ""},
-							"block_num":         map[string]interface{}{"long": int64(0)},
-							"producer_block_id": map[string]interface{}{"string": ""},
-							"block_time":        map[string]interface{}{"long.timestamp-millis": timestamp},
+							"context_free": map[string]interface{}{"boolean": false},
+							"elapsed":      map[string]interface{}{"long": int64(0)},
 							"account_ram_deltas": []interface{}{
 								map[string]interface{}{
 									"account": map[string]interface{}{"string": ""},
