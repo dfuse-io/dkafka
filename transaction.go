@@ -160,7 +160,7 @@ var transactionSchema = RecordSchema{
 		NewOptionalField("elapsed", "long"),
 		NewOptionalField("net_usage", "long"),
 		{Name: "action_traces", Type: NewArray(newActionTraceBasicSchema())},
-		NewOptionalField("exception", newExceptionBasicSchema()),
+		NewOptionalField("exception", "Exception"),
 		NewOptionalField("error_code", "int"),
 		{Name: "ram_ops", Type: NewArray(newRAMOpBasicSchema())},
 		{Name: "creation_tree", Type: NewArray(newCreationTreeBasicSchema())},
