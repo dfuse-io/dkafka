@@ -1,12 +1,14 @@
 package dkafka
 
 import (
+	"math/big"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	pbcodec "github.com/dfuse-io/dfuse-eosio/pb/dfuse/eosio/codec/v1"
+	"github.com/golang/protobuf/jsonpb"
 	"github.com/riferrei/srclient"
 	pbbstream "github.com/streamingfast/pbgo/dfuse/bstream/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -168,7 +170,7 @@ func Test_transactionGenerator_Apply(t *testing.T) {
 									"message": map[string]interface{}{"string": ""},
 									"name":    map[string]interface{}{"string": ""},
 								}},
-							"error_code":             map[string]interface{}{"int": int32(0)},
+							"error_code":             map[string]interface{}{"bytes.decimal": new(big.Rat).SetInt64(0)},
 							"action_ordinal":         map[string]interface{}{"int": int32(0)},
 							"creator_action_ordinal": map[string]interface{}{"int": int32(0)},
 							"closest_unnotified_ancestor_action_ordinal": map[string]interface{}{"int": int32(0)},
@@ -181,7 +183,7 @@ func Test_transactionGenerator_Apply(t *testing.T) {
 							"message": map[string]interface{}{"string": ""},
 							"name":    map[string]interface{}{"string": ""},
 						}},
-					"error_code": map[string]interface{}{"int": int32(0)},
+					"error_code": map[string]interface{}{"bytes.decimal": new(big.Rat).SetInt64(0)},
 					"ram_ops": []interface{}{
 						map[string]interface{}{
 							"operation":    map[string]interface{}{"int": int32(0)},
@@ -258,7 +260,7 @@ func Test_transactionGenerator_Apply(t *testing.T) {
 							"message": nil,
 							"name":    nil,
 						}},
-					"error_code":    map[string]interface{}{"int": int32(0)},
+					"error_code":    map[string]interface{}{"bytes.decimal": new(big.Rat).SetInt64(0)},
 					"ram_ops":       []interface{}{},
 					"creation_tree": []interface{}{},
 				},
@@ -305,6 +307,59 @@ func Test_transactionGenerator_Apply(t *testing.T) {
 				t1.Errorf("Apply() got = %v, want %v", messages[0].Key, tt.expect.key)
 			}
 
+		})
+	}
+}
+
+func Test_transactionGenerator_Apply_approval(t *testing.T) {
+	tests := []struct {
+		name       string
+		file       string
+		nbMessages int
+	}{
+		{
+			"transaction-1",
+			"testdata/block-transactions-6723651.pb.json",
+			2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			block := &pbcodec.Block{}
+			err := jsonpb.UnmarshalString(string(readFileFromTestdata(t, tt.file)), block)
+			if err != nil {
+				t.Fatalf("jsonpb.UnmarshalString(): %v", err)
+			}
+
+			abiCodec := NewStreamedAbiCodec(&DfuseAbiRepository{},
+				nil, srclient.CreateMockSchemaRegistryClient("mock://bench-adapter"), "", "mock://bench-adapter")
+
+			if err != nil {
+				t.Fatalf("cannot load codec for %s", transactionNotification)
+			}
+			transactionGen := transactionGenerator{
+				headers:  default_headers,
+				topic:    "test.topic",
+				abiCodec: abiCodec,
+			}
+			for i, trx := range block.TransactionTraces() {
+				_, err := transactionGen.Apply(TransactionContext{
+					block:       block,
+					stepName:    "NEW",
+					transaction: trx,
+					blockStep: BlockStep{
+						blk:            block,
+						step:           pbbstream.ForkStep_STEP_NEW,
+						cursor:         "???",
+						previousCursor: "???",
+					},
+				})
+				if err != nil {
+					t.Errorf("transactionGen.Apply() at %d with error = %v", i, err)
+					return
+				}
+			}
 		})
 	}
 }

@@ -1,0 +1,403 @@
+{
+   "version": "eosio::abi/1.1",
+   "structs": [
+      {
+         "name": "addma",
+         "base": "",
+         "fields": [
+            {
+               "name": "final_moving_average_settings",
+               "type": "asset[]"
+            }
+         ]
+      },
+      {
+         "name": "calcsecma",
+         "base": "",
+         "fields": [
+            {
+               "name": "moving_average_setting",
+               "type": "asset"
+            }
+         ]
+      },
+      {
+         "name": "feed_completion_data",
+         "base": "",
+         "fields": [
+            {
+               "name": "intervals",
+               "type": "feed_completion_element[]"
+            }
+         ]
+      },
+      {
+         "name": "feed_completion_element",
+         "base": "",
+         "fields": [
+            {
+               "name": "sources_pushed",
+               "type": "uint64"
+            },
+            {
+               "name": "timestamp",
+               "type": "uint64"
+            }
+         ]
+      },
+      {
+         "name": "feed_data",
+         "base": "",
+         "fields": [
+            {
+               "name": "source",
+               "type": "name"
+            },
+            {
+               "name": "rates",
+               "type": "uint64[]"
+            },
+            {
+               "name": "weight",
+               "type": "uint64"
+            },
+            {
+               "name": "source_type",
+               "type": "uint8"
+            }
+         ]
+      },
+      {
+         "name": "final_rates_data",
+         "base": "",
+         "fields": [
+            {
+               "name": "index",
+               "type": "uint64"
+            },
+            {
+               "name": "rates",
+               "type": "urate[]"
+            },
+            {
+               "name": "rolling_moving_average",
+               "type": "moving_average_impl"
+            }
+         ]
+      },
+      {
+         "name": "init",
+         "base": "",
+         "fields": [
+            {
+               "name": "interval",
+               "type": "uint8"
+            },
+            {
+               "name": "cache_window",
+               "type": "uint32"
+            },
+            {
+               "name": "final_price_table_size",
+               "type": "uint32[]"
+            },
+            {
+               "name": "final_moving_average_settings",
+               "type": "asset[]"
+            },
+            {
+               "name": "ultra_comprehensive_rate_weight",
+               "type": "uint32"
+            }
+         ]
+      },
+      {
+         "name": "last_known_rate",
+         "base": "",
+         "fields": [
+            {
+               "name": "source",
+               "type": "name"
+            },
+            {
+               "name": "latest_rate",
+               "type": "rate"
+            }
+         ]
+      },
+      {
+         "name": "moving_average_impl",
+         "base": "",
+         "fields": [
+            {
+               "name": "average",
+               "type": "rate"
+            },
+            {
+               "name": "is_valid_deprecated",
+               "type": "bool"
+            },
+            {
+               "name": "param",
+               "type": "uint64"
+            },
+            {
+               "name": "moving_window_counter",
+               "type": "uint8"
+            },
+            {
+               "name": "unit",
+               "type": "uint8"
+            }
+         ]
+      },
+      {
+         "name": "oracle_state_data",
+         "base": "",
+         "fields": [
+            {
+               "name": "conversion_rate_symbol",
+               "type": "symbol"
+            },
+            {
+               "name": "trading_volume_symbol",
+               "type": "symbol"
+            },
+            {
+               "name": "latest_timestamp",
+               "type": "uint64"
+            },
+            {
+               "name": "interval",
+               "type": "uint8"
+            },
+            {
+               "name": "cache_window",
+               "type": "uint8"
+            },
+            {
+               "name": "registered_sources",
+               "type": "uint32"
+            },
+            {
+               "name": "ultra_comprehensive_rate_weight",
+               "type": "uint32"
+            }
+         ]
+      },
+      {
+         "name": "purgefrates",
+         "base": "",
+         "fields": [
+            {
+               "name": "scope",
+               "type": "uint64"
+            }
+         ]
+      },
+      {
+         "name": "pushrate",
+         "base": "",
+         "fields": [
+            {
+               "name": "exchange",
+               "type": "name"
+            },
+            {
+               "name": "rates",
+               "type": "rate[]"
+            },
+            {
+               "name": "volume",
+               "type": "asset"
+            }
+         ]
+      },
+      {
+         "name": "rate",
+         "base": "",
+         "fields": [
+            {
+               "name": "timestamp",
+               "type": "uint64"
+            },
+            {
+               "name": "price",
+               "type": "asset"
+            }
+         ]
+      },
+      {
+         "name": "regexchange",
+         "base": "",
+         "fields": [
+            {
+               "name": "exchange",
+               "type": "name"
+            }
+         ]
+      },
+      {
+         "name": "removema",
+         "base": "",
+         "fields": [
+            {
+               "name": "final_moving_average_settings",
+               "type": "asset[]"
+            }
+         ]
+      },
+      {
+         "name": "resetfavg",
+         "base": "",
+         "fields": [
+            {
+               "name": "time_symbol",
+               "type": "symbol?"
+            }
+         ]
+      },
+      {
+         "name": "resetfeed",
+         "base": "",
+         "fields": [
+            {
+               "name": "exchange",
+               "type": "name?"
+            }
+         ]
+      },
+      {
+         "name": "resetfrates",
+         "base": "",
+         "fields": [
+            {
+               "name": "scope",
+               "type": "uint64?"
+            }
+         ]
+      },
+      {
+         "name": "terminate",
+         "base": ""
+      },
+      {
+         "name": "unregexchg",
+         "base": "",
+         "fields": [
+            {
+               "name": "exchange",
+               "type": "name"
+            }
+         ]
+      },
+      {
+         "name": "urate",
+         "base": "",
+         "fields": [
+            {
+               "name": "timestamp",
+               "type": "uint64"
+            },
+            {
+               "name": "price",
+               "type": "uint64"
+            }
+         ]
+      }
+   ],
+   "actions": [
+      {
+         "name": "addma",
+         "type": "addma",
+         "ricardian_contract": ""
+      },
+      {
+         "name": "calcsecma",
+         "type": "calcsecma",
+         "ricardian_contract": ""
+      },
+      {
+         "name": "init",
+         "type": "init",
+         "ricardian_contract": ""
+      },
+      {
+         "name": "purgefrates",
+         "type": "purgefrates",
+         "ricardian_contract": ""
+      },
+      {
+         "name": "pushrate",
+         "type": "pushrate",
+         "ricardian_contract": ""
+      },
+      {
+         "name": "regexchange",
+         "type": "regexchange",
+         "ricardian_contract": ""
+      },
+      {
+         "name": "removema",
+         "type": "removema",
+         "ricardian_contract": ""
+      },
+      {
+         "name": "resetfavg",
+         "type": "resetfavg",
+         "ricardian_contract": ""
+      },
+      {
+         "name": "resetfeed",
+         "type": "resetfeed",
+         "ricardian_contract": ""
+      },
+      {
+         "name": "resetfrates",
+         "type": "resetfrates",
+         "ricardian_contract": ""
+      },
+      {
+         "name": "terminate",
+         "type": "terminate",
+         "ricardian_contract": ""
+      },
+      {
+         "name": "unregexchg",
+         "type": "unregexchg",
+         "ricardian_contract": ""
+      }
+   ],
+   "tables": [
+      {
+         "name": "feedcompl",
+         "index_type": "i64",
+         "type": "feed_completion_data"
+      },
+      {
+         "name": "feeddata",
+         "index_type": "i64",
+         "type": "feed_data"
+      },
+      {
+         "name": "finalaverage",
+         "index_type": "i64",
+         "type": "moving_average_impl"
+      },
+      {
+         "name": "finalrates",
+         "index_type": "i64",
+         "type": "final_rates_data"
+      },
+      {
+         "name": "lastknwnrate",
+         "index_type": "i64",
+         "type": "last_known_rate"
+      },
+      {
+         "name": "oraclestate",
+         "index_type": "i64",
+         "type": "oracle_state_data"
+      }
+   ]
+}

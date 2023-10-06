@@ -172,6 +172,15 @@ func NewInt128Type() Schema {
 	}
 }
 
+func NewUint64Type() Schema {
+	return map[string]interface{}{
+		"type":        "bytes",
+		"logicalType": "decimal",
+		"precision":   20,
+		"scale":       0,
+	}
+}
+
 func NewUint128Type() Schema {
 	return map[string]interface{}{
 		"type":        "bytes",
@@ -186,5 +195,12 @@ func NewIntField(name string) FieldSchema {
 	return FieldSchema{
 		Name: name,
 		Type: "int",
+	}
+}
+
+func NewSymbolType() Schema {
+	return map[string]interface{}{
+		"type":    "string",
+		"convert": "eos.Symbol",
 	}
 }

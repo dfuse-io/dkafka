@@ -312,6 +312,9 @@ func assetConverter(f func([]byte, interface{}) ([]byte, error)) func([]byte, in
 		case eos.Asset:
 			amount := big.NewRat(int64(valueType.Amount), int64(math.Pow10(int(valueType.Symbol.Precision))))
 			return f(bytes, map[string]interface{}{"amount": amount, "symbol": valueType.Symbol.Symbol, "precision": valueType.Symbol.Precision})
+		case *eos.Asset:
+			amount := big.NewRat(int64(valueType.Amount), int64(math.Pow10(int(valueType.Symbol.Precision))))
+			return f(bytes, map[string]interface{}{"amount": amount, "symbol": valueType.Symbol.Symbol, "precision": valueType.Symbol.Precision})
 		default:
 			return bytes, fmt.Errorf("unsupported asset type: %T", value)
 		}
@@ -322,6 +325,8 @@ func publicKeyConverter(f func([]byte, interface{}) ([]byte, error)) func([]byte
 	return func(bytes []byte, value interface{}) ([]byte, error) {
 		switch valueType := value.(type) {
 		case ecc.PublicKey:
+			return f(bytes, map[string]interface{}{"curve": valueType.Curve, "content": valueType.Content})
+		case *ecc.PublicKey:
 			return f(bytes, map[string]interface{}{"curve": valueType.Curve, "content": valueType.Content})
 		default:
 			return bytes, fmt.Errorf("unsupported public key type type: %T", value)
@@ -334,6 +339,8 @@ func signatureConverter(f func([]byte, interface{}) ([]byte, error)) func([]byte
 		switch valueType := value.(type) {
 		case ecc.Signature:
 			return f(bytes, map[string]interface{}{"curve": valueType.Curve, "content": valueType.Content})
+		case *ecc.Signature:
+			return f(bytes, map[string]interface{}{"curve": valueType.Curve, "content": valueType.Content})
 		default:
 			return bytes, fmt.Errorf("unsupported public key type type: %T", value)
 		}
@@ -344,6 +351,9 @@ func int128Converter(f func([]byte, interface{}) ([]byte, error)) func([]byte, i
 	return func(bytes []byte, value interface{}) ([]byte, error) {
 		switch valueType := value.(type) {
 		case eos.Int128:
+			rat := new(big.Rat).SetInt(valueType.BigInt())
+			return f(bytes, rat)
+		case *eos.Int128:
 			rat := new(big.Rat).SetInt(valueType.BigInt())
 			return f(bytes, rat)
 		default:
@@ -358,8 +368,29 @@ func uint128Converter(f func([]byte, interface{}) ([]byte, error)) func([]byte, 
 		case eos.Uint128:
 			rat := new(big.Rat).SetInt(valueType.BigInt())
 			return f(bytes, rat)
+		case *eos.Uint128:
+			rat := new(big.Rat).SetInt(valueType.BigInt())
+			return f(bytes, rat)
 		default:
 			return bytes, fmt.Errorf("unsupported asset type: %T", value)
+		}
+	}
+}
+
+func symbolConverter(f func([]byte, interface{}) ([]byte, error)) func([]byte, interface{}) ([]byte, error) {
+	return func(bytes []byte, value interface{}) ([]byte, error) {
+		switch valueType := value.(type) {
+		case eos.Symbol:
+			return f(bytes, valueType.Symbol)
+		case *eos.Symbol:
+			return f(bytes, valueType.Symbol)
+		case string:
+			return f(bytes, valueType)
+		case *string:
+			return f(bytes, valueType)
+
+		default:
+			return bytes, fmt.Errorf("unsupported symbol type: %T", value)
 		}
 	}
 }
@@ -370,6 +401,7 @@ var schemaTypeConverters = map[string]goavro.ConvertBuild{
 	"ecc.Signature": signatureConverter,
 	"eos.Int128":    int128Converter,
 	"eos.Uint128":   uint128Converter,
+	"eos.Symbol":    symbolConverter,
 }
 
 var avroPrimitiveTypeByBuiltInTypes map[string]interface{}
@@ -466,7 +498,7 @@ func initBuiltInTypesForTables() {
 		"checksum160":          "bytes",
 		"checksum256":          "bytes",
 		"checksum512":          "bytes",
-		"symbol":               "string", // FIXME check with blockchain team
+		"symbol":               NewSymbolType(),
 		"symbol_code":          "string", // FIXME check with blockchain team
 	}
 	avroRecordTypeByBuiltInTypes = map[string]RecordSchema{
@@ -488,6 +520,7 @@ func initBuiltInTypesForActions() {
 	avroPrimitiveTypeByBuiltInTypes["time_point"] = "string"
 	avroPrimitiveTypeByBuiltInTypes["time_point_sec"] = "string"
 	avroPrimitiveTypeByBuiltInTypes["block_timestamp_type"] = "string"
+	avroPrimitiveTypeByBuiltInTypes["symbol"] = "string"
 	avroRecordTypeByBuiltInTypes = map[string]RecordSchema{}
 }
 

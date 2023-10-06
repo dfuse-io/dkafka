@@ -9,7 +9,7 @@ ENV ?= prod-testnet
 KUBECONFIG ?= ~/.kube/dfuse.$(ENV).kube
 CODEC ?= "json"
 TOPIC ?= "io.dkafka.test"
-
+CAPTURE ?= false
 
 MESSAGE_TYPE ?= '{"create" : "EosioNftFtCreatedNotification","update" : "EosioNftFtUpdatedNotification","issue" : "EosioNftFtIssuedNotification"}[action]'
 KEY_EXPRESSION ?= '"action"=="create" ? [data.create.memo] : [transaction_id]'
@@ -31,8 +31,8 @@ STREAM_ACT_START_BLOCK ?= 49608000
 ## CDC TABLES
 # CDC_TABLES_ACCOUNT ?= 'eosio.token'
 # CDC_TABLES_TABLE_NAMES ?= 'accounts:s+k'
-CDC_START_BLOCK ?= 31
-CDC_ACCOUNT ?= eosio
+CDC_START_BLOCK ?= 43922490
+CDC_ACCOUNT ?= eosio.oracle
 
 CDC_TABLES_START_BLOCK ?= $(CDC_START_BLOCK)
 CDC_TABLES_ACCOUNT ?= $(CDC_ACCOUNT)
@@ -121,6 +121,7 @@ stream: ## stream expression based localy
 
 cdc-tables-mig: ## CDC stream on tables
 	$(BINARY_PATH) cdc tables \
+		--capture=$(CAPTURE) \
 		--dfuse-firehose-grpc-addr=localhost:9000 \
 		--abicodec-grpc-addr=localhost:9001 \
 		--kafka-cursor-topic="cursor" \
@@ -134,6 +135,7 @@ cdc-tables-mig: ## CDC stream on tables
 
 cdc-tables: ## CDC stream on tables
 	$(BINARY_PATH) cdc tables \
+		--capture=$(CAPTURE) \
 		--dfuse-firehose-grpc-addr=localhost:9000 \
 		--abicodec-grpc-addr=localhost:9001 \
 		--kafka-topic=$(TOPIC) \
@@ -146,6 +148,7 @@ cdc-tables: ## CDC stream on tables
 
 cdc-actions: build up ## CDC stream on tables
 	$(BINARY_PATH) cdc actions \
+		--capture=$(CAPTURE) \
 		--dfuse-firehose-grpc-addr=localhost:9000 \
 		--abicodec-grpc-addr=localhost:9001 \
 		--kafka-topic=$(TOPIC) \
@@ -158,11 +161,12 @@ cdc-actions: build up ## CDC stream on tables
 
 cdc-transactions: build up ## CDC stream on tables
 	$(BINARY_PATH) cdc transactions \
+		--capture=$(CAPTURE) \
 		--dfuse-firehose-grpc-addr=localhost:9000 \
 		--kafka-topic=$(TOPIC) \
 		--kafka-compression-type=$(COMPRESSION_TYPE) \
 		--kafka-compression-level=$(COMPRESSION_LEVEL) \
-		--start-block-num=$(CDC_ACTIONS_START_BLOCK) \
+		--start-block-num=$(CDC_START_BLOCK) \
 		--kafka-message-max-bytes=$(MESSAGE_MAX_SIZE) \
 		--codec=$(CODEC)
 
