@@ -155,6 +155,13 @@ func TestCdCAdapter_Adapt_pb(t *testing.T) {
 			"factory.a",
 			1,
 		},
+		{
+			"eosio.oracle",
+			"testdata/block-43922498.pb.json",
+			"testdata/eosio.oracle.abi",
+			"*",
+			4,
+		},
 	}
 
 	for _, tt := range tests {
@@ -215,7 +222,7 @@ func TestCdCAdapter_Adapt_pb(t *testing.T) {
 			for _, m := range messages {
 				assert.Equal(t, findHeader("content-type", m.Headers), "application/avro")
 				assert.Equal(t, findHeader("ce_datacontenttype", m.Headers), "application/avro")
-				assert.Equal(t, findHeader("ce_dataschema", m.Headers), "mock://bench-adapter/schemas/ids/3")
+				assert.Assert(t, findHeader("ce_dataschema", m.Headers) != "")
 			}
 		})
 	}

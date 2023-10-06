@@ -419,223 +419,77 @@ func BenchmarkCodecMarshal(b *testing.B) {
 	}
 }
 
-var AccountSchema = `
-{
-	"namespace": "dkafka.test",
-	"name": "Account",
-	"type": "record",
-	"fields": [
-		{
-			"name": "balance",
-			
-			"type": {
-				"namespace": "eosio",
-				"name": "Asset",
-				"type": "record",
-				"convert": "eosio.Asset",
-				"fields": [
-					{
-						"name": "amount",
-						"type": {
-							"type": "bytes",
-							"logicalType": "decimal",
-							"precision": 32,
-							"scale": 8
-						}
-					},
-					{
-						"name": "symbol",
-						"type": "string"
-					}
-				]
-			}
-		}
-	]
+func TestAvroCodecOptionalAsset(t *testing.T) {
+	checkCodec(t, NewOptional(assetSchema), eos.Asset{
+		Amount: eos.Int64(100_000_000),
+		Symbol: eos.Symbol{
+			Precision: uint8(8),
+			Symbol:    "UOS",
+		},
+	})
 }
-`
-
-var NullableAccountSchema = `
-{
-	"namespace": "dkafka.test",
-	"name": "Account",
-	"type": "record",
-	"fields": [
-		{
-			"name": "balance",
-			"type": ["null",{
-				"namespace": "eosio",
-				"name": "Asset",
-				"type": "record",
-				"convert": "eosio.Asset",
-				"fields": [
-					{
-						"name": "amount",
-						"type": {
-							"type": "bytes",
-							"logicalType": "decimal",
-							"precision": 32,
-							"scale": 8
-						}
-					},
-					{
-						"name": "symbol",
-						"type": "string"
-					}
-				]
-			}],
-			"default": null
-		}
-	]
-}
-`
 
 func TestAvroCodecAsset(t *testing.T) {
-
-	schema := newSchema(t, 42, AccountSchema, nil)
-
-	codec := KafkaAvroCodec{
-		"mock://test/schemas/ids/%d",
-		RegisteredSchema{
-			id:      uint32(schema.ID()),
-			schema:  schema.Schema(),
-			version: schema.Version(),
-			codec:   schema.Codec(),
-		},
-	}
-	asset := eos.Asset{
+	checkCodec(t, assetSchema, eos.Asset{
 		Amount: eos.Int64(100_000_000),
 		Symbol: eos.Symbol{
 			Precision: uint8(8),
 			Symbol:    "UOS",
 		},
-	}
-	bytes, err := codec.Marshal(nil, map[string]interface{}{
-		"balance": asset,
 	})
-	if err != nil {
-		t.Fatalf("codec.Marshal() error: %v", err)
-	}
-	value, err := codec.Unmarshal(bytes)
-	t.Logf("%v", value)
-	if err != nil {
-		t.Fatalf("codec.Unmarshal() error: %v", err)
-	}
 }
-
-var Uint128Record = newRecordFQN(
-	"dkafka.test",
-	"Uint128Record",
-	[]FieldSchema{
-		{
-			Name: "sender_id",
-			Type: NewUint128Type(),
-		},
-	})
 
 func TestAvroCodecUint128(t *testing.T) {
-	schema := newSchema(t, 42, marshalSchema(t, Uint128Record), nil)
-
-	codec := KafkaAvroCodec{
-		"mock://test/schemas/ids/%d",
-		RegisteredSchema{
-			id:      uint32(schema.ID()),
-			schema:  schema.Schema(),
-			version: schema.Version(),
-			codec:   schema.Codec(),
-		},
-	}
-	v := eos.Uint128{
+	checkCodec(t, NewUint128Type(), eos.Uint128{
 		Lo: 42,
 		Hi: 0,
-	}
-	bytes, err := codec.Marshal(nil, map[string]interface{}{
-		"sender_id": v,
 	})
-	if err != nil {
-		t.Fatalf("codec.Marshal() error: %v", err)
-	}
-	value, err := codec.Unmarshal(bytes)
-	t.Logf("%v", value)
-	if err != nil {
-		t.Fatalf("codec.Unmarshal() error: %v", err)
-	}
 }
-
-var Int128Record = newRecordFQN(
-	"dkafka.test",
-	"Int128Record",
-	[]FieldSchema{
-		{
-			Name: "sender_id",
-			Type: NewInt128Type(),
-		},
-	})
 
 func TestAvroCodecInt128(t *testing.T) {
-	schema := newSchema(t, 42, marshalSchema(t, Int128Record), nil)
-
-	codec := KafkaAvroCodec{
-		"mock://test/schemas/ids/%d",
-		RegisteredSchema{
-			id:      uint32(schema.ID()),
-			schema:  schema.Schema(),
-			version: schema.Version(),
-			codec:   schema.Codec(),
-		},
-	}
-	v := eos.Int128{
+	checkCodec(t, NewInt128Type(), eos.Int128{
 		Lo: 42,
 		Hi: 0,
-	}
-	bytes, err := codec.Marshal(nil, map[string]interface{}{
-		"sender_id": v,
 	})
-	if err != nil {
-		t.Fatalf("codec.Marshal() error: %v", err)
-	}
-	value, err := codec.Unmarshal(bytes)
-	t.Logf("%v", value)
-	if err != nil {
-		t.Fatalf("codec.Unmarshal() error: %v", err)
-	}
-}
-
-func TestAvroCodecNullableAsset(t *testing.T) {
-
-	schema := newSchema(t, 42, NullableAccountSchema, nil)
-
-	codec := KafkaAvroCodec{
-		"mock://test/schemas/ids/%d",
-		RegisteredSchema{
-			id:      uint32(schema.ID()),
-			schema:  schema.Schema(),
-			version: schema.Version(),
-			codec:   schema.Codec(),
-		},
-	}
-	asset := eos.Asset{
-		Amount: eos.Int64(100_000_000),
-		Symbol: eos.Symbol{
-			Precision: uint8(8),
-			Symbol:    "UOS",
-		},
-	}
-	bytes, err := codec.Marshal(nil, map[string]interface{}{
-		"balance": asset,
-	})
-	if err != nil {
-		t.Fatalf("codec.Marshal() error: %v", err)
-	}
-	value, err := codec.Unmarshal(bytes)
-	t.Logf("%v", value)
-	if err != nil {
-		t.Fatalf("codec.Unmarshal() error: %v", err)
-	}
 }
 
 func TestAvroCodecNullAsset(t *testing.T) {
+	var nullableAccountSchema = `
+	{
+		"namespace": "dkafka.test",
+		"name": "Account",
+		"type": "record",
+		"fields": [
+			{
+				"name": "balance",
+				"type": ["null",{
+					"namespace": "eosio",
+					"name": "Asset",
+					"type": "record",
+					"convert": "eosio.Asset",
+					"fields": [
+						{
+							"name": "amount",
+							"type": {
+								"type": "bytes",
+								"logicalType": "decimal",
+								"precision": 32,
+								"scale": 8
+							}
+						},
+						{
+							"name": "symbol",
+							"type": "string"
+						}
+					]
+				}],
+				"default": null
+			}
+		]
+	}
+	`
 
-	schema := newSchema(t, 42, NullableAccountSchema, nil)
+	schema := newSchema(t, 42, nullableAccountSchema, nil)
 
 	codec := KafkaAvroCodec{
 		"mock://test/schemas/ids/%d",
@@ -755,6 +609,52 @@ func TestAccountsTableNotification(t *testing.T) {
 	}
 	value, err := codec.Unmarshal(bytes)
 	t.Logf("%v", value)
+	if err != nil {
+		t.Fatalf("codec.Unmarshal() error: %v", err)
+	}
+}
+
+func TestAvroCodecSymbol(t *testing.T) {
+	checkCodec(t, NewSymbolType(), eos.Symbol{
+		Precision: uint8(8),
+		Symbol:    "UOS",
+	})
+}
+
+func checkCodec[T any](t *testing.T, fieldType interface{}, value T) {
+	schema := newRecordFQN(
+		"dkafka.test",
+		"TestCodec",
+		[]FieldSchema{
+			{
+				Name: "value",
+				Type: fieldType,
+			},
+		})
+	schemaV := newSchema(t, 42, marshalSchema(t, schema), nil)
+
+	codec := KafkaAvroCodec{
+		"mock://test/schemas/ids/%d",
+		RegisteredSchema{
+			id:      uint32(schemaV.ID()),
+			schema:  schemaV.Schema(),
+			version: schemaV.Version(),
+			codec:   schemaV.Codec(),
+		},
+	}
+	checkCodecInstance(t, codec, value)
+	checkCodecInstance(t, codec, &value)
+}
+
+func checkCodecInstance[T any](t *testing.T, codec KafkaAvroCodec, value T) {
+	bytes, err := codec.Marshal(nil, map[string]interface{}{
+		"value": value,
+	})
+	if err != nil {
+		t.Fatalf("codec.Marshal() error: %v", err)
+	}
+	v, err := codec.Unmarshal(bytes)
+	t.Logf("checkCodecInstance unmarshal value: %v", v)
 	if err != nil {
 		t.Fatalf("codec.Unmarshal() error: %v", err)
 	}
