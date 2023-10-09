@@ -256,12 +256,13 @@ func executeCdC(cmd *cobra.Command, args []string,
 		Irreversible: viper.GetBool("cdc-cmd-irreversible"),
 		Executed:     viper.GetBool("cdc-cmd-executed"),
 
-		Codec:             viper.GetString("cdc-cmd-codec"),
-		SchemaRegistryURL: viper.GetString("cdc-cmd-schema-registry-url"),
-		SchemaNamespace:   viper.GetString("cdc-cmd-namespace"),
-		SchemaVersion:     viper.GetString("cdc-cmd-version"),
-		LocalABIFiles:     localABIFiles,
-		ABICodecGRPCAddr:  viper.GetString("cdc-cmd-abicodec-grpc-addr"),
+		Codec:              viper.GetString("cdc-cmd-codec"),
+		SchemaRegistryURL:  viper.GetString("cdc-cmd-schema-registry-url"),
+		SchemaNamespace:    viper.GetString("cdc-cmd-namespace"),
+		SchemaMajorVersion: viper.GetUint("cdc-cmd-major-version"),
+		SchemaVersion:      viper.GetString("cdc-cmd-version"),
+		LocalABIFiles:      localABIFiles,
+		ABICodecGRPCAddr:   viper.GetString("cdc-cmd-abicodec-grpc-addr"),
 	}
 	conf = f(conf, args)
 	cmd.SilenceUsage = true
