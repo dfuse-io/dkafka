@@ -81,10 +81,11 @@ type Config struct {
 	Executed          bool
 	Irreversible      bool
 
-	Codec             string
-	SchemaRegistryURL string
-	SchemaNamespace   string
-	SchemaVersion     string
+	Codec              string
+	SchemaRegistryURL  string
+	SchemaNamespace    string
+	SchemaMajorVersion string
+	SchemaVersion      string
 }
 
 type App struct {
@@ -293,10 +294,11 @@ func (a *App) NewCDCCtx(ctx context.Context, producer *kafka.Producer, headers [
 	switch cdcType := a.config.CdCType; cdcType {
 	case TABLES_CDC_TYPE:
 		msg := MessageSchemaGenerator{
-			Namespace: a.config.SchemaNamespace,
-			Version:   a.config.SchemaVersion,
-			Account:   a.config.Account,
-			Source:    source,
+			Namespace:    a.config.SchemaNamespace,
+			MajorVersion: a.config.SchemaMajorVersion,
+			Version:      a.config.SchemaVersion,
+			Account:      a.config.Account,
+			Source:       source,
 		}
 		abiCodec, err = newABICodec(
 			a.config.Codec, a.config.Account, a.config.SchemaRegistryURL, abiDecoder,
@@ -327,10 +329,11 @@ func (a *App) NewCDCCtx(ctx context.Context, producer *kafka.Producer, headers [
 			return appCtx, err
 		}
 		msg := MessageSchemaGenerator{
-			Namespace: a.config.SchemaNamespace,
-			Version:   a.config.SchemaVersion,
-			Account:   a.config.Account,
-			Source:    source,
+			Namespace:    a.config.SchemaNamespace,
+			MajorVersion: a.config.SchemaMajorVersion,
+			Version:      a.config.SchemaVersion,
+			Account:      a.config.Account,
+			Source:       source,
 		}
 		abiCodec, err = newABICodec(
 			a.config.Codec, a.config.Account, a.config.SchemaRegistryURL, abiDecoder,
@@ -357,10 +360,11 @@ func (a *App) NewCDCCtx(ctx context.Context, producer *kafka.Producer, headers [
 			filter = ""
 		}
 		msg := MessageSchemaGenerator{
-			Namespace: a.config.SchemaNamespace,
-			Version:   a.config.SchemaVersion,
-			Account:   a.config.Account,
-			Source:    source,
+			Namespace:    a.config.SchemaNamespace,
+			MajorVersion: a.config.SchemaMajorVersion,
+			Version:      a.config.SchemaVersion,
+			Account:      a.config.Account,
+			Source:       source,
 		}
 		abiCodec, err = newABICodec(
 			a.config.Codec, a.config.Account, a.config.SchemaRegistryURL, abiDecoder,
@@ -792,10 +796,11 @@ func newABICodec(codec string, account string, schemaRegistryURL string, abiDeco
 }
 
 type MessageSchemaGenerator struct {
-	Namespace string
-	Version   string
-	Account   string
-	Source    string
+	Namespace    string
+	MajorVersion string
+	Version      string
+	Account      string
+	Source       string
 }
 
 func (msg MessageSchemaGenerator) getTableSchema(tableName string, abi *ABI) (MessageSchema, error) {
@@ -814,7 +819,7 @@ func (msg MessageSchemaGenerator) newNamedSchemaGenOptions(name string, abi *ABI
 	return NamedSchemaGenOptions{
 		Name:      name,
 		Namespace: msg.Namespace,
-		Version:   schemaVersion(msg.Version, abi.AbiBlockNum),
+		Version:   schemaVersion(msg.Version, msg.MajorVersion, abi.AbiBlockNum),
 		AbiSpec: AbiSpec{
 			Account: msg.Account,
 			Abi:     abi,
@@ -824,10 +829,16 @@ func (msg MessageSchemaGenerator) newNamedSchemaGenOptions(name string, abi *ABI
 	}
 }
 
-func schemaVersion(version string, abiBlockNumber uint32) string {
+func schemaVersion(version string, majorVersion string, abiBlockNumber uint32) string {
 	if version == "" {
-		return fmt.Sprintf("0.%d.0", abiBlockNumber)
+		if majorVersion == "" {
+			zlog.Warn("Using abiBlockNumber for minor version, but majorVersion wasn't specified.")
+		}
+		return fmt.Sprintf("%s.%d.0", majorVersion, abiBlockNumber)
 	} else {
+		if majorVersion != "" {
+			zlog.Warn("Major version is defined, but being ignored, since version is also defined and takes precedence.")
+		}
 		return version
 	}
 }
