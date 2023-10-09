@@ -84,7 +84,7 @@ type Config struct {
 	Codec              string
 	SchemaRegistryURL  string
 	SchemaNamespace    string
-	SchemaMajorVersion string
+	SchemaMajorVersion uint
 	SchemaVersion      string
 }
 
@@ -797,7 +797,7 @@ func newABICodec(codec string, account string, schemaRegistryURL string, abiDeco
 
 type MessageSchemaGenerator struct {
 	Namespace    string
-	MajorVersion string
+	MajorVersion uint
 	Version      string
 	Account      string
 	Source       string
@@ -829,14 +829,14 @@ func (msg MessageSchemaGenerator) newNamedSchemaGenOptions(name string, abi *ABI
 	}
 }
 
-func schemaVersion(version string, majorVersion string, abiBlockNumber uint32) string {
+func schemaVersion(version string, majorVersion uint, abiBlockNumber uint32) string {
 	if version == "" {
-		if majorVersion == "" {
+		if majorVersion == 0 {
 			zlog.Warn("Using abiBlockNumber for minor version, but majorVersion wasn't specified.")
 		}
-		return fmt.Sprintf("%s.%d.0", majorVersion, abiBlockNumber)
+		return fmt.Sprintf("%d.%d.0", majorVersion, abiBlockNumber)
 	} else {
-		if majorVersion != "" {
+		if majorVersion != 0 {
 			zlog.Warn("Major version is defined, but being ignored, since version is also defined and takes precedence.")
 		}
 		return version
